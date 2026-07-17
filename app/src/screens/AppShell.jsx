@@ -2,7 +2,7 @@
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
 import { HRBP_I18N, HRBP_CHANGES, HRBP_KB, HRBP_SOURCES, HRBP_SOURCE_HISTORY } from "../data.js";
-import { latestIsapCheck, forceScan } from "../isapIntegration.js";
+import { latestIsapCheck, forceScan, fetchPersistedState } from "../isapIntegration.js";
 
 function useSources() {
   return React.useState(HRBP_SOURCES);
@@ -98,6 +98,22 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   const [sources, setSources] = useSources();
   const [sourceHistory, setSourceHistory] = React.useState(HRBP_SOURCE_HISTORY);
   const [scanning, setScanning] = React.useState(false);
+  React.useEffect(() => {
+    fetchPersistedState().then((state) => {
+      if (!state.sources.length) return; // no run yet (or no Blob store attached) — keep seed data
+      setSources((prev) => prev.map((s) => {
+        const p = state.sources.find((x) => x.id === s.id);
+        return p ? { ...s, lastChecked: p.lastChecked, found: p.found } : s;
+      }));
+      if (Object.keys(state.history).length) {
+        setSourceHistory((prev) => {
+          const next = { ...prev };
+          Object.entries(state.history).forEach(([id, events]) => { next[id] = events; });
+          return next;
+        });
+      }
+    }).catch((e) => console.error("Persisted state fetch failed:", e)); // under plain vite dev/preview /api doesn't exist — falls back to seed data
+  }, []);
   const runScan = React.useCallback(() => {
     if (scanning) return;
     setScanning(true);

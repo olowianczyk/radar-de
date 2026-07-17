@@ -50,6 +50,15 @@ export function latestIsapCheck(sources) {
 // the Vercel Cron hitting this same backend endpoint — see vercel.json). Calls
 // our own /api/scan-all with each active source's real keyword + lastChecked, so
 // the check is scoped to "what's new since we last looked", not a fixed window.
+// Reads back whatever /api/scan-all last persisted (manual run or the daily
+// cron) so a page load after an overnight cron run shows real, current state
+// instead of the seed data — see /api/state.js and _lib.js's loadState/saveState.
+export async function fetchPersistedState() {
+  const res = await fetch("/api/state");
+  if (!res.ok) throw new Error(`state fetch failed: ${res.status}`);
+  return res.json();
+}
+
 export async function forceScan(activeSources) {
   const res = await fetch("/api/scan-all", {
     method: "POST",

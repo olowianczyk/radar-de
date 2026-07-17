@@ -4,7 +4,35 @@
 // reliable than fighting Vercel's per-function bundling across directories.
 // ponytail: this exists; keep both copies in sync if the keyword mappings change.
 
+const { put, list } = require("@vercel/blob");
+
 const SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
+// Single JSON blob as the persistence layer — the whole state is one small
+// object (per-source lastChecked/found + detected-act history), not
+// relational data, so a key-value blob is simpler than provisioning Postgres.
+// ponytail: this exists; move to Postgres if the state shape grows relational needs.
+const STATE_PATH = "hrbp-state.json";
+
+async function loadState() {
+  try {
+    const { blobs } = await list({ prefix: STATE_PATH, limit: 1 });
+    if (!blobs.length) return null;
+    const res = await fetch(blobs[0].url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    return null; // no Blob store attached yet, or first run — caller falls back to defaults
+  }
+}
+
+async function saveState(state) {
+  await put(STATE_PATH, JSON.stringify(state), {
+    access: "public",
+    contentType: "application/json",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+  });
+}
 
 async function searchActs({ keyword, dateFrom, dateTo, publisher = "DU", limit = 10 }) {
   const params = new URLSearchParams({ publisher, limit: String(limit) });
@@ -88,4 +116,4 @@ async function scanSources(sources, fallbackLookbackDays = 1) {
   }));
 }
 
-module.exports = { searchActs, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, isoDaysAgo };
+module.exports = { searchActs, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, isoDaysAgo, loadState, saveState };
