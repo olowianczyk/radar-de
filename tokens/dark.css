@@ -1,0 +1,29 @@
+/* BSH HR BP — Dark theme override, toggled via [data-theme="dark"] on <html>.
+   Same brand hues (petrol/coral); neutrals and shadows invert for a dark surface. */
+:root[data-theme="dark"]{
+  --canvas:#12181a;
+  --surface:#1b2224;
+  --surface-card:#1b2224;
+  --surface-sunken:#222b2e;
+  --border:#2b3538;
+  --border-subtle:#2b3538;
+  --border-default:#374245;
+  --border-strong:#374245;
+  --text-strong:#f3f6f6;
+  --text-heading:#f3f6f6;
+  --text-body:#cfd8da;
+  --text-muted:#93a3a6;
+  --ink-300:#5b6a6d;
+  --brand-soft:#1d3a3d;
+  --teal-100:#1d3a3d;
+  --amber-100:#3a2f14;
+  --green-100:#173328;
+  --red-100:#3a1f1c;
+  --blue-100:#152a3a;
+  --coral-100:#3a1f1c;
+  --on-brand-soft:#8fd0d2;
+  --shadow-xs:0 1px 2px rgba(0,0,0,.4);
+  --shadow-sm:0 2px 10px rgba(0,0,0,.35);
+  --shadow-md:0 6px 18px rgba(0,0,0,.4);
+  --shadow-lg:0 20px 44px rgba(0,0,0,.5);
+}

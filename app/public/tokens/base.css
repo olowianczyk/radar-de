@@ -1,0 +1,17 @@
+/* BSH HR BP — base element defaults (keep minimal; tokens do the work) */
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--canvas);
+  color:var(--text-body);
+  font-family:var(--font-sans);
+  font-size:var(--fs-body);
+  line-height:var(--lh-body);
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{color:var(--text-strong);line-height:var(--lh-tight);margin:0}
+h1{font-family:var(--font-display);font-size:var(--fs-h1);font-weight:var(--fw-semibold)}
+h2{font-family:var(--font-display);font-size:var(--fs-h2);font-weight:var(--fw-semibold)}
+a{color:var(--brand);text-decoration:none}
+a:hover{color:var(--brand-hover)}
+::selection{background:var(--teal-100)}

@@ -1,0 +1,45 @@
+/* BSH HR BP — Typography
+   Figtree (UI/body), Fraunces (editorial display), IBM Plex Mono (IDs/numeric).
+   Google Fonts substitution — flagged in readme.md; swap for BSH's licensed
+   corporate face when supplied. Two scale namings kept in sync: --fs-* / --text-*. */
+:root{
+  --font-display:"Fraunces","Newsreader",Georgia,serif;
+  --font-sans:"Figtree","Segoe UI",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono","SF Mono",ui-monospace,monospace;
+
+  /* Type scale (--text-* system) */
+  --text-2xs:10px;
+  --text-xs:11px;
+  --text-sm:12.5px;
+  --text-base:14px;
+  --text-lg:16px;
+  --text-xl:20px;
+  --text-2xl:26px;
+  --text-3xl:30px;
+  --text-4xl:34px;
+
+  /* Aliased scale (--fs-* system) */
+  --fs-display:34px;
+  --fs-h1:26px;
+  --fs-h2:20px;
+  --fs-h3:16px;
+  --fs-body:14px;
+  --fs-sm:12.5px;
+  --fs-xs:11px;
+
+  --lh-tight:1.15;
+  --lh-snug:1.35;
+  --lh-body:1.55;
+
+  --fw-regular:400;
+  --fw-medium:500;
+  --fw-semibold:600;
+  --fw-bold:700;
+
+  --tracking-caps:.06em;
+  --tracking-tight:-.01em;
+
+  /* Legacy aliases */
+  --text-md:15px;
+  --leading-normal:1.55;
+}

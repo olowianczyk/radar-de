@@ -1,0 +1,104 @@
+/* BSH HR BP — Colors
+   Petrol teal brand anchor (BSH corporate) + warm coral accent + cream neutrals.
+   Base ramps first, then semantic aliases (two naming systems kept in sync:
+   short `--brand/--surface/--red-*` and scale `--danger-500/--surface-card`). */
+:root{
+  /* Brand — petrol teal */
+  --teal-900:#04302a;
+  --teal-800:#0a4a4f;
+  --teal-700:#00727e;   /* primary brand */
+  --teal-600:#118a94;
+  --teal-500:#2aa6ae;
+  --teal-300:#8fd0d2;
+  --teal-100:#dff0f0;
+  --teal-50:#eef8f8;
+
+  /* Accent — coral */
+  --coral-700:#c23a2b;
+  --coral-600:#d84a38;
+  --coral-500:#ff6f5b;  /* accent */
+  --coral-200:#ffd9d2;
+  --coral-100:#ffe6e1;
+
+  /* Warm neutrals (cream) */
+  --sand-0:#ffffff;
+  --sand-50:#fbf8f5;    /* app canvas */
+  --sand-100:#f6f1ec;
+  --sand-200:#efe8e0;
+  --sand-300:#e3d9cf;
+  --ink-900:#2c2621;    /* headings */
+  --ink-700:#4a4139;
+  --ink-500:#7a6f66;    /* muted text */
+  --ink-300:#a99e93;
+
+  /* Status ramps */
+  --amber-600:#9a6600;
+  --amber-100:#fff2d6;
+  --green-700:#137a52;
+  --green-100:#e2f3ea;
+  --red-700:#c23a2b;
+  --red-100:#ffe1dc;
+  --blue-700:#1f6fb0;
+  --blue-100:#e2eefa;
+
+  /* ---- Semantic aliases (short system) ---- */
+  --brand:var(--teal-700);
+  --brand-hover:var(--teal-800);
+  --brand-soft:var(--teal-100);
+  --accent:var(--coral-500);
+  --accent-hover:var(--coral-600);
+  --accent-soft:var(--coral-100);
+  --on-brand:#ffffff;
+
+  --canvas:var(--sand-50);
+  --surface:var(--sand-0);
+  --surface-card:var(--sand-0);
+  --surface-sunken:var(--sand-100);
+  --border:var(--sand-200);
+  --border-subtle:var(--sand-200);
+  --border-default:var(--sand-300);
+  --border-strong:var(--sand-300);
+
+  --text-strong:var(--ink-900);
+  --text-heading:var(--ink-900);
+  --text-body:var(--ink-700);
+  --text-muted:var(--ink-500);
+  --text-on-brand:#ffffff;
+
+  /* ---- Semantic aliases (scale system, used by forms/stat components) ---- */
+  --success-500:#1aa06b;
+  --success-600:var(--green-700);
+  --warning-500:#e2a400;
+  --warning-600:var(--amber-600);
+  --danger-500:#e05a48;
+  --danger-600:var(--red-700);
+
+  /* Soft status backgrounds + brand tint (aliases used by components) */
+  --brand-tint:var(--teal-100);
+  --info-100:var(--blue-100);
+  --info-600:var(--blue-700);
+  --success-100:var(--green-100);
+  --warning-100:var(--amber-100);
+  --warning-700:var(--amber-600);
+  --danger-100:var(--red-100);
+
+  --focus-ring:color-mix(in srgb,var(--teal-700) 45%,transparent);
+  --ring-color:color-mix(in srgb,var(--teal-700) 22%,transparent);
+  --on-brand-soft:var(--teal-800);
+
+  /* ---- Legacy aliases (kept so all specimen cards resolve) ---- */
+  --bsh-petrol-900:#04302a;
+  --bsh-petrol-800:#0a4a4f;
+  --bsh-petrol-700:#00727e;
+  --bsh-petrol-600:#0a8390;
+  --bsh-petrol-500:#1c9aa6;
+  --bsh-petrol-100:#dff0f0;
+  --bsh-petrol-050:#eef7f7;
+  --coral-050:#fff4f1;
+  --cream-canvas:#fbf8f5;
+  --cream-surface:#ffffff;
+  --cream-sunken:#f4efe9;
+  --bg-canvas:#fbf8f5;
+  --line-200:#e6ded6;
+  --line-300:#e3d9cf;
+}

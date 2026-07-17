@@ -1,0 +1,7 @@
+node_modules
+dist
+
+# raw design-handoff source dumps (reference material, not implementation)
+*.zip
+BSH HR BP Design System (1)/
+hr-business-partner-login-page/

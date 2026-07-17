@@ -1,0 +1,33 @@
+import React from "react";
+import { Login } from "./screens/Login.jsx";
+import { AppShell } from "./screens/AppShell.jsx";
+import { LegalChanges } from "./screens/LegalChanges.jsx";
+import { KnowledgeBase } from "./screens/KnowledgeBase.jsx";
+import { Sources } from "./screens/Sources.jsx";
+import { Alerts } from "./screens/Alerts.jsx";
+import { Reports } from "./screens/Reports.jsx";
+import { Settings } from "./screens/Settings.jsx";
+
+export default function App() {
+  const [lang, setLang] = React.useState("pl");
+  const [authed, setAuthed] = React.useState(true);
+  const [active, setActive] = React.useState("feed");
+  const [changeId, setChangeId] = React.useState(1);
+  const [kbId, setKbId] = React.useState(1);
+
+  if (!authed) return <Login lang={lang} setLang={setLang} onLogin={() => setAuthed(true)} />;
+
+  let screen;
+  if (active === "feed") screen = <LegalChanges lang={lang} selectedId={changeId} setSelectedId={setChangeId} />;
+  else if (active === "kb") screen = <KnowledgeBase lang={lang} selectedId={kbId} setSelectedId={setKbId} />;
+  else if (active === "sources") screen = <Sources lang={lang} />;
+  else if (active === "alerts") screen = <Alerts lang={lang} />;
+  else if (active === "reports") screen = <Reports lang={lang} />;
+  else screen = <Settings lang={lang} setLang={setLang} setActive={setActive} onSignOut={() => setAuthed(false)} />;
+
+  return (
+    <AppShell lang={lang} setLang={setLang} active={active} setActive={setActive} onSelectChange={(id) => { setChangeId(id); setActive("feed"); }} onSelectKb={(id) => { setKbId(id); setActive("kb"); }}>
+      {screen}
+    </AppShell>
+  );
+}
