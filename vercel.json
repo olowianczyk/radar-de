@@ -1,4 +1,7 @@
 {
   "buildCommand": "npm --prefix app ci && npm --prefix app run build && mkdir -p dist/app && cp index.html styles.css dist/ && cp -r tokens assets dist/ && cp -r app/dist/* dist/app/",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "crons": [
+    { "path": "/api/scan-all", "schedule": "0 4 * * *" }
+  ]
 }

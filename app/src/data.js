@@ -146,7 +146,7 @@ export const HRBP_CHANGES = [
   { id: 6, act: "Ustawa o związkach zawodowych", title: { pl: "Nowe progi reprezentatywności organizacji związkowej", de: "Neue Repräsentativitätsschwellen für Gewerkschaften", en: "New representativeness thresholds for trade unions" }, area: "other", status: "done", date: "15.06.2026", effective: "15.06.2026", source: "ISAP — Dz.U. 2026, poz. 1071 (tekst ujednolicony)", summary: { pl: "Zmieniono próg liczby członków wymaganych do uzyskania statusu reprezentatywnej organizacji zakładowej.", de: "Die erforderliche Mitgliederzahl für den Status einer repräsentativen Betriebsgewerkschaft wurde geändert.", en: "The member-count threshold for representative workplace union status was changed." }, affected: [] },
 ];
 
-// `keyword` maps a source to the real Sejm/ELI API taxonomy term (see sejmApi.js) —
+// `keyword` maps a source to the real Sejm/ELI API taxonomy term (see /api/_lib.js) —
 // verified live against api.sejm.gov.pl before wiring in. PIP has no ELI equivalent
 // (it's guidance, not a Dziennik Ustaw act), so it has no keyword and stays manual.
 export const HRBP_SOURCES = [

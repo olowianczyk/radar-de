@@ -114,6 +114,12 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
         return next;
       });
       setScanning(false);
+    }).catch((e) => {
+      // /api/scan-all only exists once deployed to Vercel (or under `vercel dev`) —
+      // plain `vite dev`/`vite preview` has no backend routes, so this is expected
+      // to fail locally with a 404. Don't leave the button stuck spinning either way.
+      console.error("Scan failed:", e);
+      setScanning(false);
     });
   }, [scanning, sources]);
   const t = HRBP_I18N[lang];
