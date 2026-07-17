@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="utf-8">
-<title>Karta zmiany w przepisach — BSH HR BP</title>
+<title>Karta zmiany w przepisach — HR Business Partner Platform</title>
 <link rel="stylesheet" href="./styles.css">
 <style>
 @page{size:A4;margin:20mm 18mm}
@@ -10,7 +10,7 @@
 body{margin:0;font-family:var(--font-sans);color:var(--text-body);background:#fff}
 .sheet{max-width:720px;margin:0 auto;padding:32px 8px}
 .top{display:flex;align-items:center;justify-content:space-between;padding-bottom:18px;border-bottom:2px solid var(--brand)}
-.top img{height:22px;width:auto}
+.top .brand{font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--text-heading)}
 .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);font-weight:700}
 h1{font-family:var(--font-display);font-size:26px;color:var(--text-heading);margin:18px 0 4px;line-height:1.2}
 .act{font-size:13px;color:var(--text-muted);margin-bottom:20px}
@@ -52,7 +52,7 @@ document.getElementById("sheets").innerHTML = list.map((c) => {
   return `
   <div class="sheet">
   <div class="top">
-    <img src="./assets/logo-bsh.webp" alt="BSH">
+    <span class="brand">HR Business Partner Platform</span>
     <span class="eyebrow">${t.app}</span>
   </div>
   <h1>${c.title[lang] || c.title.pl}</h1>
@@ -68,7 +68,7 @@ document.getElementById("sheets").innerHTML = list.map((c) => {
   </div>
   <p class="summary">${(c.summary[lang] || c.summary.pl)}</p>
   ${affected.length ? `<div class="affected"><h3>${t.affected}</h3>${affected.map((d) => `<div class="doc">• ${d.title[lang] || d.title.pl}</div>`).join("")}</div>` : ""}
-  <div class="footer"><span>${now}</span><span>BSH HR BP — Monitoring zmian w prawie pracy</span></div>
+  <div class="footer"><span>${now}</span><span>HR Business Partner Platform — Monitoring zmian w prawie pracy</span></div>
   </div>`;
 }).join("");
 </script>

@@ -34,10 +34,8 @@ function LangSwitch({ lang, setLang }) {
 
 function Wordmark() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <img src="/assets/logo-bsh.webp" alt="BSH" className="bsh-logo" style={{ height: 20, width: "auto" }} />
-      <div style={{ width: 1, height: 20, background: "var(--border-default)" }} />
-      <div style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--text-heading)", fontWeight: 500 }}>HR</div>
+    <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700, letterSpacing: ".03em", textTransform: "uppercase", color: "var(--text-heading)", lineHeight: 1.25 }}>
+      HR Business Partner Platform
     </div>
   );
 }
@@ -154,7 +152,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
           height: "var(--topbar-h)", flex: "0 0 var(--topbar-h)", display: "flex", alignItems: "center",
           gap: isMobile ? 10 : 16, padding: isMobile ? "0 14px" : "0 24px", background: "var(--surface)", borderBottom: "1px solid var(--border-subtle)",
         }}>
-          {isMobile && <img src="/assets/logo-bsh.webp" alt="BSH" className="bsh-logo" style={{ height: 16, width: "auto" }} />}
+          {isMobile && <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, letterSpacing: ".03em", textTransform: "uppercase", color: "var(--text-heading)", whiteSpace: "nowrap" }}>HR BP Platform</span>}
           <div style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: isMobile ? 13.5 : 15, color: "var(--text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {t.nav[active] || t.app}
           </div>

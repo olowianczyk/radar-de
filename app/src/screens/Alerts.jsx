@@ -55,9 +55,7 @@ export function Alerts({ lang, role }) {
           </div>
           <div style={{ padding: "22px 24px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-              <img src="/assets/logo-bsh.webp" alt="BSH" style={{ height: 18, width: "auto" }} />
-              <div style={{ width: 1, height: 16, background: "var(--border-default)" }} />
-              <span style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "var(--text-heading)" }}>HR</span>
+              <span style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 700, letterSpacing: ".03em", textTransform: "uppercase", color: "var(--text-heading)" }}>HR Business Partner Platform</span>
             </div>
             <div style={{ fontWeight: 700, color: "var(--text-heading)", fontSize: 15, marginBottom: 10 }}>{t.subjectPreview}</div>
             <p style={{ margin: "0 0 16px", fontSize: 13.5, color: "var(--text-body)", lineHeight: 1.6 }}>{t.emailIntro}</p>
