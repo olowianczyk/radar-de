@@ -14,9 +14,6 @@
   #intro a { color: var(--brand); }
   #intro a:hover { color: var(--brand-hover); }
 
-  @keyframes bshPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
-  @keyframes bshDot { 0%, 80%, 100% { opacity: .35; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-4px); } }
-
   .header {
     position: absolute; top: 24px; left: 28px; right: 28px; z-index: 10;
     display: flex; align-items: center; gap: 16px;
@@ -87,52 +84,6 @@
   #scene-quote .quote-rule { opacity: 0; width: 56px; height: 3px; background: var(--brand); margin-top: 30px; transition: opacity .5s ease; }
   #scene-quote.active .quote-rule { opacity: 1; }
 
-  #scene-greeting .heading { font-family: 'Fraunces', serif; font-size: 56px; font-weight: 600; color: var(--text-strong); margin-bottom: 6px; opacity: 0; transform: translateY(16px); transition: opacity .6s ease, transform .6s ease; }
-  #scene-greeting.active .heading { opacity: 1; transform: translateY(0); }
-  #scene-greeting .subtext { font-family: 'Figtree', sans-serif; font-size: 20px; color: var(--text-muted); margin-bottom: 40px; opacity: 0; transform: translateY(16px); transition: opacity .55s ease .15s, transform .55s ease .15s; }
-  #scene-greeting.active .subtext { opacity: 1; transform: translateY(0); }
-  #scene-greeting .cta {
-    opacity: 0; transform: translateY(16px);
-    transition: opacity .55s ease .3s, transform .55s ease .3s, background .16s ease;
-    background: var(--accent); color: #fff; font-family: 'Figtree', sans-serif; font-weight: 700;
-    font-size: 18px; padding: 16px 34px; border-radius: 999px; display: inline-flex; align-items: center;
-    gap: 10px; box-shadow: 0 12px 28px rgba(255,111,91,.35); cursor: pointer; border: none;
-  }
-  #scene-greeting.active .cta { opacity: 1; transform: translateY(0); animation: bshPulse 2.6s ease-in-out infinite; }
-  #scene-greeting .cta:hover { background: var(--accent-hover); }
-  .dots { display: flex; gap: 8px; margin-top: 44px; opacity: 0; transition: opacity .5s ease; }
-  #scene-greeting.active .dots { opacity: 1; }
-  .dots span { width: 7px; height: 7px; border-radius: 999px; background: var(--brand); animation: bshDot 1.3s ease-in-out infinite; }
-  .dots span:nth-child(2) { animation-delay: .15s; }
-  .dots span:nth-child(3) { animation-delay: .3s; }
-
-  #scene-login .login-card {
-    width: 420px; max-width: 90vw; background: var(--surface); border: 1px solid var(--border);
-    border-radius: 16px; box-shadow: 0 20px 50px rgba(120,90,60,.14); padding: 40px;
-  }
-  #scene-login .login-card img { width: 100px; height: auto; display: block; margin-bottom: 22px; }
-  #scene-login .login-title { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 600; color: var(--text-strong); margin-bottom: 6px; }
-  #scene-login .login-sub { font-family: 'Figtree', sans-serif; font-size: 14px; color: var(--text-muted); margin-bottom: 26px; }
-  #scene-login form { display: flex; flex-direction: column; gap: 16px; }
-  .field label { display: block; font-family: 'Figtree', sans-serif; font-size: 13px; font-weight: 600; color: var(--text-strong); margin-bottom: 6px; }
-  .field input {
-    width: 100%; height: 44px; box-sizing: border-box; border-radius: 10px;
-    border: 1px solid var(--border-default); padding: 0 14px; font-family: 'Figtree', sans-serif;
-    font-size: 14px; color: var(--text-strong); background: var(--surface);
-  }
-  .field input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--ring-color); }
-  .row-between { display: flex; align-items: center; justify-content: space-between; }
-  .remember { display: flex; align-items: center; gap: 8px; font-family: 'Figtree', sans-serif; font-size: 13px; color: var(--text-body); }
-  .forgot { font-family: 'Figtree', sans-serif; font-size: 13px; font-weight: 600; }
-  .login-submit {
-    height: 44px; border: none; border-radius: 999px; background: var(--brand); color: #fff;
-    font-family: 'Figtree', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer;
-  }
-  .login-submit:hover { background: var(--brand-hover); }
-  .login-msg { font-family: 'Figtree', sans-serif; font-size: 13px; text-align: center; min-height: 18px; opacity: 0; }
-  .login-msg.show { opacity: 1; }
-  .login-msg.ok { color: var(--success-600); }
-  .login-msg.err { color: var(--danger-600); }
 </style>
 </head>
 <body>
@@ -177,42 +128,12 @@
     <div class="quote-rule"></div>
   </div>
 
-  <div class="scene" id="scene-greeting">
-    <div class="heading">Dzień dobry, Marto 👋</div>
-    <div class="subtext">Twoja baza wiedzy o zmianach w prawie pracy już czeka.</div>
-    <button class="cta" id="cta-btn">Wejdź do aplikacji <span style="font-size:20px">→</span></button>
-    <div class="dots"><span></span><span></span><span></span></div>
-  </div>
-
-  <div class="scene" id="scene-login">
-    <div class="login-card">
-      <img src="assets/logo-bsh.webp" alt="BSH" />
-      <div class="login-title">Zaloguj się</div>
-      <div class="login-sub">Wpisz dane, aby przejść do aplikacji.</div>
-      <form id="login-form">
-        <div class="field">
-          <label for="login-email">Adres e-mail</label>
-          <input id="login-email" type="email" placeholder="imie.nazwisko@bsh.com" autocomplete="email" required />
-        </div>
-        <div class="field">
-          <label for="login-password">Hasło</label>
-          <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" required />
-        </div>
-        <div class="row-between">
-          <label class="remember"><input type="checkbox" id="login-remember" /> Zapamiętaj mnie</label>
-          <a href="#">Zapomniałeś hasła?</a>
-        </div>
-        <button type="submit" class="login-submit">Zaloguj się</button>
-        <div class="login-msg" id="login-msg"></div>
-      </form>
-    </div>
-  </div>
 </div>
 
 <script>
 // ponytail: direct port of the Design Compiler phase state machine (mark → tagline →
-// feed → quote → greeting → login) to plain DOM/CSS class toggles — no framework needed
-// for a linear timed sequence.
+// feed → quote) to plain DOM/CSS class toggles — no framework needed for a linear timed
+// sequence. After the quote, hands off straight into the app (no gate screen).
 const BSH_QUOTES = [
   'Spokój HR-owca zaczyna się od tego, że nic go nie zaskoczy.',
   'Dobry HR Business Partner nie czeka na zmianę — jest na nią gotowy.',
@@ -235,11 +156,8 @@ const FEED = [
   { tag: 'PIP', title: 'Zaktualizowane wytyczne kontroli', status: 'W przeglądzie' },
 ];
 
-const SCENES = ['scene-mark', 'scene-tagline', 'scene-feed', 'scene-quote', 'scene-greeting', 'scene-login'];
-const DURATIONS = [3200, 4400, 5200, 4000, 5400]; // mark, tagline, feed, quote, greeting
-const LOGIN_ENABLED = false;
-const AUTO_CONTINUE = true;
-const CTA_LABEL = 'Wejdź do aplikacji';
+const SCENES = ['scene-mark', 'scene-tagline', 'scene-feed', 'scene-quote'];
+const DURATIONS = [3200, 4400, 5200, 4000]; // mark, tagline, feed, quote
 const APP_URL = 'app/dist/index.html';
 
 let phase = 0;
@@ -303,12 +221,12 @@ function setPhase(next) {
   phase = next;
   phaseStartAt = Date.now();
   SCENES.forEach((id, i) => q('#' + id).classList.toggle('active', i === phase));
-  q('#header').style.opacity = phase < 5 ? '1' : '0';
-  q('#header').style.pointerEvents = phase < 5 ? 'auto' : 'none';
   updateProgress();
 }
 
 function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+function enterApp() { window.location.href = APP_URL; }
 
 function schedule() {
   clearTimers();
@@ -316,63 +234,30 @@ function schedule() {
   let acc = 0;
   DURATIONS.forEach((d, i) => {
     acc += d;
-    timers.push(setTimeout(() => setPhase(i + 1), acc));
+    const isLast = i === DURATIONS.length - 1;
+    timers.push(setTimeout(isLast ? enterApp : () => setPhase(i + 1), acc));
   });
-  if (AUTO_CONTINUE) {
-    acc += 5400; // greeting hold before auto-advance
-    timers.push(setTimeout(goToLogin, acc));
-  }
 }
 
-function goToLogin() {
-  clearTimers();
-  setPhase(LOGIN_ENABLED ? 5 : 4);
-}
-
-function skip() { goToLogin(); }
-
-function enterApp() { window.location.href = APP_URL; }
+function skip() { clearTimers(); enterApp(); }
 
 function onKeyDown(e) {
-  if (phase >= 5) return;
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space') {
     e.preventDefault();
-    goToLogin();
+    skip();
   }
-}
-
-function initLoginForm() {
-  const form = q('#login-form');
-  const msg = q('#login-msg');
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const email = q('#login-email').value;
-    const password = q('#login-password').value;
-    msg.classList.remove('ok', 'err');
-    if (!email || !password) {
-      msg.textContent = 'Podaj adres e-mail i hasło.';
-      msg.classList.add('show', 'err');
-      return;
-    }
-    msg.textContent = 'Witaj ponownie — przenosimy Cię do aplikacji…';
-    msg.classList.add('show', 'ok');
-  });
 }
 
 function init() {
   q('#quote-text').textContent = nextBshQuote();
-  q('#cta-btn').textContent = ''; // rebuild below to keep the arrow span
-  q('#cta-btn').innerHTML = `${CTA_LABEL} <span style="font-size:20px">→</span>`;
   buildTaglineWords();
   buildFeedCards();
   buildProgressSegments();
-  initLoginForm();
   setPhase(0);
   schedule();
   progressTick = setInterval(updateProgress, 80);
   q('#skip-btn').addEventListener('click', skip);
-  q('#cta-btn').addEventListener('click', enterApp);
   window.addEventListener('keydown', onKeyDown);
 }
 
