@@ -37,3 +37,29 @@ export async function fetchIsapSources() {
 export async function setSourceMonitoring(sourceId, active) {
   return simulateNetwork({ id: sourceId, active }, 200);
 }
+
+function formatNow() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+function parseDMYHM(s) {
+  const [datePart, timePart] = (s || "").split(" ");
+  const [d, m, y] = (datePart || "").split(".").map(Number);
+  const [h, min] = (timePart || "").split(":").map(Number);
+  return new Date(y || 0, (m || 1) - 1, d || 1, h || 0, min || 0).getTime();
+}
+
+export function latestIsapCheck(sources) {
+  return sources.reduce((latest, s) => (parseDMYHM(s.lastChecked) > parseDMYHM(latest) ? s.lastChecked : latest), sources[0]?.lastChecked || "");
+}
+
+// Manually forces the scan that otherwise only runs automatically at 06:00. Real
+// version: `await fetch('/api/isap/scan', { method: 'POST' })` — triggers the
+// server-side scrape/diff job immediately instead of waiting for the schedule.
+export async function forceScan(activeSources) {
+  await simulateNetwork(null, 1200);
+  const nowStr = formatNow();
+  return activeSources.map((s) => ({ ...s, lastChecked: nowStr }));
+}

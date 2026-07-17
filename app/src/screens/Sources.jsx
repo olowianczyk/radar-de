@@ -1,11 +1,10 @@
 // Monitored sources — legal acts/gazettes scanned automatically; toggle monitoring per source.
 import React from "react";
 import { Card, Badge, Switch, Icon, Button, IconButton } from "../components/index.js";
-import { HRBP_I18N, HRBP_SOURCES, HRBP_SOURCE_HISTORY } from "../data.js";
+import { HRBP_I18N, HRBP_SOURCE_HISTORY } from "../data.js";
 import { setSourceMonitoring } from "../isapIntegration.js";
 
-export function Sources({ lang, role }) {
-  const [sources, setSources] = React.useState(HRBP_SOURCES);
+export function Sources({ lang, role, sources, setSources, scanning, runScan }) {
   const [expanded, setExpanded] = React.useState(null);
   const eventMeta = {
     scan: { icon: "check", color: "var(--text-muted)", label: (t) => t.evScan },
@@ -32,9 +31,12 @@ export function Sources({ lang, role }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 14 }}>{t.sourcesSub}</p>
-        <Button variant="secondary" iconLeft={<Icon name="plus" size={16} />} disabled={role === "viewer"} onClick={addSource}>+ {t.sourcesTitle}</Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button variant="secondary" iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={16} className={scanning ? "hrbp-spin" : ""} />} disabled={scanning} onClick={runScan}>{scanning ? t.scanning : t.checkNow}</Button>
+          <Button variant="secondary" iconLeft={<Icon name="plus" size={16} />} disabled={role === "viewer"} onClick={addSource}>+ {t.sourcesTitle}</Button>
+        </div>
       </div>
       <Card padding="none">
         {role === "viewer" && (

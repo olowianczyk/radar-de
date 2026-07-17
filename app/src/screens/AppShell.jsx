@@ -2,18 +2,10 @@
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
 import { HRBP_I18N, HRBP_CHANGES, HRBP_KB, HRBP_SOURCES } from "../data.js";
+import { latestIsapCheck, forceScan } from "../isapIntegration.js";
 
-function parseDMYHM(s) {
-  const [datePart, timePart] = (s || "").split(" ");
-  const [d, m, y] = (datePart || "").split(".").map(Number);
-  const [h, min] = (timePart || "").split(":").map(Number);
-  return new Date(y || 0, (m || 1) - 1, d || 1, h || 0, min || 0).getTime();
-}
-function latestIsapCheck() {
-  return HRBP_SOURCES.reduce((latest, s) => {
-    const t = parseDMYHM(s.lastChecked);
-    return t > parseDMYHM(latest) ? s.lastChecked : latest;
-  }, HRBP_SOURCES[0]?.lastChecked || "");
+function useSources() {
+  return React.useState(HRBP_SOURCES);
 }
 
 function LangSwitch({ lang, setLang }) {
@@ -103,6 +95,16 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   const [internalRole, setInternalRole] = useRole();
   const role = roleProp != null ? roleProp : internalRole;
   const setRole = setRoleProp || setInternalRole;
+  const [sources, setSources] = useSources();
+  const [scanning, setScanning] = React.useState(false);
+  const runScan = React.useCallback(() => {
+    if (scanning) return;
+    setScanning(true);
+    forceScan(sources.filter((s) => s.active)).then((updated) => {
+      setSources((prev) => prev.map((s) => updated.find((u) => u.id === s.id) || s));
+      setScanning(false);
+    });
+  }, [scanning, sources]);
   const t = HRBP_I18N[lang];
   const [notifOpen, setNotifOpen] = React.useState(false);
   const notifRef = React.useRef(null);
@@ -166,8 +168,13 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
           {!isMobile && (
             <span title={t.sourcesSub} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
               <Icon name="radar" size={13} />
-              {t.lastChecked}: {latestIsapCheck()}
+              {t.lastChecked}: {latestIsapCheck(sources)}
             </span>
+          )}
+          {!isMobile && (
+            <IconButton label={t.checkNow} onClick={runScan} disabled={scanning}>
+              <Icon name={scanning ? "loader-2" : "refresh-cw"} size={16} className={scanning ? "hrbp-spin" : ""} />
+            </IconButton>
           )}
           <LangSwitch lang={lang} setLang={setLang} />
           <IconButton label="Tryb ciemny" active={dark} onClick={() => setDark((d) => !d)}><Icon name={dark ? "sun" : "moon"} size={18} /></IconButton>
@@ -223,7 +230,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
         </header>
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole }) : children}
+            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, scanning, runScan }) : children}
           </div>
         </main>
       </div>

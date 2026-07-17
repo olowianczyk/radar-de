@@ -2,31 +2,64 @@
 import React from "react";
 import { Card, StatCard, StatusPill, Badge, Button, Input, Tabs, Icon, Select, Checkbox } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
-import { HRBP_I18N, HRBP_CHANGES, HRBP_SOURCES, HRBP_KB, HRBP_STATUS_MAP, HRBP_AREA_TONE } from "../data.js";
+import { HRBP_I18N, HRBP_CHANGES, HRBP_KB, HRBP_STATUS_MAP, HRBP_AREA_TONE } from "../data.js";
+import { latestIsapCheck } from "../isapIntegration.js";
 
-function ScanBanner({ lang }) {
+function parseDMY(s) {
+  const [d, m, y] = (s || "").split(".").map(Number);
+  return new Date(y || 0, (m || 1) - 1, d || 1).getTime();
+}
+
+// Presets for the "what period do we search" filter. 'all' and 'custom' return
+// no fixed start (custom needs a picked date); the rest are computed from now.
+function periodRange(period, customDate) {
+  const now = new Date();
+  if (period === "custom") {
+    if (!customDate) return [null, null];
+    return [new Date(customDate + "T00:00:00").getTime(), now.getTime()];
+  }
+  if (period === "quarter") { const d = new Date(now); d.setMonth(d.getMonth() - 3); return [d.getTime(), now.getTime()]; }
+  if (period === "6m") { const d = new Date(now); d.setMonth(d.getMonth() - 6); return [d.getTime(), now.getTime()]; }
+  if (period === "year") { const d = new Date(now); d.setFullYear(d.getFullYear() - 1); return [d.getTime(), now.getTime()]; }
+  if (period === "prevYear") return [new Date(now.getFullYear() - 1, 0, 1).getTime(), new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59).getTime()];
+  if (period === "curYear") return [new Date(now.getFullYear(), 0, 1).getTime(), now.getTime()];
+  return [null, null];
+}
+
+function ScanBanner({ lang, sources, scanning, runScan }) {
   const t = HRBP_I18N[lang];
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--brand-soft)", color: "var(--on-brand-soft)", padding: "10px 16px", borderRadius: "var(--radius-md)", fontSize: 13 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--brand-soft)", color: "var(--on-brand-soft)", padding: "10px 16px", borderRadius: "var(--radius-md)", fontSize: 13, flexWrap: "wrap" }}>
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success-500)", flex: "0 0 8px" }} />
       <Icon name="radar" size={16} />
       <span style={{ fontWeight: 600 }}>{t.monitoring}: {lang === "pl" ? "automatyczne skanowanie codziennie o 06:00" : lang === "de" ? "automatischer Scan täglich um 06:00" : "automatic scan daily at 06:00"}</span>
-      <span style={{ opacity: 0.75 }}>· {t.lastChecked.toLowerCase()}: 16.07.2026 06:00</span>
+      <span style={{ opacity: 0.75 }}>· {t.lastChecked.toLowerCase()}: {latestIsapCheck(sources)}</span>
+      <div style={{ flex: 1 }} />
+      <Button variant="secondary" size="sm" disabled={scanning} onClick={runScan} iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={14} className={scanning ? "hrbp-spin" : ""} />}>
+        {scanning ? t.scanning : t.checkNow}
+      </Button>
     </div>
   );
 }
 
-export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role }) {
+export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role, sources, scanning, runScan }) {
   const t = HRBP_I18N[lang];
+  const [period, setPeriod] = React.useState("all");
+  const [customDate, setCustomDate] = React.useState("");
   const [tab, setTab] = React.useState("all");
   const [query, setQuery] = React.useState("");
   const [area, setArea] = React.useState("");
   const [selected, setSelected] = React.useState(() => new Set());
   const toggleSelect = (id) => setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const changes = HRBP_CHANGES;
+  const [periodStart, periodEnd] = periodRange(period, customDate);
   const filtered = changes.filter((c) => {
     if (tab !== "all" && c.status !== tab) return false;
     if (area && c.area !== area) return false;
+    if (periodStart != null) {
+      const cd = parseDMY(c.date);
+      if (cd < periodStart || cd > periodEnd) return false;
+    }
     const q = query.trim().toLowerCase();
     if (!q) return true;
     return c.title[lang].toLowerCase().includes(q) || c.act.toLowerCase().includes(q) || c.summary[lang].toLowerCase().includes(q);
@@ -59,17 +92,31 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role 
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-3xl)", color: "var(--text-heading)", margin: 0 }}>{t.greet}</h1>
         <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 14 }}>{t.greetSub.replace("{n}", String(newCount + changes.filter(c=>c.status==="urgent").length))}</p>
       </div>
-      <ScanBanner lang={lang} />
+      <ScanBanner lang={lang} sources={sources} scanning={scanning} runScan={runScan} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
         <StatCard label={t.kpi.new} value={String(newCount)} accent="danger" icon={<Icon name="sparkles" size={18} />} />
         <StatCard label={t.kpi.pending} value={String(pendingCount)} accent="petrol" icon={<Icon name="clock" size={18} />} />
-        <StatCard label={t.kpi.tracked} value={String(HRBP_SOURCES.length)} accent="success" icon={<Icon name="radar" size={18} />} />
+        <StatCard label={t.kpi.tracked} value={String(sources.length)} accent="success" icon={<Icon name="radar" size={18} />} />
         <StatCard label={t.kpi.updated} value={String(doneCount)} accent="coral" icon={<Icon name="check-circle-2" size={18} />} />
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} iconLeft={<Icon name="search" size={16} />} /></div>
         <div style={{ width: 200 }}><Select value={area} onChange={(e) => setArea(e.target.value)} placeholder={t.allAreas} options={[{ value: "", label: t.allAreas }, ...Object.keys(t.area).map((k) => ({ value: k, label: t.area[k] }))]} /></div>
-        {(query || area) && <Button variant="ghost" iconLeft={<Icon name="x" size={14} />} onClick={() => { setQuery(""); setArea(""); }}>{t.clearFilters}</Button>}
+        <div style={{ width: 200 }}>
+          <Select value={period} onChange={(e) => setPeriod(e.target.value)} options={[
+            { value: "all", label: t.periodAll },
+            { value: "custom", label: t.periodCustom },
+            { value: "quarter", label: t.periodQuarter },
+            { value: "6m", label: t.period6m },
+            { value: "year", label: t.periodYear },
+            { value: "prevYear", label: t.periodPrevYear },
+            { value: "curYear", label: t.periodCurYear },
+          ]} />
+        </div>
+        {period === "custom" && (
+          <div style={{ width: 180 }}><Input type="date" label={t.periodFrom} value={customDate} onChange={(e) => setCustomDate(e.target.value)} /></div>
+        )}
+        {(query || area || period !== "all") && <Button variant="ghost" iconLeft={<Icon name="x" size={14} />} onClick={() => { setQuery(""); setArea(""); setPeriod("all"); setCustomDate(""); }}>{t.clearFilters}</Button>}
         <Button variant="secondary" iconLeft={<Icon name="file-spreadsheet" size={16} />} onClick={() => exportCsvFor(filtered)} disabled={filtered.length === 0}>{t.exportCsv}</Button>
         <Button variant="secondary" iconLeft={<Icon name="file-down" size={16} />} onClick={exportPdf} disabled={filtered.length === 0}>{t.exportPdf}</Button>
       </div>
