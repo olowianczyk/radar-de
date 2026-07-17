@@ -1,7 +1,20 @@
 // AppShell — sidebar + top bar + PL/DE/EN language switcher. Composes SidebarNav.
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
-import { HRBP_I18N, HRBP_CHANGES, HRBP_KB } from "../data.js";
+import { HRBP_I18N, HRBP_CHANGES, HRBP_KB, HRBP_SOURCES } from "../data.js";
+
+function parseDMYHM(s) {
+  const [datePart, timePart] = (s || "").split(" ");
+  const [d, m, y] = (datePart || "").split(".").map(Number);
+  const [h, min] = (timePart || "").split(":").map(Number);
+  return new Date(y || 0, (m || 1) - 1, d || 1, h || 0, min || 0).getTime();
+}
+function latestIsapCheck() {
+  return HRBP_SOURCES.reduce((latest, s) => {
+    const t = parseDMYHM(s.lastChecked);
+    return t > parseDMYHM(latest) ? s.lastChecked : latest;
+  }, HRBP_SOURCES[0]?.lastChecked || "");
+}
 
 function LangSwitch({ lang, setLang }) {
   const langs = ["pl", "de", "en"];
@@ -152,6 +165,12 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
             </span>
           )}
           <div style={{ flex: 1 }} />
+          {!isMobile && (
+            <span title={t.sourcesSub} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+              <Icon name="radar" size={13} />
+              {t.lastChecked}: {latestIsapCheck()}
+            </span>
+          )}
           <LangSwitch lang={lang} setLang={setLang} />
           <IconButton label="Tryb ciemny" active={dark} onClick={() => setDark((d) => !d)}><Icon name={dark ? "sun" : "moon"} size={18} /></IconButton>
           {!isMobile && (
