@@ -17,7 +17,10 @@ async function loadState() {
   try {
     const { blobs } = await list({ prefix: STATE_PATH, limit: 1 });
     if (!blobs.length) return null;
-    const res = await fetch(blobs[0].url);
+    // The store is private, so a plain fetch needs the read-write token as bearer auth.
+    const res = await fetch(blobs[0].url, {
+      headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
+    });
     if (!res.ok) return null;
     return await res.json();
   } catch (e) {
@@ -27,7 +30,7 @@ async function loadState() {
 
 async function saveState(state) {
   await put(STATE_PATH, JSON.stringify(state), {
-    access: "public",
+    access: "private",
     contentType: "application/json",
     addRandomSuffix: false,
     allowOverwrite: true,
