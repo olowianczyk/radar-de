@@ -1,10 +1,10 @@
 // Monitored sources — legal acts/gazettes scanned automatically; toggle monitoring per source.
 import React from "react";
 import { Card, Badge, Switch, Icon, Button, IconButton } from "../components/index.js";
-import { HRBP_I18N, HRBP_SOURCE_HISTORY } from "../data.js";
+import { HRBP_I18N } from "../data.js";
 import { setSourceMonitoring } from "../isapIntegration.js";
 
-export function Sources({ lang, role, sources, setSources, scanning, runScan }) {
+export function Sources({ lang, role, sources, setSources, sourceHistory, scanning, runScan }) {
   const [expanded, setExpanded] = React.useState(null);
   const eventMeta = {
     scan: { icon: "check", color: "var(--text-muted)", label: (t) => t.evScan },
@@ -46,7 +46,7 @@ export function Sources({ lang, role, sources, setSources, scanning, runScan }) 
         )}
         {sources.map((s, i) => {
           const isOpen = expanded === s.id;
-          const hist = HRBP_SOURCE_HISTORY[s.id] || [];
+          const hist = sourceHistory[s.id] || [];
           return (
             <React.Fragment key={s.id}>
               <div style={{
@@ -82,7 +82,9 @@ export function Sources({ lang, role, sources, setSources, scanning, runScan }) 
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-heading)" }}>{meta.label(t)}</div>
-                          <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{ev.note}</div>
+                          <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                            {ev.url ? <a href={ev.url} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>{ev.note}</a> : ev.note}
+                          </div>
                         </div>
                         <div style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)", flex: "0 0 auto" }}>{ev.ts}</div>
                       </div>

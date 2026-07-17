@@ -146,13 +146,16 @@ export const HRBP_CHANGES = [
   { id: 6, act: "Ustawa o związkach zawodowych", title: { pl: "Nowe progi reprezentatywności organizacji związkowej", de: "Neue Repräsentativitätsschwellen für Gewerkschaften", en: "New representativeness thresholds for trade unions" }, area: "other", status: "done", date: "15.06.2026", effective: "15.06.2026", source: "ISAP — Dz.U. 2026, poz. 1071 (tekst ujednolicony)", summary: { pl: "Zmieniono próg liczby członków wymaganych do uzyskania statusu reprezentatywnej organizacji zakładowej.", de: "Die erforderliche Mitgliederzahl für den Status einer repräsentativen Betriebsgewerkschaft wurde geändert.", en: "The member-count threshold for representative workplace union status was changed." }, affected: [] },
 ];
 
+// `keyword` maps a source to the real Sejm/ELI API taxonomy term (see sejmApi.js) —
+// verified live against api.sejm.gov.pl before wiring in. PIP has no ELI equivalent
+// (it's guidance, not a Dziennik Ustaw act), so it has no keyword and stays manual.
 export const HRBP_SOURCES = [
-  { id: 1, name: "Kodeks pracy — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", lastChecked: "16.07.2026 06:00", found: 1, active: true },
-  { id: 2, name: "Ustawa o PPK — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", lastChecked: "16.07.2026 06:00", found: 1, active: true },
-  { id: 3, name: "Rozporządzenia MRPiPS ws. BHP", type: "Rozporządzenie", url: "https://isap.sejm.gov.pl", lastChecked: "15.07.2026 22:00", found: 1, active: true },
-  { id: 4, name: "Ustawa o zatrudnianiu cudzoziemców", type: "Ustawa", url: "https://isap.sejm.gov.pl", lastChecked: "15.07.2026 22:00", found: 1, active: true },
-  { id: 5, name: "Ustawa o związkach zawodowych", type: "Ustawa", url: "https://isap.sejm.gov.pl", lastChecked: "14.07.2026 18:00", found: 1, active: true },
-  { id: 6, name: "Państwowa Inspekcja Pracy — wytyczne", type: "Wytyczne", url: "https://www.pip.gov.pl", lastChecked: "14.07.2026 18:00", found: 0, active: false },
+  { id: 1, name: "Kodeks pracy — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "kodeks pracy", lastChecked: "16.07.2026 06:00", found: 1, active: true },
+  { id: 2, name: "Ustawa o PPK — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "pracownicze plany kapitałowe", lastChecked: "16.07.2026 06:00", found: 1, active: true },
+  { id: 3, name: "Rozporządzenia MRPiPS ws. BHP", type: "Rozporządzenie", url: "https://isap.sejm.gov.pl", keyword: "BHP", lastChecked: "15.07.2026 22:00", found: 1, active: true },
+  { id: 4, name: "Ustawa o zatrudnianiu cudzoziemców", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "cudzoziemcy", lastChecked: "15.07.2026 22:00", found: 1, active: true },
+  { id: 5, name: "Ustawa o związkach zawodowych", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "związki zawodowe", lastChecked: "14.07.2026 18:00", found: 1, active: true },
+  { id: 6, name: "Państwowa Inspekcja Pracy — wytyczne", type: "Wytyczne", url: "https://www.pip.gov.pl", keyword: null, lastChecked: "14.07.2026 18:00", found: 0, active: false },
 ];
 
 export const HRBP_SOURCE_HISTORY = {

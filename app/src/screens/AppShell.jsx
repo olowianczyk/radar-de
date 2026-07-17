@@ -1,7 +1,7 @@
 // AppShell — sidebar + top bar + PL/DE/EN language switcher. Composes SidebarNav.
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
-import { HRBP_I18N, HRBP_CHANGES, HRBP_KB, HRBP_SOURCES } from "../data.js";
+import { HRBP_I18N, HRBP_CHANGES, HRBP_KB, HRBP_SOURCES, HRBP_SOURCE_HISTORY } from "../data.js";
 import { latestIsapCheck, forceScan } from "../isapIntegration.js";
 
 function useSources() {
@@ -96,12 +96,23 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   const role = roleProp != null ? roleProp : internalRole;
   const setRole = setRoleProp || setInternalRole;
   const [sources, setSources] = useSources();
+  const [sourceHistory, setSourceHistory] = React.useState(HRBP_SOURCE_HISTORY);
   const [scanning, setScanning] = React.useState(false);
   const runScan = React.useCallback(() => {
     if (scanning) return;
     setScanning(true);
-    forceScan(sources.filter((s) => s.active)).then((updated) => {
-      setSources((prev) => prev.map((s) => updated.find((u) => u.id === s.id) || s));
+    forceScan(sources.filter((s) => s.active)).then((results) => {
+      setSources((prev) => prev.map((s) => {
+        const r = results.find((x) => x.id === s.id);
+        return r ? { ...s, lastChecked: r.lastChecked, found: r.found } : s;
+      }));
+      setSourceHistory((prev) => {
+        const next = { ...prev };
+        results.forEach((r) => {
+          if (r.detected && r.detected.length) next[r.id] = [...r.detected, ...(prev[r.id] || [])];
+        });
+        return next;
+      });
       setScanning(false);
     });
   }, [scanning, sources]);
@@ -230,7 +241,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
         </header>
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, scanning, runScan }) : children}
+            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan }) : children}
           </div>
         </main>
       </div>
