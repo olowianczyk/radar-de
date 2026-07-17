@@ -116,7 +116,7 @@
 
   <div class="scene" id="scene-feed">
     <div class="feed-eyebrow-wrap">
-      <div class="feed-eyebrow">DZISIAJ · 06:00 · SKAN ISAP</div>
+      <div class="feed-eyebrow" id="feed-eyebrow"></div>
       <div class="feed-heading">Wykryto 3 zmiany w prawie</div>
     </div>
     <div class="feed-list" id="feed-list"></div>
@@ -157,8 +157,17 @@ const FEED = [
 ];
 
 const SCENES = ['scene-mark', 'scene-tagline', 'scene-feed', 'scene-quote'];
-const DURATIONS = [3200, 4400, 5200, 4000]; // mark, tagline, feed, quote
+const DURATIONS = [1600, 2200, 2600, 1800]; // mark, tagline, feed, quote
 const APP_URL = 'app/index.html';
+
+function lastScanLabel() {
+  const now = new Date();
+  const scan = new Date(now);
+  scan.setHours(6, 0, 0, 0);
+  if (scan > now) scan.setDate(scan.getDate() - 1);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(scan.getDate())}.${pad(scan.getMonth() + 1)}.${scan.getFullYear()} ${pad(scan.getHours())}:${pad(scan.getMinutes())} · SKAN ISAP`;
+}
 
 let phase = 0;
 let phaseStartAt = Date.now();
@@ -251,6 +260,7 @@ function onKeyDown(e) {
 
 function init() {
   q('#quote-text').textContent = nextBshQuote();
+  q('#feed-eyebrow').textContent = lastScanLabel();
   buildTaglineWords();
   buildFeedCards();
   buildProgressSegments();

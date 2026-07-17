@@ -9,6 +9,19 @@ function parseDMY(s) {
   const [d, m, y] = (s || "").split(".").map(Number);
   return new Date(y || 0, (m || 1) - 1, d || 1).getTime();
 }
+// Attachments are seed/demo metadata only — no real file bytes are stored anywhere
+// (see design handoff notes). Download produces a stub placeholder file so the
+// button is at least functional until real file storage is wired up.
+function downloadAttachment(a) {
+  const note = `${a.name}\n\nTo jest plik zastępczy — dane załącznika są demonstracyjne (brak realnego pliku).\nRozmiar: ${a.size}\nDodane przez: ${a.by}\nData: ${a.ts}`;
+  const blob = new Blob([note], { type: "text/plain;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = a.name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
   const t = HRBP_I18N[lang];
   const [query, setQuery] = React.useState("");
@@ -148,7 +161,7 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
                           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</div>
                           <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{a.size} · {t.uploadedBy} {a.by} · {a.ts}</div>
                         </div>
-                        <IconButton label="download"><Icon name="download" size={15} /></IconButton>
+                        <IconButton label="download" onClick={() => downloadAttachment(a)}><Icon name="download" size={15} /></IconButton>
                       </div>
                     ))}
                   </div>

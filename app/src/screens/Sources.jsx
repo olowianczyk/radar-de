@@ -20,11 +20,21 @@ export function Sources({ lang, role }) {
   };
   const t = HRBP_I18N[lang];
 
+  const addSource = () => {
+    const name = window.prompt(t.sourcesTitle + " — nazwa aktu / źródła:");
+    if (!name || !name.trim()) return;
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const nowStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const id = Math.max(0, ...sources.map((s) => s.id)) + 1;
+    setSources((prev) => [...prev, { id, name: name.trim(), type: "Ustawa", url: "https://isap.sejm.gov.pl", lastChecked: nowStr, found: 0, active: true }]);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
         <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 14 }}>{t.sourcesSub}</p>
-        <Button variant="secondary" iconLeft={<Icon name="plus" size={16} />} disabled={role === "viewer"}>+ {t.sourcesTitle}</Button>
+        <Button variant="secondary" iconLeft={<Icon name="plus" size={16} />} disabled={role === "viewer"} onClick={addSource}>+ {t.sourcesTitle}</Button>
       </div>
       <Card padding="none">
         {role === "viewer" && (
