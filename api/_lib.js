@@ -4,7 +4,7 @@
 // reliable than fighting Vercel's per-function bundling across directories.
 // ponytail: this exists; keep both copies in sync if the keyword mappings change.
 
-const { put, list } = require("@vercel/blob");
+const { put, get } = require("@vercel/blob");
 
 const SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
 // Single JSON blob as the persistence layer — the whole state is one small
@@ -15,14 +15,12 @@ const STATE_PATH = "hrbp-state.json";
 
 async function loadState() {
   try {
-    const { blobs } = await list({ prefix: STATE_PATH, limit: 1 });
-    if (!blobs.length) { console.error("loadState: list() found no blobs"); return null; }
-    // The store is private, so a plain fetch needs the read-write token as bearer auth.
-    const res = await fetch(blobs[0].url, {
-      headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
-    });
-    if (!res.ok) { console.error(`loadState: fetch ${blobs[0].url} -> ${res.status}`); return null; }
-    return await res.json();
+    // get() handles private-store auth itself (unlike a plain fetch of the blob
+    // URL, which 403s — private blobs need a signed request, not a bearer header).
+    const result = await get(STATE_PATH, { access: "private" });
+    if (!result || result.statusCode !== 200) return null;
+    const text = await new Response(result.stream).text();
+    return JSON.parse(text);
   } catch (e) {
     console.error("loadState threw:", e.message);
     return null; // no Blob store attached yet, or first run — caller falls back to defaults
