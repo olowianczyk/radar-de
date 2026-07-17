@@ -16,14 +16,15 @@ const STATE_PATH = "hrbp-state.json";
 async function loadState() {
   try {
     const { blobs } = await list({ prefix: STATE_PATH, limit: 1 });
-    if (!blobs.length) return null;
+    if (!blobs.length) { console.error("loadState: list() found no blobs"); return null; }
     // The store is private, so a plain fetch needs the read-write token as bearer auth.
     const res = await fetch(blobs[0].url, {
       headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
     });
-    if (!res.ok) return null;
+    if (!res.ok) { console.error(`loadState: fetch ${blobs[0].url} -> ${res.status}`); return null; }
     return await res.json();
   } catch (e) {
+    console.error("loadState threw:", e.message);
     return null; // no Blob store attached yet, or first run — caller falls back to defaults
   }
 }
