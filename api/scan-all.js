@@ -32,6 +32,7 @@ module.exports = async (req, res) => {
     const nextState = {
       sources: results.map((r) => ({ id: r.id, lastChecked: r.lastChecked, found: r.found })),
       history,
+      faq: prevState.faq || {}, // scan-all doesn't touch FAQ — carry it forward so a scan can't wipe generated entries
       lastRun: new Date().toISOString(),
     };
     // Persist best-effort: a scan that succeeded should still return 200 even if

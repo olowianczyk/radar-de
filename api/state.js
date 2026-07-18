@@ -6,5 +6,5 @@ const { loadState } = require("./_lib.js");
 
 module.exports = async (req, res) => {
   const state = await loadState();
-  res.status(200).json(state || { sources: [], history: {}, lastRun: null });
+  res.status(200).json(state ? { faq: {}, ...state } : { sources: [], history: {}, faq: {}, lastRun: null });
 };

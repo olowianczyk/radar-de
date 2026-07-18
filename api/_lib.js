@@ -5,8 +5,10 @@
 // ponytail: this exists; keep both copies in sync if the keyword mappings change.
 
 const { put, get } = require("@vercel/blob");
+const { PDFParse } = require("pdf-parse");
 
 const SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
+const ELI_BASE = "https://api.sejm.gov.pl/eli/acts";
 // Single JSON blob as the persistence layer — the whole state is one small
 // object (per-source lastChecked/found + detected-act history), not
 // relational data, so a key-value blob is simpler than provisioning Postgres.
@@ -110,6 +112,7 @@ async function scanSources(sources, fallbackLookbackDays = 1) {
         type: "detected",
         note: item.title,
         url: isapDocUrl(item.address),
+        eli: item.ELI,
       }));
       return { id: s.id, lastChecked: nowStr, found: items.length, detected };
     } catch (e) {
@@ -118,4 +121,57 @@ async function scanSources(sources, fallbackLookbackDays = 1) {
   }));
 }
 
-module.exports = { searchActs, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, isoDaysAgo, loadState, saveState };
+// Downloads the real act PDF from the Sejm/ELI API and extracts its text —
+// the search API only returns title/metadata, not body text, and generating
+// an FAQ from a title alone would just be the LLM guessing specifics (the
+// exact fabrication problem the curated demo cards already have). Capped at
+// 20000 chars: Polish amendment regulations are typically a few pages: full
+// codes (e.g. Kodeks pracy itself) would need chunking, out of scope here.
+const MAX_ACT_TEXT_CHARS = 20000;
+
+async function fetchActText(eli) {
+  const res = await fetch(`${ELI_BASE}/${eli}/text.pdf`);
+  if (!res.ok) throw new Error(`act PDF fetch failed: ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const parser = new PDFParse({ data: buffer });
+  const result = await parser.getText();
+  await parser.destroy();
+  if (!result.text) throw new Error("PDF had no extractable text");
+  return result.text.slice(0, MAX_ACT_TEXT_CHARS);
+}
+
+// Asks Claude to write a small FAQ strictly from the real act text (not from
+// the title, not from general knowledge) — grounding it in the actual source
+// is what keeps this from being the same kind of invented content as the
+// hand-written demo cards. Requires ANTHROPIC_API_KEY (set in the Vercel
+// dashboard — can't be provisioned via the Vercel MCP tools available here,
+// same manual step as the Blob store).
+async function generateFaqForAct({ eli, title, url }) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+  const actText = await fetchActText(eli);
+  const prompt = `Poniżej jest pełny tekst polskiego aktu prawnego (tytuł: "${title}"). Napisz 3-5 pytań i odpowiedzi FAQ dla działu HR, które streszczają WYŁĄCZNIE to, co faktycznie zmienia ten akt. Nie zgaduj i nie dodawaj informacji spoza tekstu. Odpowiedz TYLKO surowym JSON (bez markdown, bez \`\`\`), w formacie:
+[{"question":{"pl":"...","de":"...","en":"..."},"answer":{"pl":"...","de":"...","en":"..."}}]
+Tekst aktu:
+${actText}`;
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2048,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!res.ok) throw new Error(`Anthropic API error ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  const raw = data.content?.[0]?.text || "[]";
+  const items = JSON.parse(raw.trim().replace(/^```json\s*|\s*```$/g, ""));
+  return { eli, title, url, generatedAt: new Date().toISOString(), items };
+}
+
+module.exports = { searchActs, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, isoDaysAgo, loadState, saveState, generateFaqForAct, fetchActText };

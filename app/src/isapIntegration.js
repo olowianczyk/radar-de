@@ -59,6 +59,21 @@ export async function fetchPersistedState() {
   return res.json();
 }
 
+// Generates an FAQ for one real detected act. The backend fetches the act's
+// real PDF text and grounds the LLM's answer in it (see api/_lib.js
+// generateFaqForAct) — not just the title — so this isn't the same kind of
+// invented content as the hand-written demo cards in data.js.
+export async function generateFaq({ eli, title, url }) {
+  const res = await fetch("/api/generate-faq", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ eli, title, url }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `generate-faq failed: ${res.status}`);
+  return data.entry;
+}
+
 export async function forceScan(activeSources) {
   const res = await fetch("/api/scan-all", {
     method: "POST",

@@ -2,6 +2,7 @@
   "name": "hrbp-platform-api",
   "private": true,
   "dependencies": {
-    "@vercel/blob": "^2.6.1"
+    "@vercel/blob": "^2.6.1",
+    "pdf-parse": "^2.4.5"
   }
 }
