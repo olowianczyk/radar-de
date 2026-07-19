@@ -5,7 +5,6 @@
 // ponytail: this exists; keep both copies in sync if the keyword mappings change.
 
 const { put, get } = require("@vercel/blob");
-const { PDFParse } = require("pdf-parse");
 
 const SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
 const ELI_BASE = "https://api.sejm.gov.pl/eli/acts";
@@ -130,14 +129,20 @@ async function scanSources(sources, fallbackLookbackDays = 1) {
 const MAX_ACT_TEXT_CHARS = 20000;
 
 async function fetchActText(eli) {
+  // Required lazily, and pinned to 1.1.1: pdf-parse 2.x pulls in @napi-rs/canvas
+  // for page rendering, which isn't installed — it crashed at require-time with
+  // "DOMMatrix is not defined", which (since _lib.js is required by every /api
+  // function) took down the whole backend, not just FAQ generation. 1.1.1 is the
+  // older text-only extractor with no canvas dependency — verified against a
+  // real Sejm PDF before switching. Lazy require here too, so a future break
+  // in this dependency only fails FAQ generation, not every /api function.
+  const pdfParse = require("pdf-parse");
   const res = await fetch(`${ELI_BASE}/${eli}/text.pdf`);
   if (!res.ok) throw new Error(`act PDF fetch failed: ${res.status}`);
   const buffer = Buffer.from(await res.arrayBuffer());
-  const parser = new PDFParse({ data: buffer });
-  const result = await parser.getText();
-  await parser.destroy();
-  if (!result.text) throw new Error("PDF had no extractable text");
-  return result.text.slice(0, MAX_ACT_TEXT_CHARS);
+  const data = await pdfParse(buffer);
+  if (!data.text) throw new Error("PDF had no extractable text");
+  return data.text.slice(0, MAX_ACT_TEXT_CHARS);
 }
 
 // Asks Claude to write a small FAQ strictly from the real act text (not from
