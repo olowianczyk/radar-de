@@ -72,13 +72,38 @@ export function buildChangesFromHistory(sourceHistory, sources) {
   return changes;
 }
 
-export async function forceScan(activeSources) {
+// `range`, when given ({from, to} as YYYY-MM-DD), overrides each source's
+// "since last checked" default with a user-picked period.
+export async function forceScan(activeSources, range) {
   const res = await fetch("/api/scan-all", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sources: activeSources.map((s) => ({ id: s.id, keyword: s.keyword, lastChecked: s.lastChecked })) }),
+    body: JSON.stringify({
+      sources: activeSources.map((s) => ({ id: s.id, keyword: s.keyword, lastChecked: s.lastChecked })),
+      ...(range ? { dateFrom: range.from, dateTo: range.to } : {}),
+    }),
   });
   if (!res.ok) throw new Error(`scan-all failed: ${res.status}`);
   const data = await res.json();
   return data.results;
+}
+
+// Quarterly presets for the scan-period picker: current quarter back through
+// 2 years (8 quarters), newest first, plus a "custom" sentinel the UI renders
+// as two date inputs.
+export function quarterOptions() {
+  const now = new Date();
+  const currentQ = Math.floor(now.getMonth() / 3);
+  const options = [];
+  for (let i = 0; i < 8; i++) {
+    const totalQ = currentQ - i;
+    const year = now.getFullYear() + Math.floor(totalQ / 4);
+    const q = ((totalQ % 4) + 4) % 4;
+    const fromMonth = q * 3;
+    const from = `${year}-${String(fromMonth + 1).padStart(2, "0")}-01`;
+    const toDate = new Date(year, fromMonth + 3, 0);
+    const to = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, "0")}-${String(toDate.getDate()).padStart(2, "0")}`;
+    options.push({ value: `${year}-Q${q + 1}`, label: `Q${q + 1} ${year}`, from, to });
+  }
+  return options;
 }

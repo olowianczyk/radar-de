@@ -22,16 +22,18 @@ module.exports = async (req, res) => {
     }
     const prevState = (await loadState()) || { sources: [], history: {} };
     let sources;
+    let range;
     if (req.method === "POST") {
       const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
       sources = Array.isArray(body.sources) ? body.sources : DEFAULT_SOURCES;
+      if (body.dateFrom || body.dateTo) range = { from: body.dateFrom, to: body.dateTo };
     } else {
       sources = DEFAULT_SOURCES.map((s) => {
         const prev = prevState.sources.find((p) => p.id === s.id);
         return prev && prev.lastChecked ? { ...s, lastChecked: prev.lastChecked } : s;
       });
     }
-    const results = await scanSources(sources);
+    const results = await scanSources(sources, range);
     const history = { ...prevState.history };
     results.forEach((r) => {
       if (r.detected && r.detected.length) history[r.id] = [...r.detected, ...(history[r.id] || [])];

@@ -99,14 +99,23 @@ function isoYearStart() {
 // frontend's real state) or just { id, keyword } (cron path — no persisted
 // per-source state server-side, so it also falls back to start-of-year on a
 // source's very first run; subsequent runs use the persisted lastChecked).
-async function scanSources(sources) {
+// `range`, when given ({from, to} as YYYY-MM-DD), overrides per-source
+// lastChecked entirely — a manual scan for a user-picked period.
+function isIsoDate(s) {
+  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+async function scanSources(sources, range) {
   const todayIso = isoToday();
   const nowStr = formatNow();
+  const rangeFrom = range && isIsoDate(range.from) ? range.from : null;
+  const rangeTo = range && isIsoDate(range.to) ? range.to : todayIso;
   return Promise.all(sources.map(async (s) => {
     if (!s.keyword) return { id: s.id, lastChecked: nowStr, found: 0, detected: [] };
-    const dateFrom = toIsoDate(s.lastChecked) || isoYearStart();
+    const dateFrom = rangeFrom || toIsoDate(s.lastChecked) || isoYearStart();
+    const dateTo = rangeFrom ? rangeTo : todayIso;
     try {
-      const items = await searchActs({ keyword: s.keyword, dateFrom, dateTo: todayIso, limit: 10 });
+      const items = await searchActs({ keyword: s.keyword, dateFrom, dateTo, limit: 10 });
       const detected = items.map((item) => ({
         ts: formatDetectedTs(item.announcementDate),
         type: "detected",

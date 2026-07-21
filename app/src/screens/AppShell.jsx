@@ -114,10 +114,10 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
       }
     }).catch((e) => console.error("Persisted state fetch failed:", e)); // under plain vite dev/preview /api doesn't exist — falls back to seed data
   }, []);
-  const runScan = React.useCallback(() => {
+  const runScan = React.useCallback((range) => {
     if (scanning) return;
     setScanning(true);
-    forceScan(sources.filter((s) => s.active)).then((results) => {
+    forceScan(sources.filter((s) => s.active), range).then((results) => {
       setSources((prev) => prev.map((s) => {
         const r = results.find((x) => x.id === s.id);
         return r ? { ...s, lastChecked: r.lastChecked, found: r.found } : s;
