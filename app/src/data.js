@@ -124,6 +124,13 @@ export const HRBP_SOURCES = [
   { id: 4, name: "Ustawa o zatrudnianiu cudzoziemców", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "cudzoziemcy", area: "contracts", lastChecked: null, found: 0, active: true },
   { id: 5, name: "Ustawa o związkach zawodowych", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "związki zawodowe", area: "other", lastChecked: null, found: 0, active: true },
   { id: 6, name: "Państwowa Inspekcja Pracy — wytyczne", type: "Wytyczne", url: "https://www.pip.gov.pl", keyword: null, area: "safety", lastChecked: null, found: 0, active: false },
+  { id: 7, name: "Urlopy macierzyńskie, rodzicielskie, wychowawcze", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "urlop rodzicielski", area: "leave", lastChecked: null, found: 0, active: true },
+  { id: 8, name: "Rozporządzenie o minimalnym wynagrodzeniu", type: "Rozporządzenie", url: "https://isap.sejm.gov.pl", keyword: "minimalne wynagrodzenie za pracę", area: "pay", lastChecked: null, found: 0, active: true },
+  { id: 9, name: "Czas pracy — praca zdalna, elastyczny czas pracy", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "czas pracy", area: "contracts", lastChecked: null, found: 0, active: true },
+  { id: 10, name: "Ochrona danych osobowych pracowników (RODO)", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "ochrona danych osobowych", area: "other", lastChecked: null, found: 0, active: true },
+  { id: 11, name: "Emerytury pomostowe i składki ZUS", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "emerytury pomostowe", area: "social", lastChecked: null, found: 0, active: true },
+  { id: 12, name: "Przeciwdziałanie mobbingowi i dyskryminacji w zatrudnieniu", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "mobbing", area: "contracts", lastChecked: null, found: 0, active: true },
+  { id: 13, name: "Zatrudnianie osób niepełnosprawnych (PFRON)", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "zatrudnianie osób niepełnosprawnych", area: "other", lastChecked: null, found: 0, active: true },
 ];
 
 // No seed history — real per-source history comes back from /api/state once a

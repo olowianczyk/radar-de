@@ -61,6 +61,13 @@ const DEFAULT_SOURCES = [
   { id: 3, name: "Rozporządzenia MRPiPS ws. BHP", keyword: "BHP" },
   { id: 4, name: "Ustawa o zatrudnianiu cudzoziemców", keyword: "cudzoziemcy" },
   { id: 5, name: "Ustawa o związkach zawodowych", keyword: "związki zawodowe" },
+  { id: 7, name: "Urlopy macierzyńskie, rodzicielskie, wychowawcze", keyword: "urlop rodzicielski" },
+  { id: 8, name: "Rozporządzenie o minimalnym wynagrodzeniu", keyword: "minimalne wynagrodzenie za pracę" },
+  { id: 9, name: "Czas pracy — praca zdalna, elastyczny czas pracy", keyword: "czas pracy" },
+  { id: 10, name: "Ochrona danych osobowych pracowników (RODO)", keyword: "ochrona danych osobowych" },
+  { id: 11, name: "Emerytury pomostowe i składki ZUS", keyword: "emerytury pomostowe" },
+  { id: 12, name: "Przeciwdziałanie mobbingowi i dyskryminacji w zatrudnieniu", keyword: "mobbing" },
+  { id: 13, name: "Zatrudnianie osób niepełnosprawnych (PFRON)", keyword: "zatrudnianie osób niepełnosprawnych" },
 ];
 
 function isoToday() {
