@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, StatCard, StatusPill, Badge, Button, Input, Tabs, Icon, Select, Checkbox } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
-import { HRBP_I18N, HRBP_CHANGES, HRBP_KB, HRBP_STATUS_MAP, HRBP_AREA_TONE } from "../data.js";
+import { HRBP_I18N, HRBP_KB, HRBP_STATUS_MAP, HRBP_AREA_TONE } from "../data.js";
 import { latestIsapCheck } from "../isapIntegration.js";
 
 function parseDMY(s) {
@@ -42,7 +42,7 @@ function ScanBanner({ lang, sources, scanning, runScan }) {
   );
 }
 
-export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role, sources, scanning, runScan }) {
+export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role, sources, scanning, runScan, changes: changesProp }) {
   const t = HRBP_I18N[lang];
   const [period, setPeriod] = React.useState("all");
   const [customDate, setCustomDate] = React.useState("");
@@ -51,7 +51,7 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
   const [area, setArea] = React.useState("");
   const [selected, setSelected] = React.useState(() => new Set());
   const toggleSelect = (id) => setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
-  const changes = HRBP_CHANGES;
+  const changes = changesProp || [];
   const [periodStart, periodEnd] = periodRange(period, customDate);
   const filtered = changes.filter((c) => {
     if (tab !== "all" && c.status !== tab) return false;

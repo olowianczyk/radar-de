@@ -13,6 +13,13 @@ const { DEFAULT_SOURCES, scanSources, loadState, saveState } = require("./_lib.j
 
 module.exports = async (req, res) => {
   try {
+    // GET is the daily-cron path. Vercel Cron sends Authorization: Bearer
+    // $CRON_SECRET automatically when that env var is set — reject anything
+    // else so the cheap-but-real Sejm API can't be hit by an arbitrary GET.
+    if (req.method === "GET" && process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
     const prevState = (await loadState()) || { sources: [], history: {} };
     let sources;
     if (req.method === "POST") {
@@ -24,7 +31,7 @@ module.exports = async (req, res) => {
         return prev && prev.lastChecked ? { ...s, lastChecked: prev.lastChecked } : s;
       });
     }
-    const results = await scanSources(sources, 1);
+    const results = await scanSources(sources);
     const history = { ...prevState.history };
     results.forEach((r) => {
       if (r.detected && r.detected.length) history[r.id] = [...r.detected, ...(history[r.id] || [])];

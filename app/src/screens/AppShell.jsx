@@ -1,8 +1,8 @@
 // AppShell — sidebar + top bar + PL/DE/EN language switcher. Composes SidebarNav.
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
-import { HRBP_I18N, HRBP_CHANGES, HRBP_KB, HRBP_SOURCES, HRBP_SOURCE_HISTORY } from "../data.js";
-import { latestIsapCheck, forceScan, fetchPersistedState, generateFaq } from "../isapIntegration.js";
+import { HRBP_I18N, HRBP_KB, HRBP_SOURCES, HRBP_SOURCE_HISTORY } from "../data.js";
+import { latestIsapCheck, forceScan, fetchPersistedState, generateFaq, buildChangesFromHistory } from "../isapIntegration.js";
 
 function useSources() {
   return React.useState(HRBP_SOURCES);
@@ -161,7 +161,8 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [notifOpen]);
-  const notifChanges = HRBP_CHANGES.filter((c) => c.status === "new" || c.status === "urgent");
+  const changes = React.useMemo(() => buildChangesFromHistory(sourceHistory, sources, faq), [sourceHistory, sources, faq]);
+  const notifChanges = changes.filter((c) => c.status === "new" || c.status === "urgent");
   const notifKb = HRBP_KB.filter((k) => k.needsUpdate);
   const notifTotal = notifChanges.length + notifKb.length;
   const [readIds, setReadIds] = React.useState(() => {
@@ -171,7 +172,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   const markRead = (key) => { if (readIds.has(key)) return; persistRead(new Set(readIds).add(key)); };
   const markAllRead = () => { const next = new Set(readIds); notifChanges.forEach((c) => next.add(`c${c.id}`)); notifKb.forEach((k) => next.add(`k${k.id}`)); persistRead(next); };
   const unreadTotal = notifChanges.filter((c) => !readIds.has(`c${c.id}`)).length + notifKb.filter((k) => !readIds.has(`k${k.id}`)).length;
-  const newCount = HRBP_CHANGES.filter((c) => c.status === "new" || c.status === "urgent").length;
+  const newCount = notifChanges.length;
   const items = [
     { id: "feed", label: t.nav.feed, icon: <Icon name="scale" size={18} />, badge: newCount },
     { id: "kb", label: t.nav.kb, icon: <Icon name="book-open" size={18} /> },
@@ -278,7 +279,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
         </header>
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, faq, generatingFaq, requestFaq }) : children}
+            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, faq, generatingFaq, requestFaq, changes }) : children}
           </div>
         </main>
       </div>

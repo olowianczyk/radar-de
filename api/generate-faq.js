@@ -6,14 +6,29 @@
 // entry instead of piling up duplicates.
 const { generateFaqForAct, loadState, saveState } = require("./_lib.js");
 
+// Each call downloads a PDF and pays for an Anthropic request, so a public,
+// unauthenticated endpoint needs a cap — otherwise anyone with the URL can
+// burn the API budget by requesting FAQs for a stream of distinct elis.
+// ponytail: fixed window in the same state blob already used for persistence,
+// good enough for a low-traffic internal tool; move to a real rate limiter
+// (e.g. Upstash) if this app gets meaningfully public traffic.
+const RATE_LIMIT_MAX = 20;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
 module.exports = async (req, res) => {
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const { eli, title, url } = body;
     if (!eli) { res.status(400).json({ error: "eli is required" }); return; }
-    const entry = await generateFaqForAct({ eli, title, url });
     const prevState = (await loadState()) || { sources: [], history: {}, faq: {} };
-    const nextState = { ...prevState, faq: { ...(prevState.faq || {}), [eli]: entry } };
+    const now = Date.now();
+    const recentCalls = (prevState.faqCallLog || []).filter((ts) => now - ts < RATE_LIMIT_WINDOW_MS);
+    if (recentCalls.length >= RATE_LIMIT_MAX) {
+      res.status(429).json({ error: "too many FAQ generations this hour, try again later" });
+      return;
+    }
+    const entry = await generateFaqForAct({ eli, title, url });
+    const nextState = { ...prevState, faqCallLog: [...recentCalls, now], faq: { ...(prevState.faq || {}), [eli]: entry } };
     try { await saveState(nextState); } catch (e) { console.error("saveState failed:", e.message); }
     res.status(200).json({ entry });
   } catch (e) {

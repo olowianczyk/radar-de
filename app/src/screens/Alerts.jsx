@@ -1,14 +1,14 @@
 // Email alerts — configure who/how often gets emailed on detected legal changes, + preview.
 import React from "react";
 import { Card, Badge, StatusPill, Switch, Select, Button, Icon } from "../components/index.js";
-import { HRBP_I18N, HRBP_CHANGES, HRBP_STATUS_MAP } from "../data.js";
+import { HRBP_I18N, HRBP_STATUS_MAP } from "../data.js";
 
-export function Alerts({ lang, role }) {
+export function Alerts({ lang, role, changes }) {
   const [enabled, setEnabled] = React.useState(true);
   const [freq, setFreq] = React.useState("daily");
   const [onlyUrgent, setOnlyUrgent] = React.useState(false);
   const t = HRBP_I18N[lang];
-  const digestChanges = HRBP_CHANGES.filter((c) => c.status === "new" || c.status === "urgent");
+  const digestChanges = (changes || []).filter((c) => c.status === "new" || c.status === "urgent");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>

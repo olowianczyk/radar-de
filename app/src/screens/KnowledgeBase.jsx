@@ -3,7 +3,7 @@
 import React from "react";
 import { Card, Badge, Input, Icon, Button, Avatar, Textarea, IconButton, Tabs, Select } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
-import { HRBP_I18N, HRBP_KB, HRBP_CHANGES, HRBP_KB_COMMENTS, HRBP_KB_ATTACHMENTS, HRBP_KB_VERSIONS, HRBP_AREA_TONE } from "../data.js";
+import { HRBP_I18N, HRBP_KB, HRBP_KB_COMMENTS, HRBP_KB_ATTACHMENTS, HRBP_KB_VERSIONS, HRBP_AREA_TONE } from "../data.js";
 
 function parseDMY(s) {
   const [d, m, y] = (s || "").split(".").map(Number);
@@ -62,7 +62,9 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
     return a.title[lang].localeCompare(b.title[lang]);
   });
   const sel = docs.find((d) => d.id === selectedId) || HRBP_KB.find((d) => d.id === selectedId);
-  const relatedChanges = sel ? HRBP_CHANGES.filter((c) => c.affected.includes(sel.id)) : [];
+  // No real mapping exists from a detected Sejm act to a specific KB document —
+  // that link was fabricated demo data, not derivable from the real scan/API.
+  const relatedChanges = [];
   const extIcon = (ext) => ext === "pdf" ? "file-text" : (ext === "xlsx" || ext === "xls") ? "file-spreadsheet" : "file";
 
   return (

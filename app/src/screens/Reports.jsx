@@ -2,23 +2,19 @@
 import React from "react";
 import { Card, StatCard, Icon, Select, Button } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
-import { HRBP_I18N, HRBP_CHANGES, HRBP_SOURCES } from "../data.js";
+import { HRBP_I18N, HRBP_SOURCES } from "../data.js";
 
-export function Reports({ lang }) {
+export function Reports({ lang, changes: changesProp }) {
   const t = HRBP_I18N[lang];
   const [area, setArea] = React.useState("");
   const [status, setStatus] = React.useState("");
-  const allChanges = HRBP_CHANGES;
+  const allChanges = changesProp || [];
   const changes = allChanges.filter((c) => (!area || c.area === area) && (!status || c.status === status));
 
   const byArea = ["leave", "pay", "safety", "contracts", "social", "other"]
     .map((area) => ({ area, n: changes.filter((c) => c.area === area).length, tone: { leave: "var(--brand)", pay: "var(--blue-700)", safety: "var(--amber-600)", contracts: "var(--ink-500)", social: "var(--green-700)", other: "var(--coral-500)" }[area] }))
     .filter((b) => b.n > 0);
   const maxArea = Math.max(1, ...byArea.map((b) => b.n));
-
-  const trend = [3, 5, 4, 6, 5, changes.length];
-  const tmax = Math.max(...trend);
-  const months = lang === "de" ? ["Feb", "Mär", "Apr", "Mai", "Jun", "Jul"] : lang === "en" ? ["Feb", "Mar", "Apr", "May", "Jun", "Jul"] : ["II", "III", "IV", "V", "VI", "VII"];
 
   const topSources = [...HRBP_SOURCES].sort((a, b) => b.found - a.found).slice(0, 5);
   const doneCount = changes.filter((c) => c.status === "done").length;
@@ -32,9 +28,7 @@ export function Reports({ lang }) {
         {(area || status) && <Button variant="ghost" iconLeft={<Icon name="x" size={14} />} onClick={() => { setArea(""); setStatus(""); }}>{t.clearFilters}</Button>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
-        <StatCard label={t.avgReview} value="2.4 dni" accent="petrol" icon={<Icon name="timer" size={18} />} />
         <StatCard label={t.detected} value={String(changes.length)} accent="danger" icon={<Icon name="sparkles" size={18} />} />
-        <StatCard label={t.compliance} value="94%" delta="+2pp" deltaDir="up" accent="success" icon={<Icon name="check-circle-2" size={18} />} />
         <StatCard label={t.monitored} value={String(HRBP_SOURCES.length)} accent="coral" icon={<Icon name="radar" size={18} />} />
       </div>
       {changes.length === 0 ? (
@@ -51,16 +45,6 @@ export function Reports({ lang }) {
                   <div style={{ width: (b.n / maxArea * 100) + "%", height: "100%", background: b.tone, borderRadius: "var(--radius-pill)" }} />
                 </div>
                 <div style={{ width: 20, textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-heading)" }}>{b.n}</div>
-              </div>
-            ))}
-          </div>
-        </Card>
-        <Card padding="lg" header={t.trend}>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 150, marginTop: 8 }}>
-            {trend.map((v, i) => (
-              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                <div style={{ width: "100%", maxWidth: 30, height: (v / tmax * 120) + "px", background: i === trend.length - 1 ? "var(--accent)" : "var(--brand)", borderRadius: "6px 6px 0 0" }} />
-                <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{months[i]}</div>
               </div>
             ))}
           </div>

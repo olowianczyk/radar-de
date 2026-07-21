@@ -68,12 +68,6 @@ function isoToday() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
-function isoDaysAgo(days) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 function toIsoDate(dmyhm) {
   const datePart = (dmyhm || "").split(" ")[0];
   const [d, m, y] = datePart.split(".").map(Number);
@@ -94,16 +88,23 @@ function formatDetectedTs(announcementDate) {
   return `${d}.${m}.${y} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
 
+// Start of the current year — used as the "no lastChecked yet" fallback so a
+// first-ever scan surfaces this year's changes instead of just the last day.
+function isoYearStart() {
+  return `${new Date().getFullYear()}-01-01`;
+}
+
 // Runs one real scan per source against the live Sejm/ELI API. `sources` items
 // need { id, keyword, lastChecked } (lastChecked in "DD.MM.YYYY HH:MM" — from the
-// frontend's real state) or just { id, keyword } (cron path — falls back to a
-// fixed lookback window since there's no persisted per-source state server-side).
-async function scanSources(sources, fallbackLookbackDays = 1) {
+// frontend's real state) or just { id, keyword } (cron path — no persisted
+// per-source state server-side, so it also falls back to start-of-year on a
+// source's very first run; subsequent runs use the persisted lastChecked).
+async function scanSources(sources) {
   const todayIso = isoToday();
   const nowStr = formatNow();
   return Promise.all(sources.map(async (s) => {
     if (!s.keyword) return { id: s.id, lastChecked: nowStr, found: 0, detected: [] };
-    const dateFrom = toIsoDate(s.lastChecked) || isoDaysAgo(fallbackLookbackDays);
+    const dateFrom = toIsoDate(s.lastChecked) || isoYearStart();
     try {
       const items = await searchActs({ keyword: s.keyword, dateFrom, dateTo: todayIso, limit: 10 });
       const detected = items.map((item) => ({
@@ -128,7 +129,10 @@ async function scanSources(sources, fallbackLookbackDays = 1) {
 // codes (e.g. Kodeks pracy itself) would need chunking, out of scope here.
 const MAX_ACT_TEXT_CHARS = 20000;
 
+const ELI_RE = /^[A-Za-z0-9._/-]+$/;
+
 async function fetchActText(eli) {
+  if (!ELI_RE.test(eli)) throw new Error("invalid eli");
   // Required lazily, and pinned to 1.1.1: pdf-parse 2.x pulls in @napi-rs/canvas
   // for page rendering, which isn't installed — it crashed at require-time with
   // "DOMMatrix is not defined", which (since _lib.js is required by every /api
@@ -179,4 +183,4 @@ ${actText}`;
   return { eli, title, url, generatedAt: new Date().toISOString(), items };
 }
 
-module.exports = { searchActs, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, isoDaysAgo, loadState, saveState, generateFaqForAct, fetchActText };
+module.exports = { searchActs, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, loadState, saveState, generateFaqForAct, fetchActText };

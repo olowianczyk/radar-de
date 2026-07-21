@@ -149,58 +149,28 @@ export const HRBP_I18N = {
   },
 };
 
-export const HRBP_CHANGES = [
-  { id: 1, act: "Kodeks pracy — art. 1481", title: { pl: "Nowe zasady pracy zdalnej okazjonalnej", de: "Neue Regeln für gelegentliche Remote-Arbeit", en: "New rules for occasional remote work" }, area: "contracts", status: "urgent", date: "14.07.2026", effective: "01.09.2026", source: "ISAP — Dz.U. 2026, poz. 1188 (tekst ujednolicony)", summary: { pl: "Zwiększono limit dni pracy zdalnej okazjonalnej z 24 do 30 dni rocznie oraz doprecyzowano zasady rozliczania ekwiwalentu.", de: "Das Limit für gelegentliche Remote-Arbeit wurde von 24 auf 30 Tage pro Jahr erhöht; die Abgeltungsregeln wurden präzisiert.", en: "The occasional remote-work limit rises from 24 to 30 days/year; equivalent-payment rules were clarified." }, affected: [1, 3] },
-  { id: 2, act: "Rozporządzenie MRPiPS ws. BHP", title: { pl: "Aktualizacja norm dot. stanowisk z monitorami ekranowymi", de: "Aktualisierte Normen für Bildschirmarbeitsplätze", en: "Updated standards for display-screen workstations" }, area: "safety", status: "new", date: "12.07.2026", effective: "01.10.2026", source: "ISAP — Dz.U. 2026, poz. 1172 (tekst ujednolicony)", summary: { pl: "Nowe wymogi dotyczące przerw i badań okulistycznych dla pracowników biurowych.", de: "Neue Anforderungen an Pausen und augenärztliche Untersuchungen für Büromitarbeitende.", en: "New requirements for breaks and eye examinations for office employees." }, affected: [5] },
-  { id: 3, act: "Ustawa o PPK", title: { pl: "Zmiana progu wynagrodzenia dla obniżonej wpłaty podstawowej", de: "Geänderte Gehaltsschwelle für reduzierten Basisbeitrag", en: "Changed pay threshold for the reduced basic contribution" }, area: "pay", status: "progress", date: "08.07.2026", effective: "01.01.2027", source: "ISAP — Dz.U. 2026, poz. 1140 (tekst ujednolicony)", summary: { pl: "Podwyższono próg 1,2-krotności minimalnego wynagrodzenia uprawniający do obniżonej wpłaty podstawowej PPK.", de: "Die Schwelle des 1,2-fachen Mindestlohns für den reduzierten PPK-Basisbeitrag wurde angehoben.", en: "The 1.2×-minimum-wage threshold qualifying for the reduced PPK basic contribution was raised." }, affected: [2] },
-  { id: 4, act: "Kodeks pracy — art. 1731", title: { pl: "Wydłużenie urlopu opiekuńczego", de: "Verlängerung des Pflegeurlaubs", en: "Extended caregiver leave" }, area: "leave", status: "waiting", date: "05.07.2026", effective: "—", source: "ISAP — projekt, II czytanie w Sejmie", summary: { pl: "Projekt zakłada wydłużenie bezpłatnego urlopu opiekuńczego z 5 do 7 dni w roku kalendarzowym.", de: "Der Entwurf verlängert den unbezahlten Pflegeurlaub von 5 auf 7 Tage pro Kalenderjahr.", en: "The draft extends unpaid caregiver leave from 5 to 7 days per calendar year." }, affected: [1] },
-  { id: 5, act: "Ustawa o zatrudnianiu cudzoziemców", title: { pl: "Uproszczenie procedury powiadomień o powierzeniu pracy", de: "Vereinfachtes Meldeverfahren für Beschäftigung", en: "Simplified work-assignment notification procedure" }, area: "contracts", status: "done", date: "20.06.2026", effective: "01.07.2026", source: "ISAP — Dz.U. 2026, poz. 1090 (tekst ujednolicony)", summary: { pl: "Skrócono czas rozpatrywania powiadomień z 14 do 7 dni oraz wprowadzono w pełni elektroniczny obieg.", de: "Die Bearbeitungszeit für Meldungen wurde von 14 auf 7 Tage verkürzt; die Abwicklung ist nun vollständig elektronisch.", en: "Notification processing time was cut from 14 to 7 days, and the process is now fully electronic." }, affected: [3] },
-  { id: 6, act: "Ustawa o związkach zawodowych", title: { pl: "Nowe progi reprezentatywności organizacji związkowej", de: "Neue Repräsentativitätsschwellen für Gewerkschaften", en: "New representativeness thresholds for trade unions" }, area: "other", status: "done", date: "15.06.2026", effective: "15.06.2026", source: "ISAP — Dz.U. 2026, poz. 1071 (tekst ujednolicony)", summary: { pl: "Zmieniono próg liczby członków wymaganych do uzyskania statusu reprezentatywnej organizacji zakładowej.", de: "Die erforderliche Mitgliederzahl für den Status einer repräsentativen Betriebsgewerkschaft wurde geändert.", en: "The member-count threshold for representative workplace union status was changed." }, affected: [] },
-];
+// Real legal changes are no longer hand-written here — they're built at runtime
+// from actual Sejm/ELI scan results (see isapIntegration.js buildChangesFromHistory),
+// fed by /api/scan-all + /api/state. This used to be 6 fabricated demo entries with
+// invented Dz.U. positions and summaries; removed because they read as real legal
+// facts but weren't.
 
 // `keyword` maps a source to the real Sejm/ELI API taxonomy term (see /api/_lib.js) —
 // verified live against api.sejm.gov.pl before wiring in. PIP has no ELI equivalent
 // (it's guidance, not a Dziennik Ustaw act), so it has no keyword and stays manual.
+// `area` is our own HR-topic categorization of the source, not a legal fact.
 export const HRBP_SOURCES = [
-  { id: 1, name: "Kodeks pracy — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "kodeks pracy", lastChecked: "16.07.2026 06:00", found: 1, active: true },
-  { id: 2, name: "Ustawa o PPK — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "pracownicze plany kapitałowe", lastChecked: "16.07.2026 06:00", found: 1, active: true },
-  { id: 3, name: "Rozporządzenia MRPiPS ws. BHP", type: "Rozporządzenie", url: "https://isap.sejm.gov.pl", keyword: "BHP", lastChecked: "15.07.2026 22:00", found: 1, active: true },
-  { id: 4, name: "Ustawa o zatrudnianiu cudzoziemców", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "cudzoziemcy", lastChecked: "15.07.2026 22:00", found: 1, active: true },
-  { id: 5, name: "Ustawa o związkach zawodowych", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "związki zawodowe", lastChecked: "14.07.2026 18:00", found: 1, active: true },
-  { id: 6, name: "Państwowa Inspekcja Pracy — wytyczne", type: "Wytyczne", url: "https://www.pip.gov.pl", keyword: null, lastChecked: "14.07.2026 18:00", found: 0, active: false },
+  { id: 1, name: "Kodeks pracy — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "kodeks pracy", area: "contracts", lastChecked: null, found: 0, active: true },
+  { id: 2, name: "Ustawa o PPK — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "pracownicze plany kapitałowe", area: "pay", lastChecked: null, found: 0, active: true },
+  { id: 3, name: "Rozporządzenia MRPiPS ws. BHP", type: "Rozporządzenie", url: "https://isap.sejm.gov.pl", keyword: "BHP", area: "safety", lastChecked: null, found: 0, active: true },
+  { id: 4, name: "Ustawa o zatrudnianiu cudzoziemców", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "cudzoziemcy", area: "contracts", lastChecked: null, found: 0, active: true },
+  { id: 5, name: "Ustawa o związkach zawodowych", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "związki zawodowe", area: "other", lastChecked: null, found: 0, active: true },
+  { id: 6, name: "Państwowa Inspekcja Pracy — wytyczne", type: "Wytyczne", url: "https://www.pip.gov.pl", keyword: null, area: "safety", lastChecked: null, found: 0, active: false },
 ];
 
-export const HRBP_SOURCE_HISTORY = {
-  1: [
-    { ts: "16.07.2026 06:00", type: "detected", note: "Wykryto zmianę — art. 1481, praca zdalna okazjonalna" },
-    { ts: "15.07.2026 06:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-    { ts: "14.07.2026 06:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-    { ts: "10.07.2026 06:00", type: "detected", note: "Wykryto zmianę — art. 1731, urlop opiekuńczy (projekt)" },
-  ],
-  2: [
-    { ts: "16.07.2026 06:00", type: "detected", note: "Wykryto zmianę — próg wpłaty podstawowej PPK" },
-    { ts: "15.07.2026 06:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-    { ts: "13.07.2026 06:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-  ],
-  3: [
-    { ts: "15.07.2026 22:00", type: "detected", note: "Wykryto zmianę — normy dla stanowisk z monitorami" },
-    { ts: "14.07.2026 22:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-    { ts: "13.07.2026 22:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-  ],
-  4: [
-    { ts: "15.07.2026 22:00", type: "detected", note: "Wykryto zmianę — procedura powiadomień o powierzeniu pracy" },
-    { ts: "13.07.2026 22:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-  ],
-  5: [
-    { ts: "14.07.2026 18:00", type: "detected", note: "Wykryto zmianę — progi reprezentatywności związków" },
-    { ts: "12.07.2026 18:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-  ],
-  6: [
-    { ts: "14.07.2026 18:00", type: "paused", note: "Monitorowanie wstrzymane przez Martę G.-Jarosz" },
-    { ts: "10.07.2026 18:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-    { ts: "05.07.2026 18:00", type: "resumed", note: "Monitorowanie wznowione przez Martę G.-Jarosz" },
-  ],
-};
+// No seed history — real per-source history comes back from /api/state once a
+// scan (cron or manual) has actually run. Empty until then, not invented.
+export const HRBP_SOURCE_HISTORY = {};
 
 export const HRBP_KB = [
   { id: 1, icon: "palmtree", title: { pl: "Polityka urlopowa", de: "Urlaubsrichtlinie", en: "Leave policy" }, meta: "PL · DE · EN", area: "leave", needsUpdate: true, updated: "12.03.2026",

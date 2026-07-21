@@ -8,26 +8,8 @@
 // third party itself. The backend also runs on a daily Vercel Cron independent of
 // any browser being open (see vercel.json).
 //
-// What's still not real: the PL/DE/EN summaries in HRBP_CHANGES are hand-written
-// demo content, not generated from the acts forceScan() finds — a production system
-// would still need a summarization step (LLM or human review) to turn a detected act
-// into that curated card, same as the original design notes said. Also: without a
-// database, the backend has no persisted per-source "last checked" state of its
-// own — the frontend still owns that (in React state) and sends it with each scan.
-import { HRBP_CHANGES, HRBP_SOURCES } from "./data.js";
-
 function simulateNetwork(value, ms) {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
-}
-
-// Real version: `const res = await fetch('/api/isap/changes'); return res.json();`
-export async function fetchIsapChanges() {
-  return simulateNetwork(HRBP_CHANGES, 350);
-}
-
-// Real version: `const res = await fetch('/api/isap/sources'); return res.json();`
-export async function fetchIsapSources() {
-  return simulateNetwork(HRBP_SOURCES, 250);
 }
 
 // Real version: server-side toggle persisted in a DB; here just echoes back.
@@ -72,6 +54,40 @@ export async function generateFaq({ eli, title, url }) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || `generate-faq failed: ${res.status}`);
   return data.entry;
+}
+
+// Builds the "legal changes" feed from real scan history instead of hand-written
+// demo cards. Each real detected entry has {ts, note, url, eli} (see api/_lib.js
+// scanSources) — title/act/date/source come straight from that, so nothing here
+// is invented. `effective` and workflow `status` aren't in the Sejm API at all
+// (that's a triage decision a human makes), so every entry starts as "new" with
+// no effective date until someone reviews it — no fabricated placeholder values.
+export function buildChangesFromHistory(sourceHistory, sources, faq) {
+  const changes = [];
+  Object.entries(sourceHistory || {}).forEach(([sourceId, events]) => {
+    const source = sources.find((s) => String(s.id) === String(sourceId));
+    if (!source) return;
+    (events || []).filter((e) => e.type === "detected").forEach((e) => {
+      const entry = e.eli ? faq[e.eli] : null;
+      const summary = entry?.items?.[0]
+        ? { pl: entry.items[0].answer.pl, de: entry.items[0].answer.de, en: entry.items[0].answer.en }
+        : { pl: "Brak wygenerowanego FAQ dla tego aktu.", de: "Noch keine FAQ für diesen Rechtsakt.", en: "No FAQ generated for this act yet." };
+      changes.push({
+        id: e.eli || `${sourceId}-${e.ts}`,
+        eli: e.eli,
+        act: source.name,
+        area: source.area,
+        status: "new",
+        date: (e.ts || "").split(" ")[0],
+        effective: "—",
+        source: e.url || source.url,
+        title: { pl: e.note, de: e.note, en: e.note },
+        summary,
+        affected: [],
+      });
+    });
+  });
+  return changes;
 }
 
 export async function forceScan(activeSources) {
