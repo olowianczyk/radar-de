@@ -103,6 +103,21 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   // specific period on the Sejm/ELI API instead.
   const [scanFrom, setScanFrom] = React.useState("");
   const [scanTo, setScanTo] = React.useState("");
+  // User's triage decisions (mark reviewed/implemented) — client-side only.
+  // ponytail: localStorage, move into Blob state when multi-device matters.
+  const [statusMap, setStatusMap] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem("hrbp-triage") || "{}"); } catch (e) { return {}; }
+  });
+  const setChangeStatus = React.useCallback((ids, st) => {
+    setStatusMap((prev) => {
+      const ts = new Date().toISOString().slice(0, 10);
+      const next = { ...prev };
+      (Array.isArray(ids) ? ids : [ids]).forEach((id) => { next[id] = { st, ts }; });
+      try { localStorage.setItem("hrbp-triage", JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+  }, []);
+  const [lastScanFound, setLastScanFound] = React.useState(null);
   React.useEffect(() => {
     fetchPersistedState().then((state) => {
       if (!state.sources.length) return; // no run yet (or no Blob store attached) — keep seed data
@@ -122,11 +137,14 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   const runScan = React.useCallback(() => {
     if (scanning) return;
     setScanning(true);
-    const range = scanFrom && scanTo ? { from: scanFrom, to: scanTo } : undefined;
+    // "From" alone is a valid period (backend defaults "to" = today); swap if reversed.
+    const [f, to] = scanFrom && scanTo && scanFrom > scanTo ? [scanTo, scanFrom] : [scanFrom, scanTo];
+    const range = f ? { from: f, to: to || undefined } : undefined;
     forceScan(sources.filter((s) => s.active), range).then((results) => {
+      setLastScanFound(results.reduce((n, r) => n + (r.found || 0), 0));
       setSources((prev) => prev.map((s) => {
         const r = results.find((x) => x.id === s.id);
-        return r ? { ...s, lastChecked: r.lastChecked, found: r.found } : s;
+        return r ? { ...s, lastChecked: r.lastChecked, found: r.found, error: r.error || null } : s;
       }));
       setSourceHistory((prev) => {
         const next = { ...prev };
@@ -158,7 +176,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [notifOpen]);
-  const changes = React.useMemo(() => buildChangesFromHistory(sourceHistory, sources), [sourceHistory, sources]);
+  const changes = React.useMemo(() => buildChangesFromHistory(sourceHistory, sources, statusMap), [sourceHistory, sources, statusMap]);
   const notifChanges = changes.filter((c) => c.status === "new" || c.status === "urgent");
   const notifKb = HRBP_KB.filter((k) => k.needsUpdate);
   const notifTotal = notifChanges.length + notifKb.length;
@@ -220,7 +238,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
             </IconButton>
           )}
           <LangSwitch lang={lang} setLang={setLang} />
-          <IconButton label="Tryb ciemny" active={dark} onClick={() => setDark((d) => !d)}><Icon name={dark ? "sun" : "moon"} size={18} /></IconButton>
+          <IconButton label={t.settings.darkMode} active={dark} onClick={() => setDark((d) => !d)}><Icon name={dark ? "sun" : "moon"} size={18} /></IconButton>
           {!isMobile && (
             <div ref={notifRef} style={{ position: "relative" }}>
               <IconButton label={t.notifications} active={notifOpen} onClick={() => setNotifOpen((v) => !v)} style={{ position: "relative" }}>
@@ -269,11 +287,11 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
               )}
             </div>
           )}
-          <IconButton label="Ustawienia" active={active === "settings"} onClick={() => setActive("settings")}><Icon name="settings" size={18} /></IconButton>
+          <IconButton label={t.nav.settings} active={active === "settings"} onClick={() => setActive("settings")}><Icon name="settings" size={18} /></IconButton>
         </header>
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo }) : children}
+            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound }) : children}
           </div>
         </main>
       </div>

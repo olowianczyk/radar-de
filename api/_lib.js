@@ -37,7 +37,9 @@ async function saveState(state) {
   });
 }
 
-async function searchActs({ keyword, dateFrom, dateTo, publisher = "DU", limit = 10 }) {
+// limit 100: broad keywords ("czas pracy") can exceed 10 hits in a wide range;
+// 100 covers any realistic period without pagination.
+async function searchActs({ keyword, dateFrom, dateTo, publisher = "DU", limit = 100 }) {
   const params = new URLSearchParams({ publisher, limit: String(limit) });
   if (keyword) params.set("keyword", keyword);
   if (dateFrom) params.set("dateFrom", dateFrom);
@@ -122,7 +124,7 @@ async function scanSources(sources, range) {
     const dateFrom = rangeFrom || toIsoDate(s.lastChecked) || isoYearStart();
     const dateTo = rangeFrom ? rangeTo : todayIso;
     try {
-      const items = await searchActs({ keyword: s.keyword, dateFrom, dateTo, limit: 10 });
+      const items = await searchActs({ keyword: s.keyword, dateFrom, dateTo });
       const detected = items.map((item) => ({
         ts: formatDetectedTs(item.announcementDate),
         type: "detected",

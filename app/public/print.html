@@ -35,11 +35,14 @@ h1{font-family:var(--font-display);font-size:26px;color:var(--text-heading);marg
 <script src="./print-data.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
-const idsParam = params.get("ids");
-const id = Number(params.get("id")) || 1;
 const lang = params.get("lang") || "pl";
 const t = window.HRBP_I18N[lang];
-const list = idsParam ? idsParam.split(",").map(Number).map((i) => window.HRBP_CHANGES.find((x) => x.id === i)).filter(Boolean) : [window.HRBP_CHANGES.find((x) => x.id === id) || window.HRBP_CHANGES[0]];
+// Rows come from the app via localStorage (real scan data lives in React state,
+// not in any static file) — the app writes "hrbp-print" just before opening us.
+let list = [];
+try { list = JSON.parse(localStorage.getItem("hrbp-print") || "[]"); } catch (e) {}
+// Titles/summaries come from an external API — escape before innerHTML.
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 const areaTone = { brand: ["var(--brand-soft)", "var(--teal-800)"], blue: ["var(--blue-100)", "var(--blue-700)"], amber: ["var(--amber-100)", "var(--amber-600)"], neutral: ["var(--surface-sunken)", "var(--text-muted)"], green: ["var(--green-100)", "var(--green-700)"] };
 const statusTone = { new: areaTone.blue, progress: areaTone.amber, waiting: areaTone.neutral, urgent: ["var(--red-100)", "var(--red-700)"], done: ["var(--green-100)", "var(--green-700)"] };
 const now = new Date().toLocaleString(lang === "pl" ? "pl-PL" : lang === "de" ? "de-DE" : "en-GB");
@@ -48,29 +51,29 @@ document.getElementById("sheets").innerHTML = list.map((c) => {
   const [aBg, aFg] = areaTone[window.HRBP_AREA_TONE[c.area]] || areaTone.neutral;
   const [sBg, sFg] = statusTone[c.status] || areaTone.neutral;
   const stLabel = { new: t.st.new, progress: t.st.progress, waiting: t.st.waiting, urgent: t.st.urgent, done: t.st.done }[c.status];
-  const affected = c.affected.map((docId) => window.HRBP_KB.find((k) => k.id === docId)).filter(Boolean);
+  const affected = (c.affected || []).map((docId) => window.HRBP_KB.find((k) => k.id === docId)).filter(Boolean);
   return `
   <div class="sheet">
   <div class="top">
     <span class="brand">HR Business Partner Platform</span>
     <span class="eyebrow">${t.app}</span>
   </div>
-  <h1>${c.title[lang] || c.title.pl}</h1>
-  <div class="act">${c.act}</div>
+  <h1>${esc(c.title[lang] || c.title.pl)}</h1>
+  <div class="act">${esc(c.act)}</div>
   <div class="badges">
     <span class="badge" style="background:${sBg};color:${sFg}">${stLabel}</span>
     <span class="badge" style="background:${aBg};color:${aFg}">${t.area[c.area]}</span>
   </div>
   <div class="grid">
-    <div><div class="l">${t.published}</div><div class="v">${c.date}</div></div>
-    <div><div class="l">${t.effective}</div><div class="v">${c.effective}</div></div>
-    <div><div class="l">${t.source}</div><div class="v">${c.source}</div></div>
+    <div><div class="l">${t.published}</div><div class="v">${esc(c.date)}</div></div>
+    <div><div class="l">${t.effective}</div><div class="v">${esc(c.effective)}</div></div>
+    <div><div class="l">${t.source}</div><div class="v">${esc(c.source)}</div></div>
   </div>
-  <p class="summary">${(c.summary[lang] || c.summary.pl)}</p>
+  <p class="summary">${esc(c.summary[lang] || c.summary.pl)}</p>
   ${affected.length ? `<div class="affected"><h3>${t.affected}</h3>${affected.map((d) => `<div class="doc">• ${d.title[lang] || d.title.pl}</div>`).join("")}</div>` : ""}
   <div class="footer"><span>${now}</span><span>HR Business Partner Platform — Monitoring zmian w prawie pracy</span></div>
   </div>`;
-}).join("");
+}).join("") || `<div class="sheet"><p class="summary">${esc(t.feedEmptyTitle)}</p></div>`;
 </script>
 </body>
 </html>

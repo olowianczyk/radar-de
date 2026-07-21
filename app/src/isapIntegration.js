@@ -47,19 +47,24 @@ export async function fetchPersistedState() {
 // is invented. `effective` and workflow `status` aren't in the Sejm API at all
 // (that's a triage decision a human makes), so every entry starts as "new" with
 // no effective date until someone reviews it — no fabricated placeholder values.
-export function buildChangesFromHistory(sourceHistory, sources) {
+// `statusMap` (optional) = user's persisted triage decisions keyed by change id:
+// { [id]: { st: "progress"|"done"|…, ts: "YYYY-MM-DD" } }. Untriaged stays "new".
+export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
   const changes = [];
   Object.entries(sourceHistory || {}).forEach(([sourceId, events]) => {
     const source = sources.find((s) => String(s.id) === String(sourceId));
     if (!source) return;
     (events || []).filter((e) => e.type === "detected").forEach((e) => {
       const summary = { pl: e.note, de: e.note, en: e.note };
+      const id = e.eli || `${sourceId}-${e.ts}`;
+      const triage = (statusMap || {})[id];
       changes.push({
-        id: e.eli || `${sourceId}-${e.ts}`,
+        id,
         eli: e.eli,
         act: source.name,
         area: source.area,
-        status: "new",
+        status: triage ? triage.st : "new",
+        statusTs: triage ? triage.ts : null,
         date: (e.ts || "").split(" ")[0],
         effective: "—",
         source: e.url || source.url,
@@ -69,7 +74,8 @@ export function buildChangesFromHistory(sourceHistory, sources) {
       });
     });
   });
-  return changes;
+  const dmy = (s) => { const [d, m, y] = (s || "").split(".").map(Number); return new Date(y || 0, (m || 1) - 1, d || 1).getTime(); };
+  return changes.sort((a, b) => dmy(b.date) - dmy(a.date));
 }
 
 // `range`, when given ({from, to} as YYYY-MM-DD), overrides each source's

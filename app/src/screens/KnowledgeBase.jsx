@@ -152,7 +152,6 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
                   <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
                     <Icon name="paperclip" size={13} />{t.attachments}{(HRBP_KB_ATTACHMENTS[sel.id] || []).length > 0 ? ` · ${(HRBP_KB_ATTACHMENTS[sel.id] || []).length}` : ""}
                   </div>
-                  {role !== "viewer" && <Button variant="ghost" iconLeft={<Icon name="upload" size={14} />}>{t.addAttachment}</Button>}
                 </div>
                 {(HRBP_KB_ATTACHMENTS[sel.id] || []).length === 0 ? (
                   <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted)" }}>{t.noAttachments}</p>
@@ -172,9 +171,6 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
                     ))}
                   </div>
                 )}
-              </div>
-              <div>
-                <Button variant="secondary" iconLeft={<Icon name="download" size={16} />}>PDF</Button>
               </div>
               <div>
                 <button onClick={() => setHistoryOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, marginBottom: historyOpen ? 12 : 0 }}>

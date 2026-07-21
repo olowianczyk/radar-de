@@ -26,14 +26,15 @@ function periodRange(period, customDate) {
   return [null, null];
 }
 
-function ScanBanner({ lang, sources, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo }) {
+function ScanBanner({ lang, sources, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo, lastScanFound }) {
   const t = HRBP_I18N[lang];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--brand-soft)", color: "var(--on-brand-soft)", padding: "10px 16px", borderRadius: "var(--radius-md)", fontSize: 13, flexWrap: "wrap" }}>
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success-500)", flex: "0 0 8px" }} />
       <Icon name="radar" size={16} />
-      <span style={{ fontWeight: 600 }}>{t.monitoring}: {lang === "pl" ? "automatyczne skanowanie codziennie o 06:00" : lang === "de" ? "automatischer Scan täglich um 06:00" : "automatic scan daily at 06:00"}</span>
+      <span style={{ fontWeight: 600 }}>{t.monitoring}: {t.autoScan}</span>
       <span style={{ opacity: 0.75 }}>· {t.lastChecked.toLowerCase()}: {latestIsapCheck(sources)}</span>
+      {lastScanFound != null && !scanning && <span style={{ fontWeight: 600 }}>· {t.scanDone} ({lastScanFound})</span>}
       <div style={{ flex: 1 }} />
       <Input type="date" value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} placeholder={t.periodFrom} style={{ width: 140 }} />
       <Input type="date" value={scanTo} onChange={(e) => setScanTo(e.target.value)} placeholder={t.periodTo} style={{ width: 140 }} />
@@ -44,7 +45,7 @@ function ScanBanner({ lang, sources, scanning, runScan, scanFrom, setScanFrom, s
   );
 }
 
-export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role, sources, scanning, runScan, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo }) {
+export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role, sources, scanning, runScan, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound }) {
   const t = HRBP_I18N[lang];
   const [period, setPeriod] = React.useState("all");
   const [customDate, setCustomDate] = React.useState("");
@@ -70,12 +71,17 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
   const newCount = changes.filter((c) => c.status === "new").length;
   const pendingCount = changes.filter((c) => c.status === "progress" || c.status === "waiting").length;
   const doneCount = changes.filter((c) => c.status === "done").length;
-  const exportPdf = () => {
-    const ids = filtered.map((c) => c.id).join(",");
-    window.open(`${printBase || "print.html"}?ids=${ids}&lang=${lang}`, "_blank");
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const doneThisMonth = changes.filter((c) => c.status === "done" && (c.statusTs || "").startsWith(thisMonth)).length;
+  // print.html is a separate static page — hand it the rows via localStorage
+  // (real scan data lives only in React state, not in any static file).
+  const openPrint = (rows) => {
+    try { localStorage.setItem("hrbp-print", JSON.stringify(rows)); } catch (e) {}
+    window.open(`${printBase || "print.html"}?lang=${lang}`, "_blank");
   };
+  const exportPdf = () => openPrint(filtered);
   const exportSelectedCsv = () => exportCsvFor(filtered.filter((c) => selected.has(c.id)));
-  const exportSelectedPdf = () => window.open(`${printBase || "print.html"}?ids=${[...selected].join(",")}&lang=${lang}`, "_blank");
+  const exportSelectedPdf = () => openPrint(filtered.filter((c) => selected.has(c.id)));
   function exportCsvFor(rows) {
     const header = ["Akt", "Tytuł", "Obszar", "Status", "Data publikacji", "Wejście w życie", "Źródło"];
     const data = rows.map((c) => [c.act, c.title[lang], t.area[c.area], t.st[c.status], c.date, c.effective, c.source]);
@@ -92,14 +98,18 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-3xl)", color: "var(--text-heading)", margin: 0 }}>{t.greet}</h1>
-        <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 14 }}>{t.greetSub.replace("{n}", String(newCount + changes.filter(c=>c.status==="urgent").length))}</p>
+        <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 14 }}>{(() => {
+          const n = newCount + changes.filter(c=>c.status==="urgent").length;
+          const f = t.greetSubForms;
+          return (f[new Intl.PluralRules(lang).select(n)] || f.many || f.other).replace("{n}", String(n));
+        })()}</p>
       </div>
-      <ScanBanner lang={lang} sources={sources} scanning={scanning} runScan={runScan} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} />
+      <ScanBanner lang={lang} sources={sources} scanning={scanning} runScan={runScan} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} lastScanFound={lastScanFound} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
         <StatCard label={t.kpi.new} value={String(newCount)} accent="danger" icon={<Icon name="sparkles" size={18} />} />
         <StatCard label={t.kpi.pending} value={String(pendingCount)} accent="petrol" icon={<Icon name="clock" size={18} />} />
         <StatCard label={t.kpi.tracked} value={String(sources.length)} accent="success" icon={<Icon name="radar" size={18} />} />
-        <StatCard label={t.kpi.updated} value={String(doneCount)} accent="coral" icon={<Icon name="check-circle-2" size={18} />} />
+        <StatCard label={t.kpi.updated} value={String(doneThisMonth)} accent="coral" icon={<Icon name="check-circle-2" size={18} />} />
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} iconLeft={<Icon name="search" size={16} />} /></div>
@@ -132,7 +142,7 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "10px 16px", background: "var(--brand-soft)", borderRadius: "var(--radius-md)" }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: "var(--on-brand-soft)" }}>{t.selectedCount.replace("{n}", String(selected.size))}</span>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}>
-            {role !== "viewer" && <Button variant="primary" size="sm" iconLeft={<Icon name="check" size={14} />}>{t.bulkMarkReviewed}</Button>}
+            {role !== "viewer" && <Button variant="primary" size="sm" iconLeft={<Icon name="check" size={14} />} onClick={() => { setChangeStatus([...selected], "progress"); setSelected(new Set()); }}>{t.bulkMarkReviewed}</Button>}
             <Button variant="secondary" size="sm" iconLeft={<Icon name="file-spreadsheet" size={14} />} onClick={exportSelectedCsv}>{t.exportCsv}</Button>
             <Button variant="secondary" size="sm" iconLeft={<Icon name="file-down" size={14} />} onClick={exportSelectedPdf}>{t.exportPdf}</Button>
             <Button variant="ghost" size="sm" iconLeft={<Icon name="x" size={14} />} onClick={() => setSelected(new Set())}>{t.clearSelection}</Button>
@@ -209,11 +219,11 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                 {role !== "viewer" && (
                   <React.Fragment>
-                    <Button variant="primary" iconLeft={<Icon name="check" size={16} />}>{t.markReviewed}</Button>
-                    <Button variant="ghost" iconLeft={<Icon name="file-check-2" size={16} />}>{t.updateDoc}</Button>
+                    {sel.status !== "progress" && sel.status !== "done" && <Button variant="primary" iconLeft={<Icon name="check" size={16} />} onClick={() => setChangeStatus(sel.id, "progress")}>{t.markReviewed}</Button>}
+                    {sel.status !== "done" && <Button variant="ghost" iconLeft={<Icon name="file-check-2" size={16} />} onClick={() => setChangeStatus(sel.id, "done")}>{t.updateDoc}</Button>}
                   </React.Fragment>
                 )}
-                <Button variant="secondary" iconLeft={<Icon name="printer" size={16} />} onClick={() => window.open(`${printBase || "print.html"}?id=${sel.id}&lang=${lang}`, "_blank")}>Drukuj</Button>
+                <Button variant="secondary" iconLeft={<Icon name="printer" size={16} />} onClick={() => openPrint([sel])}>{t.print}</Button>
                 {role === "viewer" && (
                   <span style={{ fontSize: 11.5, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5 }}><Icon name="eye" size={13} />{t.readOnlyNotice}</span>
                 )}

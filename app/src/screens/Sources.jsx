@@ -19,14 +19,13 @@ export function Sources({ lang, role, sources, setSources, sourceHistory, scanni
   };
   const t = HRBP_I18N[lang];
 
+  // ponytail: window.prompt over a form — two fields, native covers it.
   const addSource = () => {
     const name = window.prompt(t.sourcesTitle + " — nazwa aktu / źródła:");
     if (!name || !name.trim()) return;
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
-    const nowStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const keyword = (window.prompt("Słowo kluczowe wyszukiwania w API Sejmu (puste = źródło bez automatycznego skanu):") || "").trim() || null;
     const id = Math.max(0, ...sources.map((s) => s.id)) + 1;
-    setSources((prev) => [...prev, { id, name: name.trim(), type: "Ustawa", url: "https://isap.sejm.gov.pl", lastChecked: nowStr, found: 0, active: true }]);
+    setSources((prev) => [...prev, { id, name: name.trim(), type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword, area: "other", lastChecked: null, found: 0, active: true }]);
   };
 
   return (
@@ -65,7 +64,8 @@ export function Sources({ lang, role, sources, setSources, sourceHistory, scanni
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14 }}>{s.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{t.lastChecked}: {s.lastChecked}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{t.lastChecked}: {s.lastChecked || "—"}</div>
+                  {s.error && <div style={{ fontSize: 11.5, color: "var(--red-600, #c0392b)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{s.error}</div>}
                 </div>
                 <Badge tone="neutral">{s.type}</Badge>
                 {s.url && <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: "var(--brand)", display: "flex", alignItems: "center", gap: 4, flex: "0 0 auto" }}><Icon name="external-link" size={12} />ISAP</a>}
