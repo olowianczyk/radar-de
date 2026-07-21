@@ -50,8 +50,6 @@ export function Settings({ lang, setLang, dark, setDark, role, setRole, setActiv
         <div style={{ display: "flex", flexDirection: "column" }}>
           <Row label={t.role}><span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-heading)" }}>HR Business Partner</span></Row>
           <Row label={t.dept}><Badge tone="brand">HR</Badge></Row>
-          <Row label={t.site}><span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-heading)" }}>—</span></Row>
-          <Row label={t.email}><span style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--text-heading)" }}>hr.partner@hrbp-platform.example.com</span></Row>
         </div>
       </Card>
 
@@ -69,9 +67,6 @@ export function Settings({ lang, setLang, dark, setDark, role, setRole, setActiv
               style={{ width: 150 }} />
           </Row>
           <Row label={t.darkMode}><Switch checked={effectiveDark} onChange={(v) => { applyDark(v); flash(); }} /></Row>
-          <Row label={t.emailAlerts}>
-            <Button variant="ghost" size="sm" iconLeft={<Icon name="mail" size={14} />} onClick={() => setActive("alerts")}>{t.manage}</Button>
-          </Row>
         </Card>
 
         <Card padding="lg" header={t.account}>
