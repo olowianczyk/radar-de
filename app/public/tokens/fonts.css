@@ -1,8 +1,8 @@
-/* BSH HR BP — Webfonts, self-hosted (variable-font files in assets/fonts/).
-   Google-Fonts-family stand-ins — no licensed BSH corporate face was supplied.
+/* HR Business Partner Platform — Webfonts, self-hosted (variable-font files in assets/fonts/).
+   Google-Fonts-family stand-ins — no licensed company corporate face was supplied.
    Figtree ≈ UI sans (variable, wght 400-800 + italic), Fraunces ≈ editorial display
    (variable, opsz+wght), IBM Plex Mono ≈ mono (static weights). Replace these files
-   with BSH's licensed corporate typeface when provided — swap sources here only. */
+   with a licensed corporate typeface when provided — swap sources here only. */
 @font-face{
   font-family:"Figtree";
   src:url("../assets/fonts/Figtree[wght].ttf") format("truetype-variations");

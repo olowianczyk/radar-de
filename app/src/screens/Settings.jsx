@@ -50,8 +50,8 @@ export function Settings({ lang, setLang, dark, setDark, role, setRole, setActiv
         <div style={{ display: "flex", flexDirection: "column" }}>
           <Row label={t.role}><span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-heading)" }}>HR Business Partner</span></Row>
           <Row label={t.dept}><Badge tone="brand">HR</Badge></Row>
-          <Row label={t.site}><span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-heading)" }}>Fabryka Rzeszów · AGD</span></Row>
-          <Row label={t.email}><span style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--text-heading)" }}>hr.partner@bshg.com</span></Row>
+          <Row label={t.site}><span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-heading)" }}>—</span></Row>
+          <Row label={t.email}><span style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--text-heading)" }}>hr.partner@hrbp-platform.example.com</span></Row>
         </div>
       </Card>
 

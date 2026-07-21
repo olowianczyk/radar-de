@@ -1,6 +1,6 @@
-/* BSH HR BP — Typography
+/* HR Business Partner Platform — Typography
    Figtree (UI/body), Fraunces (editorial display), IBM Plex Mono (IDs/numeric).
-   Google Fonts substitution — flagged in readme.md; swap for BSH's licensed
+   Google Fonts substitution — flagged in readme.md; swap for a licensed
    corporate face when supplied. Two scale namings kept in sync: --fs-* / --text-*. */
 :root{
   --font-display:"Fraunces","Newsreader",Georgia,serif;

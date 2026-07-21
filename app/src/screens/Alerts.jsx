@@ -31,8 +31,8 @@ export function Alerts({ lang, role, changes }) {
             <div>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-heading)", marginBottom: 6 }}>{t.recipients}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                <Badge tone="brand">hr.partner@bshg.com</Badge>
-                <Badge tone="neutral">hr-legal-pl@bshg.com</Badge>
+                <Badge tone="brand">hr.partner@hrbp-platform.example.com</Badge>
+                <Badge tone="neutral">hr-legal-pl@hrbp-platform.example.com</Badge>
                 <Button variant="ghost" size="sm" iconLeft={<Icon name="plus" size={14} />}>{t.recipients}</Button>
               </div>
             </div>

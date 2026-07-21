@@ -134,26 +134,28 @@
 // ponytail: direct port of the Design Compiler phase state machine (mark → tagline →
 // feed → quote) to plain DOM/CSS class toggles — no framework needed for a linear timed
 // sequence. After the quote, hands off straight into the app (no gate screen).
-const BSH_QUOTES = [
+const INTRO_QUOTES = [
   'Spokój HR-owca zaczyna się od tego, że nic go nie zaskoczy.',
   'Dobry HR Business Partner nie czeka na zmianę — jest na nią gotowy.',
   'Najlepsze decyzje HR podejmuje się ze świeżą wiedzą, nie z przeczuciem.',
   'Prawo pracy zmienia się codziennie — Twoja czujność nie musi.',
   'Bycie o krok przed zmianą to nie przypadek, to nawyk.',
 ];
-function nextBshQuote() {
-  const key = 'bshIntroQuoteIdx';
+function nextIntroQuote() {
+  const key = 'introQuoteIdx';
   let idx = parseInt(localStorage.getItem(key) || '-1', 10);
   if (!Number.isFinite(idx)) idx = -1;
-  const next = (idx + 1) % BSH_QUOTES.length;
+  const next = (idx + 1) % INTRO_QUOTES.length;
   try { localStorage.setItem(key, String(next)); } catch (e) {}
-  return BSH_QUOTES[next];
+  return INTRO_QUOTES[next];
 }
 
+// Decorative placeholders for the splash animation only — not real detected
+// changes (those come from the live Sejm/ELI scan once the app loads).
 const FEED = [
-  { tag: 'Kodeks pracy', title: 'Nowe zasady urlopu rodzicielskiego', status: 'Nowe' },
-  { tag: 'BHP', title: 'Rozporządzenie MRPiPS o szkoleniach BHP', status: 'Nowe' },
-  { tag: 'PIP', title: 'Zaktualizowane wytyczne kontroli', status: 'W przeglądzie' },
+  { tag: 'Kodeks pracy', title: 'Monitorowanie zmian w przepisach', status: 'Aktywne' },
+  { tag: 'BHP', title: 'Skanowanie aktów prawnych', status: 'Aktywne' },
+  { tag: 'ISAP', title: 'Codzienna aktualizacja o 06:00', status: 'Aktywne' },
 ];
 
 const SCENES = ['scene-mark', 'scene-tagline', 'scene-feed', 'scene-quote'];
@@ -259,7 +261,7 @@ function onKeyDown(e) {
 }
 
 function init() {
-  q('#quote-text').textContent = nextBshQuote();
+  q('#quote-text').textContent = nextIntroQuote();
   q('#feed-eyebrow').textContent = lastScanLabel();
   buildTaglineWords();
   buildFeedCards();

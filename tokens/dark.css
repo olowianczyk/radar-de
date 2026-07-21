@@ -1,4 +1,4 @@
-/* BSH HR BP — Dark theme override, toggled via [data-theme="dark"] on <html>.
+/* HR Business Partner Platform — Dark theme override, toggled via [data-theme="dark"] on <html>.
    Same brand hues (petrol/coral); neutrals and shadows invert for a dark surface. */
 :root[data-theme="dark"]{
   --canvas:#12181a;

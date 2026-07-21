@@ -1,5 +1,5 @@
-/* BSH HR BP — Colors
-   Petrol teal brand anchor (BSH corporate) + warm coral accent + cream neutrals.
+/* HR Business Partner Platform — Colors
+   Petrol teal brand anchor (company corporate) + warm coral accent + cream neutrals.
    Base ramps first, then semantic aliases (two naming systems kept in sync:
    short `--brand/--surface/--red-*` and scale `--danger-500/--surface-card`). */
 :root{
@@ -87,13 +87,13 @@
   --on-brand-soft:var(--teal-800);
 
   /* ---- Legacy aliases (kept so all specimen cards resolve) ---- */
-  --bsh-petrol-900:#04302a;
-  --bsh-petrol-800:#0a4a4f;
-  --bsh-petrol-700:#00727e;
-  --bsh-petrol-600:#0a8390;
-  --bsh-petrol-500:#1c9aa6;
-  --bsh-petrol-100:#dff0f0;
-  --bsh-petrol-050:#eef7f7;
+  --petrol-900:#04302a;
+  --petrol-800:#0a4a4f;
+  --petrol-700:#00727e;
+  --petrol-600:#0a8390;
+  --petrol-500:#1c9aa6;
+  --petrol-100:#dff0f0;
+  --petrol-050:#eef7f7;
   --coral-050:#fff4f1;
   --cream-canvas:#fbf8f5;
   --cream-surface:#ffffff;

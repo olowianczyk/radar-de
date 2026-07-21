@@ -80,7 +80,11 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
       ]} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
         {docs.length === 0 ? (
-          <Card>{tab === "favorites" ? <EmptyState icon="star" title={t.kbNoFavorites} subtitle={t.kbNoFavoritesSub} /> : <EmptyState icon="search-x" title={t.kbNoResults} subtitle={t.kbNoResultsSub} />}</Card>
+          <Card>
+            {tab === "favorites" ? <EmptyState icon="star" title={t.kbNoFavorites} subtitle={t.kbNoFavoritesSub} />
+              : HRBP_KB.length === 0 ? <EmptyState icon="book-open" title={t.kbEmptyAll} subtitle={t.kbEmptyAllSub} />
+              : <EmptyState icon="search-x" title={t.kbNoResults} subtitle={t.kbNoResultsSub} />}
+          </Card>
         ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
           {docs.map((k) => {

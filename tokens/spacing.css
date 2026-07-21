@@ -1,4 +1,4 @@
-/* BSH HR BP — Spacing, radius, layout (4px base grid).
+/* HR Business Partner Platform — Spacing, radius, layout (4px base grid).
    Two namings kept in sync: --sp-* / --space-*. */
 :root{
   --sp-1:4px;  --space-1:4px;

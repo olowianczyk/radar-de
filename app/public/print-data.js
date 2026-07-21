@@ -1,4 +1,4 @@
-// BSH HR BP — Legal-change monitoring: trilingual strings + demo data.
+// HR Business Partner Platform — Legal-change monitoring: trilingual strings + demo data.
 (function () {
 const HRBP_I18N = {
   pl: {
@@ -25,13 +25,13 @@ const HRBP_I18N = {
     alertsTitle: "Powiadomienia e-mail", alertsSub: "Ustaw, kto i kiedy otrzymuje e-mail o wykrytych zmianach w przepisach",
     dailyDigest: "Codzienne podsumowanie e-mail", recipients: "Odbiorcy", frequency: "Częstotliwość",
     daily: "Codziennie o 06:30", weekly: "Raz w tygodniu (poniedziałek)", onlyUrgent: "Tylko nowe i pilne zmiany",
-    preview: "Podgląd wiadomości", subjectPreview: "BSH HR BP — 2 nowe zmiany w przepisach wymagają przeglądu",
+    preview: "Podgląd wiadomości", subjectPreview: "HR BP — 2 nowe zmiany w przepisach wymagają przeglądu",
     emailIntro: "Dzień dobry, system wykrył poniższe zmiany w monitorowanych aktach prawnych:",
     ctaPreview: "Zobacz w systemie", sendTest: "Wyślij wiadomość testową", save: "Zapisz ustawienia",
     feedEmptyTitle: "Brak zmian w tej kategorii", feedEmptySub: "Gdy system wykryje nową zmianę pasującą do tego filtra, pojawi się tutaj.",
     kbNoResults: "Brak wyników", kbNoResultsSub: "Nie znaleziono dokumentów pasujących do wyszukiwania.",
     digestEmpty: "Brak nowych ani pilnych zmian do zgłoszenia — wiadomość nie zostanie wysłana.",
-    login: { title: "Zaloguj się", subtitle: "System wsparcia HR BP", email: "Adres e-mail", password: "Hasło", remember: "Zapamiętaj mnie", submit: "Zaloguj", forgot: "Nie pamiętasz hasła?", error: "Nieprawidłowy e-mail lub hasło.", sso: "Zaloguj przez BSH SSO" },
+    login: { title: "Zaloguj się", subtitle: "System wsparcia HR BP", email: "Adres e-mail", password: "Hasło", remember: "Zapamiętaj mnie", submit: "Zaloguj", forgot: "Nie pamiętasz hasła?", error: "Nieprawidłowy e-mail lub hasło.", sso: "Zaloguj przez firmowe SSO" },
     settings: { title: "Ustawienia", profile: "Profil", account: "Konto", preferences: "Preferencje", role: "Stanowisko", dept: "Dział", site: "Lokalizacja", email: "E-mail", language: "Język interfejsu", darkMode: "Tryb ciemny", emailAlerts: "Powiadomienia e-mail", manage: "Zarządzaj", signOut: "Wyloguj się", saved: "Zapisano zmiany" },
     roleHrbp: "HR Business Partner", roleViewer: "Tylko podgląd",
     permissions: "Uprawnienia", permissionsSub: "Poziom dostępu decyduje, jakie akcje można wykonywać w systemie.",
@@ -66,13 +66,13 @@ const HRBP_I18N = {
     alertsTitle: "E-Mail-Benachrichtigungen", alertsSub: "Legen Sie fest, wer wann eine E-Mail zu erkannten Rechtsänderungen erhält",
     dailyDigest: "Tägliche E-Mail-Zusammenfassung", recipients: "Empfänger", frequency: "Häufigkeit",
     daily: "Täglich um 06:30", weekly: "Wöchentlich (montags)", onlyUrgent: "Nur neue und dringende Änderungen",
-    preview: "E-Mail-Vorschau", subjectPreview: "BSH HR BP — 2 neue Rechtsänderungen zur Prüfung",
+    preview: "E-Mail-Vorschau", subjectPreview: "HR BP — 2 neue Rechtsänderungen zur Prüfung",
     emailIntro: "Guten Morgen, das System hat folgende Änderungen in den überwachten Rechtsakten erkannt:",
     ctaPreview: "Im System ansehen", sendTest: "Test-E-Mail senden", save: "Einstellungen speichern",
     feedEmptyTitle: "Keine Änderungen in dieser Kategorie", feedEmptySub: "Sobald das System eine passende Änderung erkennt, erscheint sie hier.",
     kbNoResults: "Keine Ergebnisse", kbNoResultsSub: "Es wurden keine Dokumente zu dieser Suche gefunden.",
     digestEmpty: "Keine neuen oder dringenden Änderungen zu melden — es wird keine E-Mail versendet.",
-    login: { title: "Anmelden", subtitle: "HR-BP-Supportsystem", email: "E-Mail-Adresse", password: "Passwort", remember: "Angemeldet bleiben", submit: "Anmelden", forgot: "Passwort vergessen?", error: "Ungültige E-Mail oder Passwort.", sso: "Mit BSH SSO anmelden" },
+    login: { title: "Anmelden", subtitle: "HR-BP-Supportsystem", email: "E-Mail-Adresse", password: "Passwort", remember: "Angemeldet bleiben", submit: "Anmelden", forgot: "Passwort vergessen?", error: "Ungültige E-Mail oder Passwort.", sso: "Mit Firmen-SSO anmelden" },
     settings: { title: "Einstellungen", profile: "Profil", account: "Konto", preferences: "Einstellungen", role: "Position", dept: "Abteilung", site: "Standort", email: "E-Mail", language: "Sprache", darkMode: "Dunkelmodus", emailAlerts: "E-Mail-Benachrichtigungen", manage: "Verwalten", signOut: "Abmelden", saved: "Änderungen gespeichert" },
     roleHrbp: "HR Business Partner", roleViewer: "Nur Ansicht",
     permissions: "Berechtigungen", permissionsSub: "Die Zugriffsebene bestimmt, welche Aktionen im System möglich sind.",
@@ -107,13 +107,13 @@ const HRBP_I18N = {
     alertsTitle: "Email alerts", alertsSub: "Set who gets emailed, and how often, when legal changes are detected",
     dailyDigest: "Daily email digest", recipients: "Recipients", frequency: "Frequency",
     daily: "Daily at 06:30", weekly: "Weekly (Mondays)", onlyUrgent: "New and urgent changes only",
-    preview: "Email preview", subjectPreview: "BSH HR BP — 2 new legal changes need review",
+    preview: "Email preview", subjectPreview: "HR BP — 2 new legal changes need review",
     emailIntro: "Good morning, the system detected the following changes in monitored legal acts:",
     ctaPreview: "View in system", sendTest: "Send test email", save: "Save settings",
     feedEmptyTitle: "No changes in this category", feedEmptySub: "Once the system detects a matching legal change, it will appear here.",
     kbNoResults: "No results", kbNoResultsSub: "No documents matched your search.",
     digestEmpty: "No new or urgent changes to report — no email will be sent.",
-    login: { title: "Sign in", subtitle: "HR BP support system", email: "Email address", password: "Password", remember: "Remember me", submit: "Sign in", forgot: "Forgot password?", error: "Invalid email or password.", sso: "Sign in with BSH SSO" },
+    login: { title: "Sign in", subtitle: "HR BP support system", email: "Email address", password: "Password", remember: "Remember me", submit: "Sign in", forgot: "Forgot password?", error: "Invalid email or password.", sso: "Sign in with company SSO" },
     settings: { title: "Settings", profile: "Profile", account: "Account", preferences: "Preferences", role: "Role", dept: "Department", site: "Site", email: "Email", language: "Interface language", darkMode: "Dark mode", emailAlerts: "Email alerts", manage: "Manage", signOut: "Sign out", saved: "Changes saved" },
     roleHrbp: "HR Business Partner", roleViewer: "View only",
     permissions: "Permissions", permissionsSub: "Access level determines which actions are available in the system.",
@@ -126,125 +126,17 @@ const HRBP_I18N = {
   },
 };
 
-const HRBP_CHANGES = [
-  { id: 1, act: "Kodeks pracy — art. 1481", title: { pl: "Nowe zasady pracy zdalnej okazjonalnej", de: "Neue Regeln für gelegentliche Remote-Arbeit", en: "New rules for occasional remote work" }, area: "contracts", status: "urgent", date: "14.07.2026", effective: "01.09.2026", source: "ISAP — Dz.U. 2026, poz. 1188 (tekst ujednolicony)", summary: { pl: "Zwiększono limit dni pracy zdalnej okazjonalnej z 24 do 30 dni rocznie oraz doprecyzowano zasady rozliczania ekwiwalentu.", de: "Das Limit für gelegentliche Remote-Arbeit wurde von 24 auf 30 Tage pro Jahr erhöht; die Abgeltungsregeln wurden präzisiert.", en: "The occasional remote-work limit rises from 24 to 30 days/year; equivalent-payment rules were clarified." }, affected: [1, 3] },
-  { id: 2, act: "Rozporządzenie MRPiPS ws. BHP", title: { pl: "Aktualizacja norm dot. stanowisk z monitorami ekranowymi", de: "Aktualisierte Normen für Bildschirmarbeitsplätze", en: "Updated standards for display-screen workstations" }, area: "safety", status: "new", date: "12.07.2026", effective: "01.10.2026", source: "ISAP — Dz.U. 2026, poz. 1172 (tekst ujednolicony)", summary: { pl: "Nowe wymogi dotyczące przerw i badań okulistycznych dla pracowników biurowych.", de: "Neue Anforderungen an Pausen und augenärztliche Untersuchungen für Büromitarbeitende.", en: "New requirements for breaks and eye examinations for office employees." }, affected: [5] },
-  { id: 3, act: "Ustawa o PPK", title: { pl: "Zmiana progu wynagrodzenia dla obniżonej wpłaty podstawowej", de: "Geänderte Gehaltsschwelle für reduzierten Basisbeitrag", en: "Changed pay threshold for the reduced basic contribution" }, area: "pay", status: "progress", date: "08.07.2026", effective: "01.01.2027", source: "ISAP — Dz.U. 2026, poz. 1140 (tekst ujednolicony)", summary: { pl: "Podwyższono próg 1,2-krotności minimalnego wynagrodzenia uprawniający do obniżonej wpłaty podstawowej PPK.", de: "Die Schwelle des 1,2-fachen Mindestlohns für den reduzierten PPK-Basisbeitrag wurde angehoben.", en: "The 1.2×-minimum-wage threshold qualifying for the reduced PPK basic contribution was raised." }, affected: [2] },
-  { id: 4, act: "Kodeks pracy — art. 1731", title: { pl: "Wydłużenie urlopu opiekuńczego", de: "Verlängerung des Pflegeurlaubs", en: "Extended caregiver leave" }, area: "leave", status: "waiting", date: "05.07.2026", effective: "—", source: "ISAP — projekt, II czytanie w Sejmie", summary: { pl: "Projekt zakłada wydłużenie bezpłatnego urlopu opiekuńczego z 5 do 7 dni w roku kalendarzowym.", de: "Der Entwurf verlängert den unbezahlten Pflegeurlaub von 5 auf 7 Tage pro Kalenderjahr.", en: "The draft extends unpaid caregiver leave from 5 to 7 days per calendar year." }, affected: [1] },
-  { id: 5, act: "Ustawa o zatrudnianiu cudzoziemców", title: { pl: "Uproszczenie procedury powiadomień o powierzeniu pracy", de: "Vereinfachtes Meldeverfahren für Beschäftigung", en: "Simplified work-assignment notification procedure" }, area: "contracts", status: "done", date: "20.06.2026", effective: "01.07.2026", source: "ISAP — Dz.U. 2026, poz. 1090 (tekst ujednolicony)", summary: { pl: "Skrócono czas rozpatrywania powiadomień z 14 do 7 dni oraz wprowadzono w pełni elektroniczny obieg.", de: "Die Bearbeitungszeit für Meldungen wurde von 14 auf 7 Tage verkürzt; die Abwicklung ist nun vollständig elektronisch.", en: "Notification processing time was cut from 14 to 7 days, and the process is now fully electronic." }, affected: [3] },
-  { id: 6, act: "Ustawa o związkach zawodowych", title: { pl: "Nowe progi reprezentatywności organizacji związkowej", de: "Neue Repräsentativitätsschwellen für Gewerkschaften", en: "New representativeness thresholds for trade unions" }, area: "other", status: "done", date: "15.06.2026", effective: "15.06.2026", source: "ISAP — Dz.U. 2026, poz. 1071 (tekst ujednolicony)", summary: { pl: "Zmieniono próg liczby członków wymaganych do uzyskania statusu reprezentatywnej organizacji zakładowej.", de: "Die erforderliche Mitgliederzahl für den Status einer repräsentativen Betriebsgewerkschaft wurde geändert.", en: "The member-count threshold for representative workplace union status was changed." }, affected: [] },
-];
-
-const HRBP_SOURCES = [
-  { id: 1, name: "Kodeks pracy — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", lastChecked: "16.07.2026 06:00", found: 1, active: true },
-  { id: 2, name: "Ustawa o PPK — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", lastChecked: "16.07.2026 06:00", found: 1, active: true },
-  { id: 3, name: "Rozporządzenia MRPiPS ws. BHP", type: "Rozporządzenie", url: "https://isap.sejm.gov.pl", lastChecked: "15.07.2026 22:00", found: 1, active: true },
-  { id: 4, name: "Ustawa o zatrudnianiu cudzoziemców", type: "Ustawa", url: "https://isap.sejm.gov.pl", lastChecked: "15.07.2026 22:00", found: 1, active: true },
-  { id: 5, name: "Ustawa o związkach zawodowych", type: "Ustawa", url: "https://isap.sejm.gov.pl", lastChecked: "14.07.2026 18:00", found: 1, active: true },
-  { id: 6, name: "Państwowa Inspekcja Pracy — wytyczne", type: "Wytyczne", url: "https://www.pip.gov.pl", lastChecked: "14.07.2026 18:00", found: 0, active: false },
-];
-
-const HRBP_KB = [
-  { id: 1, icon: "palmtree", title: { pl: "Polityka urlopowa", de: "Urlaubsrichtlinie", en: "Leave policy" }, meta: "PL · DE · EN", area: "leave", needsUpdate: true, updated: "12.03.2026",
-    body: { pl: "Niniejsza polityka określa zasady udzielania urlopu wypoczynkowego, na żądanie i opiekuńczego pracownikom BSH Polska. Wniosek urlopowy składa się z minimum 3-dniowym wyprzedzeniem poprzez system HR; urlop na żądanie (do 4 dni w roku) można zgłosić w dniu rozpoczęcia. Zaległy urlop należy wykorzystać do 30 września roku następnego. Przełożony potwierdza wniosek w ciągu 2 dni roboczych, uwzględniając obsadę linii produkcyjnej.", de: "Diese Richtlinie regelt Erholungs-, Bedarfs- und Pflegeurlaub für BSH-Mitarbeitende in Polen. Urlaubsanträge sind mindestens 3 Tage im Voraus über das HR-System einzureichen; Bedarfsurlaub (bis zu 4 Tage/Jahr) kann am Antrittstag gemeldet werden. Resturlaub ist bis zum 30. September des Folgejahres zu nehmen.", en: "This policy governs annual, on-demand and caregiver leave for BSH Poland employees. Requests go through the HR system at least 3 days ahead; on-demand leave (up to 4 days/year) can be reported on the start day. Carried-over leave must be used by 30 September of the following year." } },
-  { id: 2, icon: "wallet", title: { pl: "Regulamin wynagradzania", de: "Vergütungsordnung", en: "Compensation policy" }, meta: "PL · DE", area: "pay", needsUpdate: true, updated: "03.02.2026",
-    body: { pl: "Regulamin określa zasady ustalania wynagrodzenia zasadniczego, dodatków zmianowych oraz udziału w Pracowniczych Planach Kapitałowych (PPK). Wypłata następuje do 10. dnia miesiąca za miesiąc poprzedni. Dodatek za pracę w nocy wynosi 20% stawki godzinowej. Wpłata podstawowa do PPK wynosi 2% wynagrodzenia, z możliwością obniżenia do 0,5% dla osób poniżej progu 1,2-krotności minimalnego wynagrodzenia.", de: "Diese Ordnung regelt Grundgehalt, Schichtzulagen und die Teilnahme am Mitarbeiterkapitalplan (PPK). Die Auszahlung erfolgt bis zum 10. des Folgemonats. Der Nachtzuschlag beträgt 20 % des Stundensatzes.", en: "This policy governs base pay, shift allowances, and participation in the Employee Capital Plan (PPK). Pay is disbursed by the 10th of the following month. The night-shift allowance is 20% of the hourly rate." } },
-  { id: 3, icon: "file-signature", title: { pl: "Szablony umów", de: "Vertragsvorlagen", en: "Contract templates" }, meta: "PL", area: "contracts", needsUpdate: true, updated: "18.01.2026",
-    body: { pl: "Zbiór zatwierdzonych szablonów: umowa o pracę na okres próbny, na czas określony i nieokreślony, aneks do umowy oraz umowa o zachowaniu poufności. Każdy szablon zawiera klauzule dot. pracy zdalnej okazjonalnej zgodnie z aktualnym Kodeksem pracy. Przed użyciem szablonu z cudzoziemcem sprawdź aktualną procedurę powiadomienia o powierzeniu pracy.", de: "Sammlung genehmigter Vorlagen: Probezeit-, befristeter und unbefristeter Arbeitsvertrag, Vertragsänderung und Vertraulichkeitsvereinbarung.", en: "Collection of approved templates: probationary, fixed-term and indefinite employment contracts, contract amendments, and NDAs. Each template includes occasional-remote-work clauses aligned with the current Labor Code." } },
-  { id: 4, icon: "user-plus", title: { pl: "Checklista onboardingu", de: "Onboarding-Checkliste", en: "Onboarding checklist" }, meta: "PL · DE · EN", area: "contracts", needsUpdate: false, updated: "22.11.2025",
-    body: { pl: "Krok po kroku: przygotowanie stanowiska i dostępów IT przed dniem startu, szkolenie BHP w pierwszym dniu, przydzielenie bufora (buddy) na 30 dni, spotkanie podsumowujące po 90 dniach. Lista kontrolna do odhaczenia przez HR BP i przełożonego.", de: "Schritt für Schritt: Arbeitsplatz- und IT-Zugangsvorbereitung vor dem Starttag, Arbeitsschutzschulung am ersten Tag, 30-tägiges Buddy-Programm, 90-Tage-Feedbackgespräch.", en: "Step by step: workstation and IT access prepared before the start date, safety training on day one, a 30-day buddy assignment, and a 90-day check-in. Checklist signed off by the HR BP and manager." } },
-  { id: 5, icon: "shield-check", title: { pl: "BHP i zgodność", de: "Arbeitsschutz & Compliance", en: "Health, safety & compliance" }, meta: "PL · DE · EN", area: "safety", needsUpdate: true, updated: "05.04.2026",
-    body: { pl: "Standardy BHP obowiązujące na terenie fabryki Rzeszów: obowiązkowe szkolenie wstępne i okresowe, badania profilaktyczne wg harmonogramu stanowiskowego, zasady pracy przy stanowiskach z monitorami ekranowymi (przerwy co 50 minut). Wypadek przy pracy zgłasza się niezwłocznie do działu BHP i HR BP.", de: "Arbeitsschutzstandards im Werk Rzeszów: verpflichtende Erst- und Wiederholungsschulungen, arbeitsmedizinische Vorsorgeuntersuchungen, Pausenregelung an Bildschirmarbeitsplätzen (alle 50 Minuten).", en: "Safety standards at the Rzeszów plant: mandatory initial and periodic training, occupational health checks per role schedule, and break rules for display-screen workstations (every 50 minutes). Work accidents are reported immediately to Safety and the HR BP." } },
-  { id: 6, icon: "heart-handshake", title: { pl: "Benefity pracownicze", de: "Mitarbeitervorteile", en: "Employee benefits" }, meta: "PL · DE", area: "other", needsUpdate: false, updated: "09.09.2025",
-    body: { pl: "Przegląd dostępnych benefitów: prywatna opieka medyczna, karta sportowa, ubezpieczenie grupowe na życie, dofinansowanie posiłków w stołówce zakładowej oraz program rekomendacji pracowniczych. Zapisy do programów odbywają się dwa razy w roku.", de: "Übersicht der Leistungen: private Krankenversicherung, Sportkarte, Gruppenlebensversicherung, bezuschusstes Werkskantinenessen und Mitarbeiterempfehlungsprogramm.", en: "Overview of available benefits: private healthcare, a sports card, group life insurance, subsidized canteen meals, and an employee-referral program. Enrollment windows run twice a year." } },
-];
-
-const HRBP_SOURCE_HISTORY = {
-  1: [
-    { ts: "16.07.2026 06:00", type: "detected", note: "Wykryto zmianę — art. 1481, praca zdalna okazjonalna" },
-    { ts: "15.07.2026 06:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-    { ts: "14.07.2026 06:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-    { ts: "10.07.2026 06:00", type: "detected", note: "Wykryto zmianę — art. 1731, urlop opiekuńczy (projekt)" },
-  ],
-  2: [
-    { ts: "16.07.2026 06:00", type: "detected", note: "Wykryto zmianę — próg wpłaty podstawowej PPK" },
-    { ts: "15.07.2026 06:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-    { ts: "13.07.2026 06:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-  ],
-  3: [
-    { ts: "15.07.2026 22:00", type: "detected", note: "Wykryto zmianę — normy dla stanowisk z monitorami" },
-    { ts: "14.07.2026 22:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-    { ts: "13.07.2026 22:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-  ],
-  4: [
-    { ts: "15.07.2026 22:00", type: "detected", note: "Wykryto zmianę — procedura powiadomień o powierzeniu pracy" },
-    { ts: "13.07.2026 22:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-  ],
-  5: [
-    { ts: "14.07.2026 18:00", type: "detected", note: "Wykryto zmianę — progi reprezentatywności związków" },
-    { ts: "12.07.2026 18:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-  ],
-  6: [
-    { ts: "14.07.2026 18:00", type: "paused", note: "Monitorowanie wstrzymane przez Martę G.-Jarosz" },
-    { ts: "10.07.2026 18:00", type: "scan", note: "Skanowanie ukończone — bez zmian" },
-    { ts: "05.07.2026 18:00", type: "resumed", note: "Monitorowanie wznowione przez Martę G.-Jarosz" },
-  ],
-};
-
-const HRBP_KB_COMMENTS = {
-  1: [
-    { id: 1, author: "HR Partner", ts: "14.03.2026 09:12", text: { pl: "Czy urlop na żądanie zgłaszamy też przez system, czy wystarczy mail do przełożonego?", de: "Melden wir Bedarfsurlaub auch über das System, oder reicht eine E-Mail an den Vorgesetzten?", en: "Do we log on-demand leave through the system too, or is an email to the manager enough?" } },
-    { id: 2, author: "Piotr Wójcik", ts: "14.03.2026 11:40", text: { pl: "Zawsze przez system HR — mail traktujemy tylko jako informację dodatkową dla zmianowego.", de: "Immer über das HR-System — die E-Mail dient nur als zusätzliche Info für den Schichtleiter.", en: "Always through the HR system — the email is just a heads-up for the shift lead." } },
-  ],
-  2: [
-    { id: 1, author: "Anna Kaczmarek", ts: "05.02.2026 15:20", text: { pl: "Warto dopisać przykład wyliczenia dodatku nocnego dla pracowników zmianowych — pytają o to często.", de: "Es lohnt sich, ein Beispiel für die Berechnung des Nachtzuschlags für Schichtarbeitende zu ergänzen.", en: "Worth adding a worked example of the night-shift allowance calc — comes up a lot." } },
-  ],
-};
-const HRBP_KB_ATTACHMENTS = {
-  1: [
-    { id: 1, name: "Wniosek urlopowy — wzór.pdf", size: "186 KB", ext: "pdf", by: "HR Partner", ts: "12.03.2026" },
-    { id: 2, name: "Harmonogram urlopów 2026.xlsx", size: "94 KB", ext: "xlsx", by: "Anna Kaczmarek", ts: "02.01.2026" },
-  ],
-  2: [
-    { id: 1, name: "Tabela stawek nocnych 2026.xlsx", size: "58 KB", ext: "xlsx", by: "Piotr Wójcik", ts: "03.02.2026" },
-  ],
-  3: [
-    { id: 1, name: "Umowa na okres próbny — wzór.docx", size: "122 KB", ext: "docx", by: "HR Partner", ts: "18.01.2026" },
-    { id: 2, name: "Klauzula poufności — wzór.docx", size: "77 KB", ext: "docx", by: "HR Partner", ts: "18.01.2026" },
-  ],
-  5: [
-    { id: 1, name: "Instrukcja BHP — stanowiska biurowe.pdf", size: "340 KB", ext: "pdf", by: "Dział BHP", ts: "05.04.2026" },
-  ],
-};
-const HRBP_KB_VERSIONS = {
-  1: [
-    { v: "v3", ts: "12.03.2026", author: "HR Partner", note: { pl: "Zaktualizowano limit urlopu na żądanie i termin wykorzystania zaległego urlopu.", de: "Bedarfsurlaubslimit und Frist für Resturlaub aktualisiert.", en: "Updated the on-demand leave limit and carried-over leave deadline." } },
-    { v: "v2", ts: "08.11.2025", author: "Anna Kaczmarek", note: { pl: "Dodano zasady rozliczania ekwiwalentu za pracę zdalną okazjonalną.", de: "Regeln zur Abgeltung gelegentlicher Remote-Arbeit ergänzt.", en: "Added equivalent-payment rules for occasional remote work." } },
-    { v: "v1", ts: "03.04.2025", author: "HR Partner", note: { pl: "Pierwsza wersja polityki.", de: "Erste Fassung der Richtlinie.", en: "Initial version of the policy." } },
-  ],
-  2: [
-    { v: "v2", ts: "03.02.2026", author: "Piotr Wójcik", note: { pl: "Zaktualizowano prog wpłaty podstawowej PPK.", de: "PPK-Basisbeitragsschwelle aktualisiert.", en: "Updated the PPK basic-contribution threshold." } },
-    { v: "v1", ts: "14.06.2025", author: "HR Partner", note: { pl: "Pierwsza wersja regulaminu.", de: "Erste Fassung der Ordnung.", en: "Initial version of the policy." } },
-  ],
-  3: [
-    { v: "v4", ts: "18.01.2026", author: "HR Partner", note: { pl: "Dodano klauzulę dot. pracy zdalnej okazjonalnej do wszystkich szablonów.", de: "Klausel zu gelegentlicher Remote-Arbeit in alle Vorlagen aufgenommen.", en: "Added the occasional-remote-work clause to all templates." } },
-    { v: "v3", ts: "22.09.2025", author: "HR Partner", note: { pl: "Dodano szablon aneksu do umowy.", de: "Vorlage für Vertragsänderung ergänzt.", en: "Added the contract-amendment template." } },
-    { v: "v2", ts: "11.03.2025", author: "Anna Kaczmarek", note: { pl: "Aktualizacja zgodnie ze zmianami w Kodeksie pracy.", de: "Aktualisierung gemäß Änderungen im Arbeitsgesetzbuch.", en: "Updated in line with Labor Code changes." } },
-    { v: "v1", ts: "05.11.2024", author: "HR Partner", note: { pl: "Pierwsza wersja szablonów.", de: "Erste Fassung der Vorlagen.", en: "Initial version of the templates." } },
-  ],
-  4: [
-    { v: "v1", ts: "22.11.2025", author: "HR Partner", note: { pl: "Pierwsza wersja checklisty.", de: "Erste Fassung der Checkliste.", en: "Initial version of the checklist." } },
-  ],
-  5: [
-    { v: "v3", ts: "05.04.2026", author: "Dział BHP", note: { pl: "Dodano wymogi dot. przerw dla stanowisk z monitorami ekranowymi.", de: "Pausenanforderungen für Bildschirmarbeitsplätze ergänzt.", en: "Added break requirements for display-screen workstations." } },
-    { v: "v2", ts: "14.07.2025", author: "Dział BHP", note: { pl: "Zaktualizowano harmonogram badań profilaktycznych.", de: "Vorsorgeuntersuchungsplan aktualisiert.", en: "Updated the occupational health check schedule." } },
-    { v: "v1", ts: "02.02.2025", author: "Dział BHP", note: { pl: "Pierwsza wersja standardów BHP.", de: "Erste Fassung der Arbeitsschutzstandards.", en: "Initial version of the safety standards." } },
-  ],
-  6: [
-    { v: "v2", ts: "09.09.2025", author: "HR Partner", note: { pl: "Dodano program rekomendacji pracowniczych.", de: "Mitarbeiterempfehlungsprogramm ergänzt.", en: "Added the employee-referral program." } },
-    { v: "v1", ts: "16.01.2025", author: "HR Partner", note: { pl: "Pierwsza wersja przeglądu benefitów.", de: "Erste Fassung der Leistungsübersicht.", en: "Initial version of the benefits overview." } },
-  ],
-};
+// Fabricated demo content removed (fake legal changes, fake sources history,
+// fake KB policies/comments/authors) — print/export shows nothing until this
+// is wired to the real persisted state (see /api/state.js) instead of a
+// static local copy.
+const HRBP_CHANGES = [];
+const HRBP_SOURCES = [];
+const HRBP_KB = [];
+const HRBP_SOURCE_HISTORY = {};
+const HRBP_KB_COMMENTS = {};
+const HRBP_KB_ATTACHMENTS = {};
+const HRBP_KB_VERSIONS = {};
 const HRBP_AREA_TONE = { leave: "brand", pay: "blue", safety: "amber", contracts: "neutral", social: "green", other: "neutral" };
 const HRBP_STATUS_MAP = { new: "new", progress: "progress", waiting: "waiting", urgent: "urgent", done: "done" };
 

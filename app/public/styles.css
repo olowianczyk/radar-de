@@ -1,4 +1,4 @@
-/* BSH HR BP Design System — global entry point.
+/* HR Business Partner Platform Design System — global entry point.
    Consumers link THIS file. @import lines only. */
 @import url("tokens/fonts.css");
 @import url("tokens/colors.css");
