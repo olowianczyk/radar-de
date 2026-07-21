@@ -4,7 +4,7 @@ import { Card, Badge, Switch, Icon, Button, IconButton } from "../components/ind
 import { HRBP_I18N } from "../data.js";
 import { setSourceMonitoring } from "../isapIntegration.js";
 
-export function Sources({ lang, role, sources, setSources, sourceHistory, scanning, runScan, faq, generatingFaq, requestFaq }) {
+export function Sources({ lang, role, sources, setSources, sourceHistory, scanning, runScan }) {
   const [expanded, setExpanded] = React.useState(null);
   const eventMeta = {
     scan: { icon: "check", color: "var(--text-muted)", label: (t) => t.evScan },
@@ -85,19 +85,6 @@ export function Sources({ lang, role, sources, setSources, sourceHistory, scanni
                           <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
                             {ev.url ? <a href={ev.url} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>{ev.note}</a> : ev.note}
                           </div>
-                          {ev.type === "detected" && ev.eli && (
-                            faq?.[ev.eli] ? (
-                              <Badge tone="brand" style={{ marginTop: 4 }}><Icon name="sparkles" size={11} /> {t.faqGenerated}</Badge>
-                            ) : generatingFaq?.has(ev.eli) ? (
-                              <span style={{ fontSize: 11, color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: 4, marginTop: 4 }}>
-                                <Icon name="loader-2" size={12} className="hrbp-spin" />{t.faqGenerating}
-                              </span>
-                            ) : (
-                              <button onClick={() => requestFaq(ev.eli, ev.note, ev.url)} style={{ marginTop: 4, border: "none", background: "none", cursor: "pointer", padding: 0, fontSize: 11, fontWeight: 600, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                                <Icon name="help-circle" size={12} />{t.faqGenerate}
-                              </button>
-                            )
-                          )}
                         </div>
                         <div style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)", flex: "0 0 auto" }}>{ev.ts}</div>
                       </div>

@@ -3,7 +3,6 @@ import { AppShell } from "./screens/AppShell.jsx";
 import { LegalChanges } from "./screens/LegalChanges.jsx";
 import { KnowledgeBase } from "./screens/KnowledgeBase.jsx";
 import { Sources } from "./screens/Sources.jsx";
-import { Faq } from "./screens/Faq.jsx";
 import { Alerts } from "./screens/Alerts.jsx";
 import { Reports } from "./screens/Reports.jsx";
 import { Settings } from "./screens/Settings.jsx";
@@ -18,7 +17,6 @@ export default function App() {
   if (active === "feed") screen = <LegalChanges lang={lang} selectedId={changeId} setSelectedId={setChangeId} />;
   else if (active === "kb") screen = <KnowledgeBase lang={lang} selectedId={kbId} setSelectedId={setKbId} />;
   else if (active === "sources") screen = <Sources lang={lang} />;
-  else if (active === "faq") screen = <Faq lang={lang} />;
   else if (active === "alerts") screen = <Alerts lang={lang} />;
   else if (active === "reports") screen = <Reports lang={lang} />;
   else screen = <Settings lang={lang} setLang={setLang} setActive={setActive} />;

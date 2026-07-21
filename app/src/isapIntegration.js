@@ -41,37 +41,19 @@ export async function fetchPersistedState() {
   return res.json();
 }
 
-// Generates an FAQ for one real detected act. The backend fetches the act's
-// real PDF text and grounds the LLM's answer in it (see api/_lib.js
-// generateFaqForAct) — not just the title — so this isn't the same kind of
-// invented content as the hand-written demo cards in data.js.
-export async function generateFaq({ eli, title, url }) {
-  const res = await fetch("/api/generate-faq", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ eli, title, url }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `generate-faq failed: ${res.status}`);
-  return data.entry;
-}
-
 // Builds the "legal changes" feed from real scan history instead of hand-written
 // demo cards. Each real detected entry has {ts, note, url, eli} (see api/_lib.js
 // scanSources) — title/act/date/source come straight from that, so nothing here
 // is invented. `effective` and workflow `status` aren't in the Sejm API at all
 // (that's a triage decision a human makes), so every entry starts as "new" with
 // no effective date until someone reviews it — no fabricated placeholder values.
-export function buildChangesFromHistory(sourceHistory, sources, faq) {
+export function buildChangesFromHistory(sourceHistory, sources) {
   const changes = [];
   Object.entries(sourceHistory || {}).forEach(([sourceId, events]) => {
     const source = sources.find((s) => String(s.id) === String(sourceId));
     if (!source) return;
     (events || []).filter((e) => e.type === "detected").forEach((e) => {
-      const entry = e.eli ? faq[e.eli] : null;
-      const summary = entry?.items?.[0]
-        ? { pl: entry.items[0].answer.pl, de: entry.items[0].answer.de, en: entry.items[0].answer.en }
-        : { pl: "Brak wygenerowanego FAQ dla tego aktu.", de: "Noch keine FAQ für diesen Rechtsakt.", en: "No FAQ generated for this act yet." };
+      const summary = { pl: e.note, de: e.note, en: e.note };
       changes.push({
         id: e.eli || `${sourceId}-${e.ts}`,
         eli: e.eli,

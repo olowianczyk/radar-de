@@ -2,7 +2,7 @@
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
 import { HRBP_I18N, HRBP_KB, HRBP_SOURCES, HRBP_SOURCE_HISTORY } from "../data.js";
-import { latestIsapCheck, forceScan, fetchPersistedState, generateFaq, buildChangesFromHistory } from "../isapIntegration.js";
+import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory } from "../isapIntegration.js";
 
 function useSources() {
   return React.useState(HRBP_SOURCES);
@@ -98,11 +98,8 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   const [sources, setSources] = useSources();
   const [sourceHistory, setSourceHistory] = React.useState(HRBP_SOURCE_HISTORY);
   const [scanning, setScanning] = React.useState(false);
-  const [faq, setFaq] = React.useState({});
-  const [generatingFaq, setGeneratingFaq] = React.useState(() => new Set());
   React.useEffect(() => {
     fetchPersistedState().then((state) => {
-      if (state.faq && Object.keys(state.faq).length) setFaq(state.faq);
       if (!state.sources.length) return; // no run yet (or no Blob store attached) — keep seed data
       setSources((prev) => prev.map((s) => {
         const p = state.sources.find((x) => x.id === s.id);
@@ -116,17 +113,6 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
         });
       }
     }).catch((e) => console.error("Persisted state fetch failed:", e)); // under plain vite dev/preview /api doesn't exist — falls back to seed data
-  }, []);
-  const requestFaq = React.useCallback((eli, title, url) => {
-    setGeneratingFaq((prev) => new Set(prev).add(eli));
-    generateFaq({ eli, title, url }).then((entry) => {
-      setFaq((prev) => ({ ...prev, [eli]: entry }));
-    }).catch((e) => {
-      console.error("FAQ generation failed:", e);
-      alert(`Generowanie FAQ nie powiodło się: ${e.message}`);
-    }).finally(() => {
-      setGeneratingFaq((prev) => { const next = new Set(prev); next.delete(eli); return next; });
-    });
   }, []);
   const runScan = React.useCallback(() => {
     if (scanning) return;
@@ -161,7 +147,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [notifOpen]);
-  const changes = React.useMemo(() => buildChangesFromHistory(sourceHistory, sources, faq), [sourceHistory, sources, faq]);
+  const changes = React.useMemo(() => buildChangesFromHistory(sourceHistory, sources), [sourceHistory, sources]);
   const notifChanges = changes.filter((c) => c.status === "new" || c.status === "urgent");
   const notifKb = HRBP_KB.filter((k) => k.needsUpdate);
   const notifTotal = notifChanges.length + notifKb.length;
@@ -177,7 +163,6 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
     { id: "feed", label: t.nav.feed, icon: <Icon name="scale" size={18} />, badge: newCount },
     { id: "kb", label: t.nav.kb, icon: <Icon name="book-open" size={18} /> },
     { id: "sources", label: t.nav.sources, icon: <Icon name="radar" size={18} /> },
-    { id: "faq", label: t.nav.faq, icon: <Icon name="help-circle" size={18} /> },
     { id: "alerts", label: t.nav.alerts, icon: <Icon name="mail" size={18} /> },
     { id: "reports", label: t.nav.reports, icon: <Icon name="bar-chart-3" size={18} /> },
   ];
@@ -279,7 +264,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
         </header>
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, faq, generatingFaq, requestFaq, changes }) : children}
+            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes }) : children}
           </div>
         </main>
       </div>
