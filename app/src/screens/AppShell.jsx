@@ -98,6 +98,11 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   const [sources, setSources] = useSources();
   const [sourceHistory, setSourceHistory] = React.useState(HRBP_SOURCE_HISTORY);
   const [scanning, setScanning] = React.useState(false);
+  // Shared "from/to" scan period — empty means the default incremental scan
+  // (since each source's own last-checked time). Set both to search a
+  // specific period on the Sejm/ELI API instead.
+  const [scanFrom, setScanFrom] = React.useState("");
+  const [scanTo, setScanTo] = React.useState("");
   React.useEffect(() => {
     fetchPersistedState().then((state) => {
       if (!state.sources.length) return; // no run yet (or no Blob store attached) — keep seed data
@@ -114,9 +119,10 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
       }
     }).catch((e) => console.error("Persisted state fetch failed:", e)); // under plain vite dev/preview /api doesn't exist — falls back to seed data
   }, []);
-  const runScan = React.useCallback((range) => {
+  const runScan = React.useCallback(() => {
     if (scanning) return;
     setScanning(true);
+    const range = scanFrom && scanTo ? { from: scanFrom, to: scanTo } : undefined;
     forceScan(sources.filter((s) => s.active), range).then((results) => {
       setSources((prev) => prev.map((s) => {
         const r = results.find((x) => x.id === s.id);
@@ -125,7 +131,12 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
       setSourceHistory((prev) => {
         const next = { ...prev };
         results.forEach((r) => {
-          if (r.detected && r.detected.length) next[r.id] = [...r.detected, ...(prev[r.id] || [])];
+          if (!r.detected || !r.detected.length) return;
+          const existing = prev[r.id] || [];
+          const key = (e) => e.eli || `${e.note}|${e.url}`;
+          const seen = new Set(existing.map(key));
+          const fresh = r.detected.filter((e) => !seen.has(key(e)));
+          if (fresh.length) next[r.id] = [...fresh, ...existing];
         });
         return next;
       });
@@ -137,7 +148,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
       console.error("Scan failed:", e);
       setScanning(false);
     });
-  }, [scanning, sources]);
+  }, [scanning, sources, scanFrom, scanTo]);
   const t = HRBP_I18N[lang];
   const [notifOpen, setNotifOpen] = React.useState(false);
   const notifRef = React.useRef(null);
@@ -262,7 +273,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
         </header>
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes }) : children}
+            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo }) : children}
           </div>
         </main>
       </div>

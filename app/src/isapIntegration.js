@@ -88,22 +88,3 @@ export async function forceScan(activeSources, range) {
   return data.results;
 }
 
-// Quarterly presets for the scan-period picker: current quarter back through
-// 2 years (8 quarters), newest first, plus a "custom" sentinel the UI renders
-// as two date inputs.
-export function quarterOptions() {
-  const now = new Date();
-  const currentQ = Math.floor(now.getMonth() / 3);
-  const options = [];
-  for (let i = 0; i < 8; i++) {
-    const totalQ = currentQ - i;
-    const year = now.getFullYear() + Math.floor(totalQ / 4);
-    const q = ((totalQ % 4) + 4) % 4;
-    const fromMonth = q * 3;
-    const from = `${year}-${String(fromMonth + 1).padStart(2, "0")}-01`;
-    const toDate = new Date(year, fromMonth + 3, 0);
-    const to = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, "0")}-${String(toDate.getDate()).padStart(2, "0")}`;
-    options.push({ value: `${year}-Q${q + 1}`, label: `Q${q + 1} ${year}`, from, to });
-  }
-  return options;
-}

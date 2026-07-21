@@ -1,24 +1,11 @@
 // Monitored sources — legal acts/gazettes scanned automatically; toggle monitoring per source.
 import React from "react";
-import { Card, Badge, Switch, Icon, Button, IconButton, Select, Input } from "../components/index.js";
+import { Card, Badge, Switch, Icon, Button, IconButton, Input } from "../components/index.js";
 import { HRBP_I18N } from "../data.js";
-import { setSourceMonitoring, quarterOptions } from "../isapIntegration.js";
+import { setSourceMonitoring } from "../isapIntegration.js";
 
-export function Sources({ lang, role, sources, setSources, sourceHistory, scanning, runScan }) {
+export function Sources({ lang, role, sources, setSources, sourceHistory, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo }) {
   const [expanded, setExpanded] = React.useState(null);
-  const quarters = React.useMemo(() => quarterOptions(), []);
-  const [period, setPeriod] = React.useState(quarters[0].value);
-  const [customFrom, setCustomFrom] = React.useState("");
-  const [customTo, setCustomTo] = React.useState("");
-  const runScanForPeriod = () => {
-    if (period === "custom") {
-      if (!customFrom || !customTo) return;
-      runScan({ from: customFrom, to: customTo });
-    } else {
-      const q = quarters.find((o) => o.value === period);
-      runScan(q ? { from: q.from, to: q.to } : undefined);
-    }
-  };
   const eventMeta = {
     scan: { icon: "check", color: "var(--text-muted)", label: (t) => t.evScan },
     detected: { icon: "sparkles", color: "var(--brand)", label: (t) => t.evDetected },
@@ -51,20 +38,10 @@ export function Sources({ lang, role, sources, setSources, sourceHistory, scanni
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
-        <div style={{ width: 200 }}>
-          <Select label={t.scanPeriod} value={period} onChange={(e) => setPeriod(e.target.value)} options={[
-            ...quarters.map((q) => ({ value: q.value, label: q.label })),
-            { value: "custom", label: t.periodCustom },
-          ]} />
-        </div>
-        {period === "custom" && (
-          <React.Fragment>
-            <div style={{ width: 160 }}><Input type="date" label={t.periodFrom} value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} /></div>
-            <div style={{ width: 160 }}><Input type="date" label={t.periodTo} value={customTo} onChange={(e) => setCustomTo(e.target.value)} /></div>
-          </React.Fragment>
-        )}
+        <div style={{ width: 160 }}><Input type="date" label={t.periodFrom} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} /></div>
+        <div style={{ width: 160 }}><Input type="date" label={t.periodTo} value={scanTo} onChange={(e) => setScanTo(e.target.value)} /></div>
         <Button variant="secondary" iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={16} className={scanning ? "hrbp-spin" : ""} />}
-          disabled={scanning || (period === "custom" && (!customFrom || !customTo))} onClick={runScanForPeriod}>
+          disabled={scanning} onClick={runScan}>
           {scanning ? t.scanning : t.checkNow}
         </Button>
       </div>

@@ -35,8 +35,25 @@ module.exports = async (req, res) => {
     }
     const results = await scanSources(sources, range);
     const history = { ...prevState.history };
+    const dedupeKey = (e) => e.eli || `${e.note}|${e.url}`;
+    // Dedupe existing history too — earlier scans (before this fix) already
+    // wrote duplicates for overlapping periods; collapse those on next write
+    // instead of leaving them stuck forever.
+    Object.keys(history).forEach((id) => {
+      const seen = new Set();
+      history[id] = (history[id] || []).filter((e) => {
+        const k = dedupeKey(e);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    });
     results.forEach((r) => {
-      if (r.detected && r.detected.length) history[r.id] = [...r.detected, ...(history[r.id] || [])];
+      if (!r.detected || !r.detected.length) return;
+      const existing = history[r.id] || [];
+      const seen = new Set(existing.map(dedupeKey));
+      const fresh = r.detected.filter((e) => !seen.has(dedupeKey(e)));
+      if (fresh.length) history[r.id] = [...fresh, ...existing];
     });
     const nextState = {
       sources: results.map((r) => ({ id: r.id, lastChecked: r.lastChecked, found: r.found })),

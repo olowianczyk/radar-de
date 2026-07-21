@@ -26,7 +26,7 @@ function periodRange(period, customDate) {
   return [null, null];
 }
 
-function ScanBanner({ lang, sources, scanning, runScan }) {
+function ScanBanner({ lang, sources, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo }) {
   const t = HRBP_I18N[lang];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--brand-soft)", color: "var(--on-brand-soft)", padding: "10px 16px", borderRadius: "var(--radius-md)", fontSize: 13, flexWrap: "wrap" }}>
@@ -35,6 +35,8 @@ function ScanBanner({ lang, sources, scanning, runScan }) {
       <span style={{ fontWeight: 600 }}>{t.monitoring}: {lang === "pl" ? "automatyczne skanowanie codziennie o 06:00" : lang === "de" ? "automatischer Scan täglich um 06:00" : "automatic scan daily at 06:00"}</span>
       <span style={{ opacity: 0.75 }}>· {t.lastChecked.toLowerCase()}: {latestIsapCheck(sources)}</span>
       <div style={{ flex: 1 }} />
+      <Input type="date" value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} placeholder={t.periodFrom} style={{ width: 140 }} />
+      <Input type="date" value={scanTo} onChange={(e) => setScanTo(e.target.value)} placeholder={t.periodTo} style={{ width: 140 }} />
       <Button variant="secondary" size="sm" disabled={scanning} onClick={runScan} iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={14} className={scanning ? "hrbp-spin" : ""} />}>
         {scanning ? t.scanning : t.checkNow}
       </Button>
@@ -42,7 +44,7 @@ function ScanBanner({ lang, sources, scanning, runScan }) {
   );
 }
 
-export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role, sources, scanning, runScan, changes: changesProp }) {
+export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role, sources, scanning, runScan, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo }) {
   const t = HRBP_I18N[lang];
   const [period, setPeriod] = React.useState("all");
   const [customDate, setCustomDate] = React.useState("");
@@ -92,7 +94,7 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-3xl)", color: "var(--text-heading)", margin: 0 }}>{t.greet}</h1>
         <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 14 }}>{t.greetSub.replace("{n}", String(newCount + changes.filter(c=>c.status==="urgent").length))}</p>
       </div>
-      <ScanBanner lang={lang} sources={sources} scanning={scanning} runScan={runScan} />
+      <ScanBanner lang={lang} sources={sources} scanning={scanning} runScan={runScan} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
         <StatCard label={t.kpi.new} value={String(newCount)} accent="danger" icon={<Icon name="sparkles" size={18} />} />
         <StatCard label={t.kpi.pending} value={String(pendingCount)} accent="petrol" icon={<Icon name="clock" size={18} />} />
