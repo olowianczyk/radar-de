@@ -202,7 +202,7 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
               <div style={{ display: "flex", gap: 24, padding: "14px 0", borderTop: "1px solid var(--border-subtle)", borderBottom: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
                 <Meta label={t.published} value={sel.date} />
                 <Meta label={t.effective} value={sel.effective} />
-                <Meta label={t.source} value={sel.source.startsWith("ISAP") ? <a href="https://isap.sejm.gov.pl" target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>{sel.source}</a> : sel.source} small />
+                <Meta label={t.source} value={/^https?:/.test(sel.source) ? <a href={sel.source} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>ISAP ↗</a> : sel.source} small />
               </div>
               <p style={{ margin: 0, color: "var(--text-body)", fontSize: 14, lineHeight: 1.6 }}>{sel.summary[lang]}</p>
               {sel.affected.length > 0 && (
