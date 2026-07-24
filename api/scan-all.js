@@ -25,8 +25,21 @@ module.exports = async (req, res) => {
     let range;
     if (req.method === "POST") {
       const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-      sources = Array.isArray(body.sources) ? body.sources : DEFAULT_SOURCES;
-      if (body.dateFrom || body.dateTo) range = { from: body.dateFrom, to: body.dateTo };
+      // Untrusted input merges straight into the shared Blob state (one global
+      // file, no per-user scoping) — cap the fan-out and coerce shapes so a
+      // malformed/malicious POST can't corrupt real sources' lastChecked or
+      // spin up an unbounded number of Sejm API calls in one request.
+      const rawSources = Array.isArray(body.sources) ? body.sources : DEFAULT_SOURCES;
+      sources = rawSources.slice(0, 50)
+        .map((s) => ({
+          id: Number(s && s.id),
+          keyword: typeof (s && s.keyword) === "string" ? s.keyword.slice(0, 200) : null,
+          lastChecked: typeof (s && s.lastChecked) === "string" ? s.lastChecked.slice(0, 20) : null,
+        }))
+        .filter((s) => Number.isFinite(s.id));
+      if (typeof body.dateFrom === "string" || typeof body.dateTo === "string") {
+        range = { from: typeof body.dateFrom === "string" ? body.dateFrom.slice(0, 10) : undefined, to: typeof body.dateTo === "string" ? body.dateTo.slice(0, 10) : undefined };
+      }
     } else {
       sources = DEFAULT_SOURCES.map((s) => {
         const prev = prevState.sources.find((p) => p.id === s.id);
