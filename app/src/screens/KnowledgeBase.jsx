@@ -166,7 +166,7 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
                           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</div>
                           <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{a.size} · {t.uploadedBy} {a.by} · {a.ts}</div>
                         </div>
-                        <IconButton label="download" onClick={() => downloadAttachment(a)}><Icon name="download" size={15} /></IconButton>
+                        <IconButton label={t.download} onClick={() => downloadAttachment(a)}><Icon name="download" size={15} /></IconButton>
                       </div>
                     ))}
                   </div>
