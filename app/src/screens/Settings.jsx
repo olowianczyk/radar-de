@@ -13,7 +13,7 @@ function Row({ label, children }) {
   );
 }
 
-export function Settings({ lang, setLang, dark, setDark, role, setRole, setActive, onSignOut }) {
+export function Settings({ lang, setLang, dark, setDark, role, setRole, setActive }) {
   const [saved, setSaved] = React.useState(false);
   const [localDark, setLocalDark] = React.useState(() => {
     try { return localStorage.getItem("hrbp-theme") === "dark"; } catch (e) { return false; }
@@ -67,10 +67,6 @@ export function Settings({ lang, setLang, dark, setDark, role, setRole, setActiv
               style={{ width: 150 }} />
           </Row>
           <Row label={t.darkMode}><Switch checked={effectiveDark} onChange={(v) => { applyDark(v); flash(); }} /></Row>
-        </Card>
-
-        <Card padding="lg" header={t.account}>
-          <Button variant="secondary" fullWidth iconLeft={<Icon name="log-out" size={16} />} onClick={onSignOut}>{t.signOut}</Button>
         </Card>
 
         {saved && (
