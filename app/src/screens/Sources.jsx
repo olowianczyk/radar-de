@@ -2,21 +2,15 @@
 import React from "react";
 import { Card, Badge, Switch, Icon, Button, IconButton, Input } from "../components/index.js";
 import { HRBP_I18N } from "../data.js";
-import { setSourceMonitoring } from "../isapIntegration.js";
 
 export function Sources({ lang, role, sources, setSources, sourceHistory, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo }) {
   const [expanded, setExpanded] = React.useState(null);
+  // Only "detected" events are ever recorded (see api/_lib.js scanSources) —
+  // toggling monitoring is a local UI flag, not a history event.
   const eventMeta = {
-    scan: { icon: "check", color: "var(--text-muted)", label: (t) => t.evScan },
     detected: { icon: "sparkles", color: "var(--brand)", label: (t) => t.evDetected },
-    paused: { icon: "pause", color: "var(--amber-600)", label: (t) => t.evPaused },
-    resumed: { icon: "play", color: "var(--green-700)", label: (t) => t.evResumed },
   };
-  const toggle = (id) => {
-    setSources((prev) => prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s)));
-    const next = !sources.find((s) => s.id === id)?.active;
-    setSourceMonitoring(id, next);
-  };
+  const toggle = (id) => setSources((prev) => prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s)));
   const t = HRBP_I18N[lang];
 
   // ponytail: window.prompt over a form — two fields, native covers it.
@@ -81,7 +75,7 @@ export function Sources({ lang, role, sources, setSources, sourceHistory, scanni
               {isOpen && (
                 <div style={{ padding: "4px 20px 18px 74px", display: "flex", flexDirection: "column", gap: 10, background: "var(--surface-sunken)" }}>
                   {hist.map((ev, j) => {
-                    const meta = eventMeta[ev.type] || eventMeta.scan;
+                    const meta = eventMeta[ev.type] || eventMeta.detected;
                     return (
                       <div key={j} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                         <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--surface)", color: meta.color, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 22px", marginTop: 1 }}>

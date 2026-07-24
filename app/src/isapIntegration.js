@@ -8,15 +8,6 @@
 // third party itself. The backend also runs on a daily Vercel Cron independent of
 // any browser being open (see vercel.json).
 //
-function simulateNetwork(value, ms) {
-  return new Promise((resolve) => setTimeout(() => resolve(value), ms));
-}
-
-// Real version: server-side toggle persisted in a DB; here just echoes back.
-export async function setSourceMonitoring(sourceId, active) {
-  return simulateNetwork({ id: sourceId, active }, 200);
-}
-
 function parseDMYHM(s) {
   const [datePart, timePart] = (s || "").split(" ");
   const [d, m, y] = (datePart || "").split(".").map(Number);
