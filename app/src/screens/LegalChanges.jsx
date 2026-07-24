@@ -223,6 +223,7 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
                   <React.Fragment>
                     {sel.status !== "progress" && sel.status !== "done" && <Button variant="primary" iconLeft={<Icon name="check" size={16} />} onClick={() => setChangeStatus(sel.id, "progress")}>{t.markReviewed}</Button>}
                     {sel.status !== "done" && <Button variant="ghost" iconLeft={<Icon name="file-check-2" size={16} />} onClick={() => setChangeStatus(sel.id, "done")}>{t.updateDoc}</Button>}
+                    {sel.status !== "urgent" && sel.status !== "done" && <Button variant="ghost" iconLeft={<Icon name="alert-triangle" size={16} />} onClick={() => setChangeStatus(sel.id, "urgent")}>{t.markUrgent}</Button>}
                   </React.Fragment>
                 )}
                 <Button variant="secondary" iconLeft={<Icon name="printer" size={16} />} onClick={() => openPrint([sel])}>{t.print}</Button>
