@@ -29,15 +29,17 @@ function periodRange(period, customDate) {
 function ScanBanner({ lang, sources, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo, lastScanFound }) {
   const t = HRBP_I18N[lang];
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--brand-soft)", color: "var(--on-brand-soft)", padding: "10px 16px", borderRadius: "var(--radius-md)", fontSize: 13, flexWrap: "wrap" }}>
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success-500)", flex: "0 0 8px" }} />
-      <Icon name="radar" size={16} />
-      <span style={{ fontWeight: 600 }}>{t.monitoring}: {t.autoScan}</span>
-      <span style={{ opacity: 0.75 }}>· {t.lastChecked.toLowerCase()}: {latestIsapCheck(sources)}</span>
-      {lastScanFound != null && !scanning && <span style={{ fontWeight: 600 }}>· {t.scanDone} ({lastScanFound})</span>}
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 10, background: "var(--brand-soft)", color: "var(--on-brand-soft)", padding: "10px 16px", borderRadius: "var(--radius-md)", fontSize: 13, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingBottom: 10 }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success-500)", flex: "0 0 8px" }} />
+        <Icon name="radar" size={16} />
+        <span style={{ fontWeight: 600 }}>{t.monitoring}: {t.autoScan}</span>
+        <span style={{ opacity: 0.75 }}>· {t.lastChecked.toLowerCase()}: {latestIsapCheck(sources)}</span>
+        {lastScanFound != null && !scanning && <span style={{ fontWeight: 600 }}>· {t.scanDone} ({lastScanFound})</span>}
+      </div>
       <div style={{ flex: 1 }} />
-      <Input type="date" value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} placeholder={t.periodFrom} style={{ width: 140 }} />
-      <Input type="date" value={scanTo} onChange={(e) => setScanTo(e.target.value)} placeholder={t.periodTo} style={{ width: 140 }} />
+      <Input type="date" label={t.periodFrom} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} style={{ width: 140 }} />
+      <Input type="date" label={t.periodTo} value={scanTo} onChange={(e) => setScanTo(e.target.value)} style={{ width: 140 }} />
       <Button variant="secondary" size="sm" disabled={scanning} onClick={runScan} iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={14} className={scanning ? "hrbp-spin" : ""} />}>
         {scanning ? t.scanning : t.checkNow}
       </Button>
