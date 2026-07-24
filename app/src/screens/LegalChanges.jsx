@@ -138,6 +138,7 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
         { id: "all", label: t.tabs.all, count: changes.length },
         { id: "new", label: t.tabs.new, count: newCount },
         { id: "urgent", label: t.tabs.urgent, count: changes.filter(c=>c.status==="urgent").length },
+        { id: "progress", label: t.st.progress, count: changes.filter(c=>c.status==="progress").length },
         { id: "done", label: t.tabs.done, count: doneCount },
       ]} />
       {selected.size > 0 && (
