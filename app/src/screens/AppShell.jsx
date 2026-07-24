@@ -1,6 +1,7 @@
 // AppShell — sidebar + top bar + PL/DE/EN language switcher. Composes SidebarNav.
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
+import { LoadingState } from "../components/Loading.jsx";
 import { HRBP_I18N, HRBP_KB, HRBP_SOURCES, HRBP_SOURCE_HISTORY } from "../data.js";
 import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory } from "../isapIntegration.js";
 
@@ -118,6 +119,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
     });
   }, []);
   const [lastScanFound, setLastScanFound] = React.useState(null);
+  const [initialLoading, setInitialLoading] = React.useState(true);
   React.useEffect(() => {
     fetchPersistedState().then((state) => {
       if (!state.sources.length) return; // no run yet (or no Blob store attached) — keep seed data
@@ -132,7 +134,8 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
           return next;
         });
       }
-    }).catch((e) => console.error("Persisted state fetch failed:", e)); // under plain vite dev/preview /api doesn't exist — falls back to seed data
+    }).catch((e) => console.error("Persisted state fetch failed:", e)) // under plain vite dev/preview /api doesn't exist — falls back to seed data
+      .finally(() => setInitialLoading(false));
   }, []);
   const runScan = React.useCallback(() => {
     if (scanning) return;
@@ -291,7 +294,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
         </header>
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound }) : children}
+            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound }) : children}
           </div>
         </main>
       </div>
