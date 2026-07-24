@@ -64,7 +64,7 @@ export function Sources({ lang, role, sources, setSources, sourceHistory, scanni
                 <Badge tone="neutral">{s.type}</Badge>
                 {s.url && <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: "var(--brand)", display: "flex", alignItems: "center", gap: 4, flex: "0 0 auto" }}><Icon name="external-link" size={12} />ISAP</a>}
                 <div style={{ minWidth: 90, textAlign: "center" }}>
-                  <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 20, color: s.found ? "var(--brand)" : "var(--ink-300)" }}>{s.found}</div>
+                  <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 20, color: hist.length ? "var(--brand)" : "var(--ink-300)" }}>{hist.length}</div>
                   <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".04em" }}>{t.changesFound}</div>
                 </div>
                 <Switch checked={s.active} onChange={() => toggle(s.id)} disabled={role === "viewer"} />
