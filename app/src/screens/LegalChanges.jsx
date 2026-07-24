@@ -171,7 +171,7 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
               <Card key={c.id} interactive onClick={() => setSelectedId(c.id)}
                 style={isSel ? { borderColor: "var(--brand)", boxShadow: "0 0 0 2px var(--ring-color)" } : {}} padding="md">
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                  <div onClick={(e) => e.stopPropagation()} style={{ paddingTop: 2 }}><Checkbox checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} /></div>
+                  <div onClick={(e) => e.stopPropagation()} style={{ paddingTop: 2 }}><Checkbox checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={c.title[lang]} /></div>
                   <div style={{ width: 36, height: 36, borderRadius: "var(--radius-sm)", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 36px" }}>
                     <Icon name="scale" size={17} />
                   </div>
