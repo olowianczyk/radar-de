@@ -85,7 +85,7 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
   const exportSelectedCsv = () => exportCsvFor(filtered.filter((c) => selected.has(c.id)));
   const exportSelectedPdf = () => openPrint(filtered.filter((c) => selected.has(c.id)));
   function exportCsvFor(rows) {
-    const header = ["Akt", "Tytuł", "Obszar", "Status", "Data publikacji", "Wejście w życie", "Źródło"];
+    const header = t.csvHeader;
     const data = rows.map((c) => [c.act, c.title[lang], t.area[c.area], t.st[c.status], c.date, c.effective, c.source]);
     const esc = (v) => `"${String(v).replace(/"/g, '""')}"`;
     const csv = [header, ...data].map((r) => r.map(esc).join(",")).join("\r\n");
