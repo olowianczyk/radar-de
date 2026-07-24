@@ -3,7 +3,13 @@
 import React from "react";
 import { Card, Badge, Input, Icon, Button, Avatar, Textarea, IconButton, Tabs, Select } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
-import { HRBP_I18N, HRBP_KB, HRBP_KB_COMMENTS, HRBP_KB_ATTACHMENTS, HRBP_KB_VERSIONS, HRBP_AREA_TONE } from "../data.js";
+import { HRBP_I18N, HRBP_KB_COMMENTS, HRBP_KB_ATTACHMENTS, HRBP_KB_VERSIONS, HRBP_AREA_TONE } from "../data.js";
+
+function formatDate(iso) {
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+}
 
 function parseDMY(s) {
   const [d, m, y] = (s || "").split(".").map(Number);
@@ -22,12 +28,25 @@ function downloadAttachment(a) {
   link.click();
   URL.revokeObjectURL(url);
 }
-export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
+export function KnowledgeBase({ lang, selectedId, setSelectedId, role, kbDocs, addKb }) {
   const t = HRBP_I18N[lang];
+  const docsAll = kbDocs || [];
   const [query, setQuery] = React.useState("");
   const [tab, setTab] = React.useState("all");
   const [sort, setSort] = React.useState("title");
   const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [adding, setAdding] = React.useState(false);
+  const [newTitle, setNewTitle] = React.useState("");
+  const [newArea, setNewArea] = React.useState("other");
+  const [newBody, setNewBody] = React.useState("");
+  const [addError, setAddError] = React.useState("");
+  const submitNew = () => {
+    if (!newTitle.trim() || !newBody.trim()) return;
+    setAddError("");
+    addKb({ title: newTitle.trim(), area: newArea, body: newBody.trim() })
+      .then(() => { setNewTitle(""); setNewBody(""); setNewArea("other"); setAdding(false); })
+      .catch((e) => setAddError(e.message));
+  };
   const [favorites, setFavorites] = React.useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("hrbp-kb-favorites") || "[]")); } catch (e) { return new Set(); }
   });
@@ -51,17 +70,16 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
     });
     setDraft("");
   };
-  const docs = HRBP_KB.filter((k) => {
+  const docs = docsAll.filter((k) => {
     if (tab === "favorites" && !favorites.has(k.id)) return false;
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    return k.title[lang].toLowerCase().includes(q) || t.area[k.area].toLowerCase().includes(q);
+    return k.title.toLowerCase().includes(q) || t.area[k.area].toLowerCase().includes(q);
   }).sort((a, b) => {
-    if (sort === "updated") return parseDMY(b.updated) - parseDMY(a.updated);
-    if (sort === "needsUpdate") return (b.needsUpdate ? 1 : 0) - (a.needsUpdate ? 1 : 0);
-    return a.title[lang].localeCompare(b.title[lang]);
+    if (sort === "updated") return new Date(b.ts) - new Date(a.ts);
+    return a.title.localeCompare(b.title);
   });
-  const sel = docs.find((d) => d.id === selectedId) || HRBP_KB.find((d) => d.id === selectedId);
+  const sel = docs.find((d) => d.id === selectedId) || docsAll.find((d) => d.id === selectedId);
   // No real mapping exists from a detected Sejm act to a specific KB document —
   // that link was fabricated demo data, not derivable from the real scan/API.
   const relatedChanges = [];
@@ -72,17 +90,32 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
       <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 14 }}>{t.kbSub}</p>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} iconLeft={<Icon name="search" size={16} />} /></div>
-        <div style={{ width: 200 }}><Select value={sort} onChange={(e) => setSort(e.target.value)} options={[{ value: "title", label: t.sortTitle }, { value: "updated", label: t.sortUpdated }, { value: "needsUpdate", label: t.sortNeedsUpdate }]} /></div>
+        <div style={{ width: 200 }}><Select value={sort} onChange={(e) => setSort(e.target.value)} options={[{ value: "title", label: t.sortTitle }, { value: "updated", label: t.sortUpdated }]} /></div>
+        {role !== "viewer" && <Button variant="primary" iconLeft={<Icon name="plus" size={16} />} onClick={() => setAdding((v) => !v)}>{t.kbAddDoc}</Button>}
       </div>
+      {adding && (
+        <Card padding="lg">
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <Input label={t.kbDocTitle} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+            <div style={{ width: 220 }}><Select label={t.filterArea} value={newArea} onChange={(e) => setNewArea(e.target.value)} options={Object.keys(t.area).map((k) => ({ value: k, label: t.area[k] }))} /></div>
+            <Textarea rows={5} label={t.kbDocBody} value={newBody} onChange={(e) => setNewBody(e.target.value)} />
+            {addError && <span style={{ fontSize: 12.5, color: "var(--danger-600)" }}>{addError}</span>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <Button variant="ghost" onClick={() => setAdding(false)}>{t.kbAddCancel}</Button>
+              <Button variant="primary" disabled={!newTitle.trim() || !newBody.trim()} onClick={submitNew}>{t.kbAddSave}</Button>
+            </div>
+          </div>
+        </Card>
+      )}
       <Tabs activeId={tab} onSelect={setTab} tabs={[
-        { id: "all", label: t.kbAll, count: HRBP_KB.length },
+        { id: "all", label: t.kbAll, count: docsAll.length },
         { id: "favorites", label: t.kbFavorites, count: favorites.size },
       ]} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
         {docs.length === 0 ? (
           <Card>
             {tab === "favorites" ? <EmptyState icon="star" title={t.kbNoFavorites} subtitle={t.kbNoFavoritesSub} />
-              : HRBP_KB.length === 0 ? <EmptyState icon="book-open" title={t.kbEmptyAll} subtitle={t.kbEmptyAllSub} />
+              : docsAll.length === 0 ? <EmptyState icon="book-open" title={t.kbEmptyAll} subtitle={t.kbEmptyAllSub} />
               : <EmptyState icon="search-x" title={t.kbNoResults} subtitle={t.kbNoResultsSub} />}
           </Card>
         ) : (
@@ -94,19 +127,16 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
                 style={isSel ? { borderColor: "var(--brand)", boxShadow: "0 0 0 2px var(--ring-color)" } : {}}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div style={{ width: 40, height: 40, borderRadius: "var(--radius-md)", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Icon name={k.icon} size={20} />
+                    <Icon name="file-text" size={20} />
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    {k.needsUpdate && <Badge tone="red" dot>{t.needsUpdate}</Badge>}
-                    <IconButton label={favorites.has(k.id) ? t.removeFavorite : t.addFavorite} onClick={(e) => { e.stopPropagation(); toggleFavorite(k.id); }}>
-                      <Icon name="star" size={16} style={favorites.has(k.id) ? { fill: "var(--amber-600)", color: "var(--amber-600)" } : {}} />
-                    </IconButton>
-                  </div>
+                  <IconButton label={favorites.has(k.id) ? t.removeFavorite : t.addFavorite} onClick={(e) => { e.stopPropagation(); toggleFavorite(k.id); }}>
+                    <Icon name="star" size={16} style={favorites.has(k.id) ? { fill: "var(--amber-600)", color: "var(--amber-600)" } : {}} />
+                  </IconButton>
                 </div>
-                <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14.5, marginTop: 12 }}>{k.title[lang]}</div>
+                <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14.5, marginTop: 12 }}>{k.title}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                   <Badge tone={HRBP_AREA_TONE[k.area]}>{t.area[k.area]}</Badge>
-                  <span style={{ fontSize: 11.5, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5 }}><Icon name="languages" size={12} />{k.meta}</span>
+                  <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{formatDate(k.ts)}</span>
                 </div>
               </Card>
             );
@@ -118,22 +148,20 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                 <div style={{ width: 44, height: 44, borderRadius: "var(--radius-md)", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 44px" }}>
-                  <Icon name={sel.icon} size={20} />
+                  <Icon name="file-text" size={20} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-2xl)", color: "var(--text-heading)" }}>{sel.title[lang]}</h2>
-                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{t.updated}: {sel.updated}</div>
+                  <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-2xl)", color: "var(--text-heading)" }}>{sel.title}</h2>
+                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{t.updated}: {formatDate(sel.ts)}</div>
                 </div>
                 <IconButton label={favorites.has(sel.id) ? t.removeFavorite : t.addFavorite} onClick={() => toggleFavorite(sel.id)}>
                   <Icon name="star" size={18} style={favorites.has(sel.id) ? { fill: "var(--amber-600)", color: "var(--amber-600)" } : {}} />
                 </IconButton>
-                {sel.needsUpdate && <Badge tone="red" dot>{t.needsUpdate}</Badge>}
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingBottom: 14, borderBottom: "1px solid var(--border-subtle)" }}>
                 <Badge tone={HRBP_AREA_TONE[sel.area]}>{t.area[sel.area]}</Badge>
-                <Badge tone="neutral"><Icon name="languages" size={11} /> {sel.meta}</Badge>
               </div>
-              <p style={{ margin: 0, color: "var(--text-body)", fontSize: 14, lineHeight: 1.7 }}>{sel.body[lang] || sel.body.pl}</p>
+              <p style={{ margin: 0, color: "var(--text-body)", fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{sel.body}</p>
               {relatedChanges.length > 0 && (
                 <div>
                   <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, marginBottom: 8 }}>{t.relatedChanges}</div>

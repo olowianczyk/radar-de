@@ -2,8 +2,8 @@
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
 import { LoadingState } from "../components/Loading.jsx";
-import { HRBP_I18N, HRBP_KB, HRBP_SOURCES, HRBP_SOURCE_HISTORY } from "../data.js";
-import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory } from "../isapIntegration.js";
+import { HRBP_I18N, HRBP_SOURCES, HRBP_SOURCE_HISTORY } from "../data.js";
+import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc } from "../isapIntegration.js";
 
 function useSources() {
   return React.useState(HRBP_SOURCES);
@@ -120,6 +120,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   }, []);
   const [lastScanFound, setLastScanFound] = React.useState(null);
   const [initialLoading, setInitialLoading] = React.useState(true);
+  const [kbDocs, setKbDocs] = React.useState([]);
   React.useEffect(() => {
     fetchPersistedState().then((state) => {
       if (!state.sources.length) return; // no run yet (or no Blob store attached) — keep seed data
@@ -136,7 +137,9 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
       }
     }).catch((e) => console.error("Persisted state fetch failed:", e)) // under plain vite dev/preview /api doesn't exist — falls back to seed data
       .finally(() => setInitialLoading(false));
+    fetchKbDocs().then(setKbDocs).catch((e) => console.error("KB docs fetch failed:", e)); // same plain-vite-dev caveat as above
   }, []);
+  const addKb = React.useCallback((doc) => addKbDoc(doc).then((saved) => setKbDocs((prev) => [saved, ...prev])), []);
   const runScan = React.useCallback(() => {
     if (scanning) return;
     setScanning(true);
@@ -181,7 +184,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   }, [notifOpen]);
   const changes = React.useMemo(() => buildChangesFromHistory(sourceHistory, sources, statusMap), [sourceHistory, sources, statusMap]);
   const notifChanges = changes.filter((c) => c.status === "new" || c.status === "urgent");
-  const notifKb = HRBP_KB.filter((k) => k.needsUpdate);
+  const notifKb = kbDocs.filter((k) => k.needsUpdate);
   const notifTotal = notifChanges.length + notifKb.length;
   const [readIds, setReadIds] = React.useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("hrbp-notifs-read") || "[]")); } catch (e) { return new Set(); }
@@ -294,7 +297,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
         </header>
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound }) : children}
+            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb }) : children}
           </div>
         </main>
       </div>

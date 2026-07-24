@@ -32,6 +32,24 @@ export async function fetchPersistedState() {
   return res.json();
 }
 
+export async function fetchKbDocs() {
+  const res = await fetch("/api/kb");
+  if (!res.ok) throw new Error(`kb fetch failed: ${res.status}`);
+  const data = await res.json();
+  return data.docs || [];
+}
+
+export async function addKbDoc({ title, area, body }) {
+  const res = await fetch("/api/kb", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, area, body }),
+  });
+  if (!res.ok) throw new Error(`kb add failed: ${res.status}`);
+  const data = await res.json();
+  return data.doc;
+}
+
 // Builds the "legal changes" feed from real scan history instead of hand-written
 // demo cards. Each real detected entry has {ts, note, url, eli} (see api/_lib.js
 // scanSources) — title/act/date/source come straight from that, so nothing here
