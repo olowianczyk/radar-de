@@ -60,13 +60,21 @@ export async function fetchKeywords() {
 // Exactly the query the backend runs for a source (see /api/_lib.js
 // buildSearchParams) — surfaced in the UI so "what did we actually search"
 // is never a guess. `dateFrom`/`dateTo` as YYYY-MM-DD.
-export function sourceQueryUrl(source, dateFrom, dateTo) {
-  const params = new URLSearchParams({ publisher: "DU", limit: "100" });
-  if (source.keyword) params.set("keyword", source.keyword);
-  else if (source.title) params.set("title", source.title);
+export function sourceQueryUrl(source, dateFrom, dateTo, mode) {
+  const params = new URLSearchParams({ publisher: source.publisher === "MP" ? "MP" : "DU", limit: "100" });
+  const m = mode || (source.keyword ? "keyword" : "title");
+  params.set(m, m === "keyword" ? source.keyword : source.title);
   if (dateFrom) params.set("dateFrom", dateFrom);
   if (dateTo) params.set("dateTo", dateTo);
   return `${SEJM_SEARCH_URL}?${params.toString()}`;
+}
+
+// The one-or-two queries a source stands for (mirrors api/_lib.js sourceQueries).
+export function sourceQueries(source) {
+  const qs = [];
+  if (source.keyword) qs.push({ mode: "keyword", term: source.keyword });
+  if (source.title) qs.push({ mode: "title", term: source.title });
+  return qs;
 }
 
 export function isoToday() {
@@ -118,12 +126,18 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
         title: { pl: e.note, de: e.note, en: e.note },
         summary,
         affected: [],
-        matchedBy: {
-          sourceName: source.name,
-          mode: source.keyword ? "keyword" : "title",
-          term: source.keyword || source.title || "",
-          queryUrl: sourceQueryUrl(source, iso, iso),
-        },
+        matchedBy: (() => {
+          // `via` is recorded by the backend since the multi-query engine;
+          // older history entries fall back to the source's first query.
+          const mode = e.via || (source.keyword ? "keyword" : "title");
+          return {
+            sourceName: source.name,
+            mode,
+            term: mode === "keyword" ? source.keyword : source.title,
+            publisher: e.publisher || source.publisher || "DU",
+            queryUrl: sourceQueryUrl(source, iso, iso, mode),
+          };
+        })(),
       });
     });
   });
@@ -139,7 +153,7 @@ export async function forceScan(ws, activeSources, range) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       workspace: ws,
-      sources: activeSources.map((s) => ({ id: s.id, keyword: s.keyword, title: s.title, lastChecked: s.lastChecked })),
+      sources: activeSources.map((s) => ({ id: s.id, keyword: s.keyword, title: s.title, publisher: s.publisher, lastChecked: s.lastChecked })),
       ...(range ? { dateFrom: range.from, dateTo: range.to } : {}),
     }),
   });

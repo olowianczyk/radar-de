@@ -113,7 +113,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, r
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
         <StatCard label={t.kpi.new} value={String(newCount)} accent="danger" icon={<Icon name="sparkles" size={18} />} />
         <StatCard label={t.kpi.pending} value={String(pendingCount)} accent="petrol" icon={<Icon name="clock" size={18} />} />
-        <StatCard label={t.kpi.tracked} value={String(sources.length)} accent="success" icon={<Icon name="radar" size={18} />} />
+        <StatCard label={t.kpi.tracked} value={String(sources.filter((s) => s.active && (s.keyword || s.title)).length)} accent="success" icon={<Icon name="radar" size={18} />} />
         <StatCard label={t.kpi.updated} value={String(doneThisMonth)} accent="coral" icon={<Icon name="check-circle-2" size={18} />} />
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -215,7 +215,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, r
                 <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 6 }}>
                   <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Icon name="crosshair" size={12} />{t.foundVia}</div>
                   <div style={{ fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.55 }}>
-                    {t.source}: <strong>{sel.matchedBy.sourceName}</strong> · {sel.matchedBy.mode === "keyword" ? t.scopeMatchKeyword : t.scopeMatchTitle} <span style={{ fontFamily: "var(--font-mono)" }}>„{sel.matchedBy.term}”</span> · {t.scopeRegisterValue} · {t.foundViaDate} {sel.date}{sel.actType ? <> · {t.actType}: {sel.actType}</> : null}
+                    {t.source}: <strong>{sel.matchedBy.sourceName}</strong> · {sel.matchedBy.mode === "keyword" ? t.scopeMatchKeyword : t.scopeMatchTitle} <span style={{ fontFamily: "var(--font-mono)" }}>„{sel.matchedBy.term}”</span> · {sel.matchedBy.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue} · {t.foundViaDate} {sel.date}{sel.actType ? <> · {t.actType}: {sel.actType}</> : null}
                   </div>
                   <a href={sel.matchedBy.queryUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="external-link" size={12} />{t.scopeOpenQuery}</a>
                 </div>

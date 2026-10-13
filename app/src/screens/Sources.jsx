@@ -1,12 +1,15 @@
-// Monitored sources — legal acts scanned automatically via the Sejm/ELI API.
-// The point of this screen is transparency: for every source it spells out
-// exactly what is searched (register, match mode and term, date window, limit),
-// whether its keyword even exists in the Sejm thesaurus, and links the literal
-// API query so anyone can replay it.
+// Monitored sources — legal acts scanned automatically via the Sejm/ELI API,
+// plus the sources the requirements document demands that the API cannot see
+// (EU law, case law, regulators, sanctions lists, drafts) listed as MANUAL.
+// The point of this screen is transparency: for every automatic source it
+// spells out exactly what is searched (register, match mode(s) and term(s),
+// date window, limit), whether its keyword even exists in the Sejm thesaurus,
+// and links the literal API query so anyone can replay it; for every manual
+// source it says why it isn't scanned and how often to review it.
 import React from "react";
 import { Card, Badge, Switch, Icon, Button, IconButton, Input, Select } from "../components/index.js";
-import { tFor } from "../workspaces.js";
-import { fetchKeywords, sourceQueryUrl, nextScanRange } from "../isapIntegration.js";
+import { tFor, isManualSource } from "../workspaces.js";
+import { fetchKeywords, sourceQueryUrl, sourceQueries, nextScanRange } from "../isapIntegration.js";
 
 function fmtIso(iso, lang) {
   const [y, m, d] = (iso || "").split("-");
@@ -34,15 +37,22 @@ function useKeywordThesaurus() {
   return { set, suggest };
 }
 
+function keywordOk(source, set) {
+  return !!(source.keyword && set && set.has(source.keyword.toLowerCase()));
+}
+function keywordBad(source, set) {
+  return !!(source.keyword && set && !set.has(source.keyword.toLowerCase()));
+}
+
 function KeywordStatus({ source, thesaurus, t }) {
   if (!source.keyword) return null;
   const { set, suggest } = thesaurus;
   let tone, icon, label;
   if (set === undefined) { tone = "var(--text-muted)"; icon = "loader-2"; label = t.kwChecking; }
   else if (set === null) { tone = "var(--text-muted)"; icon = "help-circle"; label = t.kwUnknown; }
-  else if (set.has(source.keyword.toLowerCase())) { tone = "var(--success-600)"; icon = "check-circle-2"; label = t.kwValid; }
+  else if (keywordOk(source, set)) { tone = "var(--success-600)"; icon = "check-circle-2"; label = t.kwValid; }
   else { tone = "var(--danger-600)"; icon = "alert-triangle"; label = t.kwInvalid; }
-  const sugg = set && !set.has(source.keyword.toLowerCase()) ? suggest(source.keyword) : [];
+  const sugg = keywordBad(source, set) ? suggest(source.keyword) : [];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: tone }}>
@@ -64,45 +74,51 @@ function ScopeRow({ label, children }) {
   );
 }
 
+function registerLabel(source, t) {
+  return source.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue;
+}
+
 function ScopePanel({ source, lang, t, thesaurus }) {
   const range = nextScanRange(source);
   const note = source.scope ? (source.scope[lang] || source.scope.pl) : null;
-  const scannable = !!(source.keyword || source.title);
+  const queries = sourceQueries(source);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px", background: "var(--surface-card)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 700, color: "var(--text-heading)" }}>
         <Icon name="crosshair" size={14} />{t.scopeTitle}
       </div>
-      {scannable ? (
-        <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-          <ScopeRow label={t.scopeRegister}>{t.scopeRegisterValue}</ScopeRow>
-          <ScopeRow label={t.scopeMatch}>
-            <span style={{ fontWeight: 500, color: "var(--text-muted)" }}>{source.keyword ? t.scopeMatchKeyword : t.scopeMatchTitle}</span>{" "}
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5 }}>„{source.keyword || source.title}”</span>
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+        <ScopeRow label={t.scopeRegister}>{registerLabel(source, t)}</ScopeRow>
+        <ScopeRow label={t.scopeMatch}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {queries.map((q) => (
+              <div key={q.mode}>
+                <span style={{ fontWeight: 500, color: "var(--text-muted)" }}>{q.mode === "keyword" ? t.scopeMatchKeyword : t.scopeMatchTitle}</span>{" "}
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5 }}>„{q.term}”</span>
+              </div>
+            ))}
             <KeywordStatus source={source} thesaurus={thesaurus} t={t} />
-          </ScopeRow>
-          <ScopeRow label={t.scopeNext}>
-            {range.first ? t.scopeSinceYearStart.replace("{y}", range.from.slice(0, 4)) : t.scopeSinceLast.replace("{d}", fmtIso(range.from, lang))}
-          </ScopeRow>
-          <ScopeRow label={t.scopeLimit}>{t.scopeLimitValue}</ScopeRow>
-        </div>
-      ) : (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--amber-600)" }}><Icon name="radar" size={13} />{t.noAutoScan}</div>
-      )}
+          </div>
+        </ScopeRow>
+        <ScopeRow label={t.scopeNext}>
+          {range.first ? t.scopeSinceYearStart.replace("{y}", range.from.slice(0, 4)) : t.scopeSinceLast.replace("{d}", fmtIso(range.from, lang))}
+        </ScopeRow>
+        <ScopeRow label={t.scopeLimit}>{t.scopeLimitValue}</ScopeRow>
+      </div>
       {note && (
         <div style={{ fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.55 }}>
           <span style={{ fontWeight: 600, color: "var(--text-heading)" }}>{t.scopeNote}: </span>{note}
         </div>
       )}
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-        {scannable && (
-          <a href={sourceQueryUrl(source, range.from, range.to)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <Icon name="external-link" size={12} />{t.scopeOpenQuery}
+        {queries.map((q) => (
+          <a key={q.mode} href={sourceQueryUrl(source, range.from, range.to, q.mode)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <Icon name="external-link" size={12} />{t.scopeOpenQuery}{queries.length > 1 ? ` (${q.mode === "keyword" ? t.scopeMatchKeyword : t.scopeMatchTitle})` : ""}
           </a>
-        )}
+        ))}
         {source.url && (
           <a href={source.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <Icon name="external-link" size={12} />{/isap/.test(source.url) ? "ISAP" : source.url.replace(/^https?:\/\//, "")}
+            <Icon name="external-link" size={12} />ISAP
           </a>
         )}
       </div>
@@ -133,8 +149,9 @@ function HowItWorks({ t }) {
 
 function AddSourceForm({ t, ws, onAdd, onCancel }) {
   const [name, setName] = React.useState("");
-  const [mode, setMode] = React.useState("keyword");
+  const [mode, setMode] = React.useState("title");
   const [term, setTerm] = React.useState("");
+  const [publisher, setPublisher] = React.useState("DU");
   const [area, setArea] = React.useState("other");
   const valid = name.trim() && term.trim();
   return (
@@ -143,10 +160,13 @@ function AddSourceForm({ t, ws, onAdd, onCancel }) {
         <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-heading)" }}>{t.addSourceTitle}</div>
         <Input label={t.srcName} value={name} onChange={(e) => setName(e.target.value)} />
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ width: 220 }}>
-            <Select label={t.srcMode} value={mode} onChange={(e) => setMode(e.target.value)} options={[{ value: "keyword", label: t.scopeMatchKeyword }, { value: "title", label: t.scopeMatchTitle }]} />
+          <div style={{ width: 200 }}>
+            <Select label={t.srcMode} value={mode} onChange={(e) => setMode(e.target.value)} options={[{ value: "title", label: t.scopeMatchTitle }, { value: "keyword", label: t.scopeMatchKeyword }]} />
           </div>
           <div style={{ flex: 1, minWidth: 220 }}><Input label={mode === "keyword" ? t.srcTerm : t.srcTermTitle} value={term} onChange={(e) => setTerm(e.target.value)} /></div>
+          <div style={{ width: 200 }}>
+            <Select label={t.scopeRegister} value={publisher} onChange={(e) => setPublisher(e.target.value)} options={[{ value: "DU", label: t.scopeRegisterValue }, { value: "MP", label: t.scopeRegisterMP }]} />
+          </div>
           <div style={{ width: 220 }}>
             <Select label={t.srcArea} value={area} onChange={(e) => setArea(e.target.value)} options={Object.keys(ws.areas).map((k) => ({ value: k, label: t.area[k] }))} />
           </div>
@@ -154,10 +174,33 @@ function AddSourceForm({ t, ws, onAdd, onCancel }) {
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{t.scopeHow[1]}</div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <Button variant="ghost" onClick={onCancel}>{t.srcCancel}</Button>
-          <Button variant="primary" disabled={!valid} onClick={() => onAdd({ name: name.trim(), mode, term: term.trim(), area })}>{t.srcAdd}</Button>
+          <Button variant="primary" disabled={!valid} onClick={() => onAdd({ name: name.trim(), mode, term: term.trim(), publisher, area })}>{t.srcAdd}</Button>
         </div>
       </div>
     </Card>
+  );
+}
+
+function ManualRow({ s, t, lang, first }) {
+  const note = s.scope ? (s.scope[lang] || s.scope.pl) : null;
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: "14px 20px", flexWrap: "wrap", borderTop: first ? "none" : "1px solid var(--border-subtle)" }}>
+      <div style={{ width: 38, height: 38, borderRadius: "var(--radius-sm)", background: "var(--amber-100)", color: "var(--amber-600)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 38px" }}>
+        <Icon name="hand" size={18} />
+      </div>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14 }}>{s.name}</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3, lineHeight: 1.5 }}>{t.manualReason[s.reason] || t.noAutoScan}{note ? ` ${note}` : ""}</div>
+      </div>
+      <Badge tone="neutral">{t.area[s.area] || t.area.other}</Badge>
+      <div style={{ minWidth: 120 }}>
+        <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".04em" }}>{t.cadenceLabel}</div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: s.cadence === "daily" ? "var(--danger-600)" : "var(--text-heading)" }}>{t.cadence[s.cadence] || s.cadence}</div>
+      </div>
+      <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4, paddingTop: 10 }}>
+        <Icon name="external-link" size={12} />{t.openSource}
+      </a>
+    </div>
   );
 }
 
@@ -171,11 +214,13 @@ export function Sources({ lang, ws, role, sources, setSources, sourceHistory, sc
   const eventMeta = { detected: { icon: "sparkles", color: "var(--brand)", label: (tt) => tt.evDetected } };
   const toggle = (id) => setSources((prev) => prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s)));
   const defaultIds = new Set(ws.sources.map((s) => s.id));
+  const auto = sources.filter((s) => !isManualSource(s));
+  const manual = sources.filter(isManualSource);
 
-  const addSource = ({ name, mode, term, area }) => {
-    const id = Math.max(0, ...sources.map((s) => s.id)) + 1;
+  const addSource = ({ name, mode, term, publisher, area }) => {
+    const id = Math.max(0, ...auto.map((s) => s.id)) + 1;
     setSources((prev) => [...prev, {
-      id, name, type: "Ustawa", url: "https://isap.sejm.gov.pl", area,
+      id, name, type: "Ustawa", url: "https://isap.sejm.gov.pl", area, publisher,
       keyword: mode === "keyword" ? term : null, title: mode === "title" ? term : null,
       lastChecked: null, found: 0, active: true, scope: null,
     }]);
@@ -199,6 +244,7 @@ export function Sources({ lang, ws, role, sources, setSources, sourceHistory, sc
           disabled={scanning} onClick={runScan}>
           {scanning ? t.scanning : t.checkNow}
         </Button>
+        <span style={{ fontSize: 12.5, color: "var(--text-muted)", paddingBottom: 10 }}>{t.autoSourcesTitle}: {auto.filter((s) => s.active).length}/{auto.length} {t.activeSources}</span>
       </div>
       <Card padding="none">
         {role === "viewer" && (
@@ -206,11 +252,11 @@ export function Sources({ lang, ws, role, sources, setSources, sourceHistory, sc
             <Icon name="eye" size={13} />{t.readOnlyNotice}
           </div>
         )}
-        {sources.map((s, i) => {
+        {auto.map((s, i) => {
           const isOpen = expanded === s.id;
           const hist = sourceHistory[s.id] || [];
-          const scannable = !!(s.keyword || s.title);
-          const kwBad = s.keyword && thesaurus.set && !thesaurus.set.has(s.keyword.toLowerCase());
+          const kwBad = keywordBad(s, thesaurus.set);
+          const queries = sourceQueries(s);
           return (
             <React.Fragment key={s.id}>
               <div style={{
@@ -223,14 +269,13 @@ export function Sources({ lang, ws, role, sources, setSources, sourceHistory, sc
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14 }}>{s.name}</div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    {scannable ? (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: kwBad ? "var(--danger-600)" : "var(--success-500)", flex: "0 0 7px" }} />
-                        {s.keyword ? t.scopeMatchKeyword : t.scopeMatchTitle}: <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-heading)" }}>„{s.keyword || s.title}”</span>
-                      </span>
-                    ) : (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--amber-600)" }}><Icon name="radar" size={12} />{t.noAutoScan}</span>
-                    )}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: kwBad && queries.length === 1 ? "var(--danger-600)" : kwBad ? "var(--amber-600)" : "var(--success-500)", flex: "0 0 7px" }} />
+                      {queries.map((q, k) => (
+                        <span key={q.mode}>{k > 0 ? " / " : ""}{q.mode === "keyword" ? t.scopeMatchKeyword : t.scopeMatchTitle}: <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-heading)" }}>„{q.term}”</span></span>
+                      ))}
+                    </span>
+                    {s.publisher === "MP" && <Badge tone="amber">M.P.</Badge>}
                     <span>· {t.lastChecked}: {s.lastChecked || "—"}</span>
                   </div>
                   {s.error && <div style={{ fontSize: 11.5, color: "var(--danger-600)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{s.error}</div>}
@@ -261,7 +306,10 @@ export function Sources({ lang, ws, role, sources, setSources, sourceHistory, sc
                           <Icon name={meta.icon} size={12} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-heading)" }}>{meta.label(t)}{ev.actType ? <span style={{ fontWeight: 500, color: "var(--text-muted)" }}> · {ev.actType}</span> : null}</div>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-heading)" }}>
+                            {meta.label(t)}{ev.actType ? <span style={{ fontWeight: 500, color: "var(--text-muted)" }}> · {ev.actType}</span> : null}
+                            {ev.via ? <span style={{ fontWeight: 500, color: "var(--text-muted)" }}> · {ev.via === "keyword" ? t.scopeMatchKeyword : t.scopeMatchTitle}</span> : null}
+                          </div>
                           <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
                             {ev.url ? <a href={ev.url} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>{ev.note}</a> : ev.note}
                           </div>
@@ -276,6 +324,17 @@ export function Sources({ lang, ws, role, sources, setSources, sourceHistory, sc
           );
         })}
       </Card>
+      {manual.length > 0 && (
+        <>
+          <div style={{ marginTop: 6 }}>
+            <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-xl)", color: "var(--text-heading)", display: "flex", alignItems: "center", gap: 8 }}><Icon name="hand" size={18} style={{ color: "var(--amber-600)" }} />{t.manualTitle} <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-muted)" }}>({manual.length})</span></h2>
+            <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 13.5, lineHeight: 1.5 }}>{t.manualSub}</p>
+          </div>
+          <Card padding="none">
+            {manual.map((s, i) => <ManualRow key={s.id} s={s} t={t} lang={lang} first={i === 0} />)}
+          </Card>
+        </>
+      )}
     </div>
   );
 }

@@ -60,8 +60,13 @@ async function saveState(ws, state) {
 //             texts, which is what a legal team usually wants.
 // limit 100: broad terms ("czas pracy") can exceed 10 hits in a wide range;
 // 100 covers any realistic period without pagination.
+const PUBLISHERS = ["DU", "MP"];
+function normalizePublisher(p) {
+  return PUBLISHERS.includes(p) ? p : "DU";
+}
+
 function buildSearchParams({ keyword, title, dateFrom, dateTo, publisher = "DU", limit = 100 }) {
-  const params = new URLSearchParams({ publisher, limit: String(limit) });
+  const params = new URLSearchParams({ publisher: normalizePublisher(publisher), limit: String(limit) });
   if (keyword) params.set("keyword", keyword);
   if (title) params.set("title", title);
   if (dateFrom) params.set("dateFrom", dateFrom);
@@ -93,54 +98,9 @@ function isapDocUrl(address) {
 }
 
 // Default scan set per workspace — used by the daily cron (vercel.json) when no
-// per-source state exists yet. Mirrors app/src/workspaces.js (ids must match:
-// persisted history is keyed by source id within a workspace). Sources without
-// keyword/title (e.g. PIP guidance) have no ELI equivalent and aren't scanned.
-const DEFAULT_SOURCES = {
-  hr: [
-    { id: 1, keyword: "kodeks pracy" },
-    { id: 2, keyword: "pracownicze plany kapitałowe" },
-    { id: 3, keyword: "BHP" },
-    { id: 4, keyword: "cudzoziemcy" },
-    { id: 5, keyword: "związki zawodowe" },
-    { id: 7, keyword: "urlop rodzicielski" },
-    { id: 8, keyword: "minimalne wynagrodzenie za pracę" },
-    { id: 9, keyword: "czas pracy" },
-    { id: 10, keyword: "ochrona danych osobowych" },
-    { id: 11, keyword: "emerytury pomostowe" },
-    { id: 12, keyword: "mobbing" },
-    { id: 13, keyword: "zatrudnianie osób niepełnosprawnych" },
-  ],
-  compliance: [
-    { id: 1, keyword: "pranie pieniędzy" },
-    { id: 2, keyword: "ochrona danych osobowych" },
-    { id: 3, title: "sygnalist" },
-    { id: 4, keyword: "korupcja" },
-    { id: 5, title: "środki ograniczające" },
-    { id: 6, keyword: "ochrona konkurencji" },
-    { id: 7, keyword: "ochrona konsumentów" },
-    { id: 8, keyword: "rachunkowość" },
-    { id: 9, keyword: "cyberbezpieczeństwo" },
-    { id: 10, title: "zrównoważonego rozwoju" },
-    { id: 11, keyword: "zamówienia publiczne" },
-    { id: 12, keyword: "ordynacja podatkowa" },
-  ],
-  legal: [
-    { id: 1, title: "Kodeks cywilny" },
-    { id: 2, title: "Kodeks spółek handlowych" },
-    { id: 3, title: "Kodeks postępowania cywilnego" },
-    { id: 4, title: "Kodeks postępowania administracyjnego" },
-    { id: 5, title: "Krajowym Rejestrze Sądowym" },
-    { id: 6, title: "Prawo upadłościowe" },
-    { id: 7, title: "Prawo restrukturyzacyjne" },
-    { id: 8, keyword: "prawo autorskie" },
-    { id: 9, keyword: "własność przemysłowa" },
-    { id: 10, title: "doręczeniach elektronicznych" },
-    { id: 11, keyword: "prawa konsumenta" },
-    { id: 12, title: "Prawo zamówień publicznych" },
-    { id: 13, keyword: "ochrona danych osobowych" },
-  ],
-};
+// per-source state exists yet. GENERATED from app/src/workspaces.js by
+// `node scripts/sync-sources.mjs` — never edit api/_sources.js by hand.
+const DEFAULT_SOURCES = require("./_sources.js");
 
 function isoToday() {
   const now = new Date();
@@ -177,40 +137,85 @@ function isIsoDate(s) {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
+// Small promise pool — ~100 sources across three workspaces must not hit the
+// Sejm API all at once from the cron.
+async function mapPool(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+// The one-or-two ELI queries a source stands for. `keyword` and `title` may
+// both be set: keyword catches omnibus amendments ("…oraz niektórych innych
+// ustaw") whose title never names the act, title catches everything that does.
+function sourceQueries(s) {
+  const qs = [];
+  if (s.keyword) qs.push({ mode: "keyword", term: s.keyword });
+  if (s.title) qs.push({ mode: "title", term: s.title });
+  return qs;
+}
+
 // Runs one real scan per source against the live Sejm/ELI API. `sources` items
-// need { id, keyword|title, lastChecked } (lastChecked in "DD.MM.YYYY HH:MM" —
-// from the frontend's real state) or just { id, keyword|title } (cron path —
-// falls back to start-of-year on a source's very first run; subsequent runs use
-// the persisted lastChecked). `range`, when given ({from, to} as YYYY-MM-DD),
-// overrides per-source lastChecked entirely — a manual scan for a user-picked period.
-// Each result carries the exact `query` it ran (mode, term, dates) so the UI can
-// show — and the user can replay — precisely what was searched.
+// need { id, keyword|title, publisher?, lastChecked } (lastChecked in
+// "DD.MM.YYYY HH:MM" — from the frontend's real state) or just
+// { id, keyword|title } (cron path — falls back to start-of-year on a source's
+// very first run; subsequent runs use the persisted lastChecked). `range`, when
+// given ({from, to} as YYYY-MM-DD), overrides per-source lastChecked entirely —
+// a manual scan for a user-picked period.
+// Each result carries the exact `queries` it ran (mode, term, register, dates,
+// URL) so the UI can show — and the user can replay — precisely what was
+// searched; each detected entry records `via` (which query found it).
 async function scanSources(sources, range) {
   const todayIso = isoToday();
   const nowStr = formatNow();
   const rangeFrom = range && isIsoDate(range.from) ? range.from : null;
   const rangeTo = range && isIsoDate(range.to) ? range.to : todayIso;
-  return Promise.all(sources.map(async (s) => {
-    if (!s.keyword && !s.title) return { id: s.id, lastChecked: nowStr, found: 0, detected: [] };
+  return mapPool(sources, 6, async (s) => {
+    const qs = sourceQueries(s);
+    if (!qs.length) return { id: s.id, lastChecked: nowStr, found: 0, detected: [] };
+    const publisher = normalizePublisher(s.publisher);
     const dateFrom = rangeFrom || toIsoDate(s.lastChecked) || isoYearStart();
     const dateTo = rangeFrom ? rangeTo : todayIso;
-    const opts = { keyword: s.keyword || undefined, title: s.title || undefined, dateFrom, dateTo };
-    const query = { mode: s.keyword ? "keyword" : "title", term: s.keyword || s.title, publisher: "DU", dateFrom, dateTo, url: `${SEARCH_URL}?${buildSearchParams(opts).toString()}` };
-    try {
-      const items = await searchActs(opts);
-      const detected = items.map((item) => ({
-        ts: formatDetectedTs(item.announcementDate),
-        type: "detected",
-        note: item.title,
-        url: isapDocUrl(item.address),
-        eli: item.ELI,
-        actType: item.type,
-      }));
-      return { id: s.id, lastChecked: nowStr, found: items.length, detected, query };
-    } catch (e) {
-      return { id: s.id, lastChecked: nowStr, found: 0, detected: [], error: e.message, query };
+    const queries = qs.map((q) => {
+      const opts = { [q.mode]: q.term, publisher, dateFrom, dateTo };
+      return { ...q, publisher, dateFrom, dateTo, url: `${SEARCH_URL}?${buildSearchParams(opts).toString()}` };
+    });
+    const detected = [];
+    const seen = new Set();
+    const errors = [];
+    for (const q of queries) {
+      try {
+        const items = await searchActs({ [q.mode]: q.term, publisher, dateFrom, dateTo });
+        items.forEach((item) => {
+          const key = item.ELI || `${item.title}|${item.address}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          detected.push({
+            ts: formatDetectedTs(item.announcementDate),
+            type: "detected",
+            note: item.title,
+            url: isapDocUrl(item.address),
+            eli: item.ELI,
+            actType: item.type,
+            via: q.mode,
+            publisher,
+          });
+        });
+      } catch (e) {
+        errors.push(e.message);
+      }
     }
-  }));
+    const result = { id: s.id, lastChecked: nowStr, found: detected.length, detected, queries, query: queries[0] };
+    if (errors.length) result.error = errors.join("; ");
+    return result;
+  });
 }
 
 // Parses an incoming POST body the same way for every endpoint.
@@ -218,4 +223,4 @@ function parseBody(req) {
   return typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
 }
 
-module.exports = { WORKSPACES, normalizeWorkspace, searchActs, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, loadState, saveState, parseBody };
+module.exports = { WORKSPACES, normalizeWorkspace, normalizePublisher, sourceQueries, searchActs, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, loadState, saveState, parseBody };

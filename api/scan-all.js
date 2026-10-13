@@ -77,11 +77,12 @@ module.exports = async (req, res) => {
       // malformed/malicious POST can't corrupt real sources' lastChecked or
       // spin up an unbounded number of Sejm API calls in one request.
       const rawSources = Array.isArray(body.sources) ? body.sources : DEFAULT_SOURCES[ws];
-      const sources = rawSources.slice(0, 50)
+      const sources = rawSources.slice(0, 150)
         .map((s) => ({
           id: Number(s && s.id),
           keyword: typeof (s && s.keyword) === "string" ? s.keyword.slice(0, 200) : null,
           title: typeof (s && s.title) === "string" ? s.title.slice(0, 200) : null,
+          publisher: s && s.publisher === "MP" ? "MP" : "DU",
           lastChecked: typeof (s && s.lastChecked) === "string" ? s.lastChecked.slice(0, 20) : null,
         }))
         .filter((s) => Number.isFinite(s.id));
@@ -93,8 +94,10 @@ module.exports = async (req, res) => {
       res.status(200).json({ results: out.results, lastRun: out.lastRun, workspace: ws });
       return;
     }
-    // Cron: all workspaces in parallel (≈40 small Sejm API calls total).
-    const runs = await Promise.all(WORKSPACES.map((ws) => scanWorkspace(ws, null, undefined)));
+    // Cron: workspaces one after another — each already runs its sources
+    // through a small pool (see _lib.js mapPool), ~130 queries in total.
+    const runs = [];
+    for (const ws of WORKSPACES) runs.push(await scanWorkspace(ws, null, undefined));
     res.status(200).json({ runs: runs.map((r) => ({ workspace: r.workspace, lastRun: r.lastRun, found: r.results.reduce((n, x) => n + (x.found || 0), 0) })) });
   } catch (e) {
     res.status(502).json({ error: e.message });
