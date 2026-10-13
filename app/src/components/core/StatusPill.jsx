@@ -8,9 +8,9 @@ const states = {
   done: { bg: 'var(--success-100)', fg: 'var(--success-600)', pl: 'Zamknięte', de: 'Geschlossen', en: 'Done' },
 };
 
-export function StatusPill({ status = 'new', lang = 'pl', showDot = true, style, ...rest }) {
+export function StatusPill({ status = 'new', lang = 'pl', label: labelProp, showDot = true, style, ...rest }) {
   const s = states[status] || states.new;
-  const label = s[lang] || s.pl;
+  const label = labelProp || s[lang] || s.pl;
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,

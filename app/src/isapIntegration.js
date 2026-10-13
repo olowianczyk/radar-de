@@ -21,39 +21,70 @@ export function latestIsapCheck(sources) {
   return sources.reduce((latest, s) => (parseDMYHM(s.lastChecked) > parseDMYHM(latest) ? s.lastChecked : latest), sources[0]?.lastChecked || "");
 }
 
-// Reads back whatever /api/scan-all last persisted for this workspace (manual
-// run or the daily cron) so a page load after an overnight cron run shows real,
-// current state instead of the seed data — see /api/state.js.
-export async function fetchPersistedState(ws) {
-  const res = await fetch(`/api/state?ws=${encodeURIComponent(ws)}`);
-  if (!res.ok) throw new Error(`state fetch failed: ${res.status}`);
-  return res.json();
+// All backend calls go through here so a failure is a typed error the UI can
+// explain: `status` (0 = network/no backend, 503 = storage not attached, …),
+// `code` and `message` as the server sent them. Nothing swallows errors.
+export class ApiError extends Error {
+  constructor(status, code, message) {
+    super(message || code || `HTTP ${status}`);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+async function api(path, init) {
+  let res;
+  try {
+    res = await fetch(path, init);
+  } catch (e) {
+    throw new ApiError(0, "network", e.message);
+  }
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* non-JSON body (e.g. a 404 page under plain vite dev) */ }
+  if (!res.ok) throw new ApiError(res.status, (data && data.error) || `http_${res.status}`, (data && (data.message || data.error)) || `HTTP ${res.status} for ${path}`);
+  return data;
+}
+
+const post = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+// Everything the shell needs on load for one workspace: scan history, shared
+// review statuses, source configuration, and whether storage is attached.
+export function fetchPersistedState(ws) {
+  return api(`/api/state?ws=${encodeURIComponent(ws)}`);
 }
 
 export async function fetchKbDocs(ws) {
-  const res = await fetch(`/api/kb?ws=${encodeURIComponent(ws)}`);
-  if (!res.ok) throw new Error(`kb fetch failed: ${res.status}`);
-  const data = await res.json();
+  const data = await api(`/api/kb?ws=${encodeURIComponent(ws)}`);
   return data.docs || [];
 }
 
 export async function addKbDoc(ws, { title, area, body }) {
-  const res = await fetch("/api/kb", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ workspace: ws, title, area, body }),
-  });
-  if (!res.ok) throw new Error(`kb add failed: ${res.status}`);
-  const data = await res.json();
+  const data = await post("/api/kb", { workspace: ws, title, area, body });
   return data.doc;
+}
+
+export async function addKbComment(ws, docId, text) {
+  const data = await post("/api/kb", { workspace: ws, action: "comment", docId, text });
+  return data.doc;
+}
+
+// Shared review statuses — returns the whole map after the write.
+export async function saveTriage(ws, ids, status) {
+  const data = await post("/api/triage", { workspace: ws, ids, status });
+  return data.triage || {};
+}
+
+// Team source configuration (on/off overrides + user-added sources) — what the
+// cron will scan tomorrow.
+export async function saveSourceConfig(ws, config) {
+  const data = await post("/api/sources", { workspace: ws, ...config });
+  return data.config;
 }
 
 // The Sejm's closed subject-keyword thesaurus (via our /api/keywords proxy).
 // Used only to tell the user whether a keyword-mode source can match anything.
 export async function fetchKeywords() {
-  const res = await fetch("/api/keywords");
-  if (!res.ok) throw new Error(`keywords fetch failed: ${res.status}`);
-  const data = await res.json();
+  const data = await api("/api/keywords");
   return data.keywords || [];
 }
 
@@ -147,17 +178,12 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
 
 // `range`, when given ({from, to} as YYYY-MM-DD), overrides each source's
 // "since last checked" default with a user-picked period.
+// Resolves to { results, persisted, persistError } — the caller must look at
+// `persisted`: a scan that ran but could not be saved is reported as such.
 export async function forceScan(ws, activeSources, range) {
-  const res = await fetch("/api/scan-all", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      workspace: ws,
-      sources: activeSources.map((s) => ({ id: s.id, keyword: s.keyword, title: s.title, publisher: s.publisher, lastChecked: s.lastChecked })),
-      ...(range ? { dateFrom: range.from, dateTo: range.to } : {}),
-    }),
+  return post("/api/scan-all", {
+    workspace: ws,
+    sources: activeSources.map((s) => ({ id: s.id, keyword: s.keyword, title: s.title, publisher: s.publisher, lastChecked: s.lastChecked })),
+    ...(range ? { dateFrom: range.from, dateTo: range.to } : {}),
   });
-  if (!res.ok) throw new Error(`scan-all failed: ${res.status}`);
-  const data = await res.json();
-  return data.results;
 }

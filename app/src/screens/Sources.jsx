@@ -204,7 +204,7 @@ function ManualRow({ s, t, lang, first }) {
   );
 }
 
-export function Sources({ lang, ws, role, sources, setSources, sourceHistory, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo }) {
+export function Sources({ lang, ws, backend, sources, setSources, sourceHistory, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo }) {
   const [expanded, setExpanded] = React.useState(null);
   const [adding, setAdding] = React.useState(false);
   const thesaurus = useKeywordThesaurus();
@@ -233,7 +233,7 @@ export function Sources({ lang, ws, role, sources, setSources, sourceHistory, sc
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 14 }}>{t.sourcesSub}</p>
-        <Button variant="secondary" iconLeft={<Icon name="plus" size={16} />} disabled={role === "viewer"} onClick={() => setAdding((v) => !v)}>{t.addSourceTitle}</Button>
+        <Button variant="secondary" iconLeft={<Icon name="plus" size={16} />} disabled={backend !== "ok"} onClick={() => setAdding((v) => !v)}>{t.addSourceTitle}</Button>
       </div>
       <HowItWorks t={t} />
       {adding && <AddSourceForm t={t} ws={ws} onAdd={addSource} onCancel={() => setAdding(false)} />}
@@ -241,17 +241,12 @@ export function Sources({ lang, ws, role, sources, setSources, sourceHistory, sc
         <div style={{ width: 160 }}><Input type="date" label={t.periodFrom} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} /></div>
         <div style={{ width: 160 }}><Input type="date" label={t.periodTo} value={scanTo} onChange={(e) => setScanTo(e.target.value)} /></div>
         <Button variant="secondary" iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={16} className={scanning ? "hrbp-spin" : ""} />}
-          disabled={scanning} onClick={runScan}>
+          disabled={scanning || backend === "down"} onClick={runScan}>
           {scanning ? t.scanning : t.checkNow}
         </Button>
         <span style={{ fontSize: 12.5, color: "var(--text-muted)", paddingBottom: 10 }}>{t.autoSourcesTitle}: {auto.filter((s) => s.active).length}/{auto.length} {t.activeSources}</span>
       </div>
       <Card padding="none">
-        {role === "viewer" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", background: "var(--surface-sunken)", fontSize: 12, color: "var(--text-muted)" }}>
-            <Icon name="eye" size={13} />{t.readOnlyNotice}
-          </div>
-        )}
         {auto.map((s, i) => {
           const isOpen = expanded === s.id;
           const hist = sourceHistory[s.id] || [];
@@ -286,7 +281,7 @@ export function Sources({ lang, ws, role, sources, setSources, sourceHistory, sc
                   <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 20, color: hist.length ? "var(--brand)" : "var(--ink-300)" }}>{hist.length}</div>
                   <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".04em" }}>{t.changesFound}</div>
                 </div>
-                <Switch checked={s.active} onChange={() => toggle(s.id)} disabled={role === "viewer"} />
+                <Switch checked={s.active} onChange={() => toggle(s.id)} disabled={backend !== "ok"} />
                 <IconButton label={t.scopeTitle} active={isOpen} onClick={() => setExpanded(isOpen ? null : s.id)}>
                   <Icon name={isOpen ? "chevron-up" : "crosshair"} size={16} />
                 </IconButton>
@@ -294,7 +289,7 @@ export function Sources({ lang, ws, role, sources, setSources, sourceHistory, sc
               {isOpen && (
                 <div style={{ padding: "4px 20px 18px 74px", display: "flex", flexDirection: "column", gap: 12, background: "var(--surface-sunken)" }}>
                   <ScopePanel source={s} lang={lang} t={t} thesaurus={thesaurus} />
-                  {!defaultIds.has(s.id) && role !== "viewer" && (
+                  {!defaultIds.has(s.id) && backend === "ok" && (
                     <div><Button variant="ghost" size="sm" iconLeft={<Icon name="trash-2" size={14} />} onClick={() => removeSource(s.id)}>{t.srcRemove}</Button></div>
                   )}
                   {hist.length > 0 && <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-heading)", marginTop: 4 }}>{t.history}</div>}

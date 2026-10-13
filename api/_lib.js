@@ -18,37 +18,90 @@ function normalizeWorkspace(ws) {
   return WORKSPACES.includes(ws) ? ws : "hr";
 }
 
-// Single JSON blob per workspace as the persistence layer — the whole state is
-// one small object (per-source lastChecked/found + detected-act history + KB
-// docs), not relational data, so a key-value blob is simpler than Postgres.
-// "hr" keeps the pre-workspace path so existing persisted HR data survives.
+// Persistence: Vercel Blob, one small JSON document per workspace AND per
+// concern — "scan" (per-source lastChecked/found + detected-act history, written
+// only by scans), "kb" (documents + comments), "triage" (review statuses,
+// shared by the whole team), "config" (source on/off overrides + user-added
+// sources, honoured by the cron). Splitting by concern keeps each write a
+// read-modify-write of a document that only one kind of action touches, so a
+// scan can't overwrite a status someone just set. Pre-split data lived in a
+// single hrbp-state[-ws].json; it is read through once and migrated on first
+// write (see legacy below).
 // ponytail: this exists; move to Postgres if the state shape grows relational needs.
-function statePath(ws) {
+const DOCS = ["scan", "kb", "triage", "config"];
+
+// No token = no store attached to the project. Every endpoint reports this
+// instead of silently working on a state that evaporates when the response ends.
+function storageAvailable() {
+  return !!process.env.BLOB_READ_WRITE_TOKEN;
+}
+
+function docPath(ws, doc) {
+  if (!DOCS.includes(doc)) throw new Error(`unknown doc ${doc}`);
+  return `hrbp/${normalizeWorkspace(ws)}/${doc}.json`;
+}
+
+function legacyPath(ws) {
   const w = normalizeWorkspace(ws);
   return w === "hr" ? "hrbp-state.json" : `hrbp-state-${w}.json`;
 }
 
-async function loadState(ws) {
+async function readBlobJson(pathname) {
+  // get() handles private-store auth itself (unlike a plain fetch of the blob
+  // URL, which 403s — private blobs need a signed request, not a bearer header).
+  let result;
   try {
-    // get() handles private-store auth itself (unlike a plain fetch of the blob
-    // URL, which 403s — private blobs need a signed request, not a bearer header).
-    const result = await get(statePath(ws), { access: "private" });
-    if (!result || result.statusCode !== 200) return null;
-    const text = await new Response(result.stream).text();
-    return JSON.parse(text);
+    result = await get(pathname, { access: "private" });
   } catch (e) {
-    console.error("loadState threw:", e.message);
-    return null; // no Blob store attached yet, or first run — caller falls back to defaults
+    if (/not.?found/i.test(`${e && e.name} ${e && e.message}`)) return null; // SDK versions differ: some throw on a missing blob
+    throw e;
   }
+  if (!result || result.statusCode === 404) return null;
+  if (result.statusCode !== 200) throw new Error(`blob ${pathname}: HTTP ${result.statusCode}`);
+  const text = await new Response(result.stream).text();
+  return JSON.parse(text);
 }
 
-async function saveState(ws, state) {
-  await put(statePath(ws), JSON.stringify(state), {
+const EMPTY = {
+  scan: () => ({ sources: [], history: {}, lastRun: null }),
+  kb: () => ({ docs: [] }),
+  triage: () => ({ statuses: {} }),
+  config: () => ({ overrides: {}, custom: [] }),
+};
+
+// Returns the document, or the empty shape when it does not exist yet. THROWS
+// when storage is unavailable or the read fails — callers decide how to report
+// that; nothing here pretends an empty store is a healthy one.
+async function loadDoc(ws, doc) {
+  if (!storageAvailable()) throw new Error("storage_unavailable");
+  const data = await readBlobJson(docPath(ws, doc));
+  if (data) return data;
+  // First read after the split: fall back to the legacy single-file state.
+  const legacy = await readBlobJson(legacyPath(ws));
+  if (legacy) {
+    if (doc === "scan") return { sources: legacy.sources || [], history: legacy.history || {}, lastRun: legacy.lastRun || null };
+    if (doc === "kb") return { docs: legacy.kb || [] };
+  }
+  return EMPTY[doc]();
+}
+
+async function saveDoc(ws, doc, data) {
+  if (!storageAvailable()) throw new Error("storage_unavailable");
+  await put(docPath(ws, doc), JSON.stringify(data), {
     access: "private",
     contentType: "application/json",
     addRandomSuffix: false,
     allowOverwrite: true,
   });
+}
+
+// Uniform error reporting for the HTTP handlers.
+function sendError(res, e) {
+  if (e && e.message === "storage_unavailable") {
+    res.status(503).json({ error: "storage_unavailable", message: "No Vercel Blob store is attached (BLOB_READ_WRITE_TOKEN missing) — nothing can be saved or read." });
+    return;
+  }
+  res.status(502).json({ error: "backend_error", message: e && e.message ? e.message : String(e) });
 }
 
 // Two match modes against the Sejm/ELI search endpoint, both scoped to one
@@ -223,4 +276,4 @@ function parseBody(req) {
   return typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
 }
 
-module.exports = { WORKSPACES, normalizeWorkspace, normalizePublisher, sourceQueries, searchActs, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, loadState, saveState, parseBody };
+module.exports = { WORKSPACES, normalizeWorkspace, normalizePublisher, sourceQueries, searchActs, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, storageAvailable, loadDoc, saveDoc, sendError, parseBody };

@@ -1,53 +1,42 @@
-// Knowledge base — policy documents; master list + article detail view, flagged
-// when a monitored legal change affects them.
+// Knowledge base — short documents a department keeps next to its legal-change
+// feed (policies, procedures, notes on pending changes). Documents and their
+// comments are persisted server-side (see /api/kb.js) and shared by the whole
+// department; favourites are a per-browser convenience. Nothing here is a
+// placeholder: there is no attachment storage and no versioning, so neither is
+// shown.
 import React from "react";
-import { Card, Badge, Input, Icon, Button, Avatar, Textarea, IconButton, Tabs, Select } from "../components/index.js";
+import { Card, Badge, Input, Icon, Button, Textarea, IconButton, Tabs, Select } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
-import { HRBP_KB_COMMENTS, HRBP_KB_ATTACHMENTS, HRBP_KB_VERSIONS } from "../data.js";
 import { tFor, areaTone } from "../workspaces.js";
 
-function formatDate(iso) {
+function formatDate(iso, lang) {
   const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString(lang === "pl" ? "pl-PL" : lang === "de" ? "de-DE" : "en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function parseDMY(s) {
-  const [d, m, y] = (s || "").split(".").map(Number);
-  return new Date(y || 0, (m || 1) - 1, d || 1).getTime();
-}
-// Attachments are seed/demo metadata only — no real file bytes are stored anywhere
-// (see design handoff notes). Download produces a stub placeholder file so the
-// button is at least functional until real file storage is wired up.
-function downloadAttachment(a) {
-  const note = `${a.name}\n\nTo jest plik zastępczy — dane załącznika są demonstracyjne (brak realnego pliku).\nRozmiar: ${a.size}\nDodane przez: ${a.by}\nData: ${a.ts}`;
-  const blob = new Blob([note], { type: "text/plain;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = a.name;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, role, kbDocs, addKb }) {
+export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, kbDocs, addKb, addComment, backend }) {
   const t = tFor(lang, ws);
   const favKey = ws.id === "hr" ? "hrbp-kb-favorites" : `hrbp-kb-favorites-${ws.id}`;
   const docsAll = kbDocs || [];
+  const writable = backend === "ok";
   const [query, setQuery] = React.useState("");
   const [tab, setTab] = React.useState("all");
   const [sort, setSort] = React.useState("title");
-  const [historyOpen, setHistoryOpen] = React.useState(false);
   const [adding, setAdding] = React.useState(false);
   const [newTitle, setNewTitle] = React.useState("");
   const [newArea, setNewArea] = React.useState("other");
   const [newBody, setNewBody] = React.useState("");
   const [addError, setAddError] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
   const submitNew = () => {
-    if (!newTitle.trim() || !newBody.trim()) return;
+    if (!newTitle.trim() || !newBody.trim() || saving) return;
     setAddError("");
+    setSaving(true);
     addKb({ title: newTitle.trim(), area: newArea, body: newBody.trim() })
-      .then(() => { setNewTitle(""); setNewBody(""); setNewArea("other"); setAdding(false); })
-      .catch((e) => setAddError(e.message));
+      .then((saved) => { setNewTitle(""); setNewBody(""); setNewArea("other"); setAdding(false); if (saved) setSelectedId(saved.id); })
+      .catch((e) => setAddError(e.status === 503 ? t.notice.storage : e.message))
+      .finally(() => setSaving(false));
   };
   const [favorites, setFavorites] = React.useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem(favKey) || "[]")); } catch (e) { return new Set(); }
@@ -60,32 +49,24 @@ export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, role, kbDoc
       return next;
     });
   };
-  const [comments, setComments] = React.useState(() => JSON.parse(JSON.stringify(HRBP_KB_COMMENTS || {})));
   const [draft, setDraft] = React.useState("");
+  const [posting, setPosting] = React.useState(false);
   const postComment = (docId) => {
     const text = draft.trim();
-    if (!text) return;
-    setComments((prev) => {
-      const list = prev[docId] ? prev[docId].slice() : [];
-      list.push({ id: (list[list.length - 1]?.id || 0) + 1, author: "HR Partner", ts: new Date().toLocaleString(lang === "pl" ? "pl-PL" : lang === "de" ? "de-DE" : "en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }), text: { pl: text, de: text, en: text } });
-      return { ...prev, [docId]: list };
-    });
-    setDraft("");
+    if (!text || posting) return;
+    setPosting(true);
+    addComment(docId, text).then(() => setDraft("")).catch(() => {}).finally(() => setPosting(false));
   };
   const docs = docsAll.filter((k) => {
     if (tab === "favorites" && !favorites.has(k.id)) return false;
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    return k.title.toLowerCase().includes(q) || ((t.area[k.area] || t.area.other) || t.area.other).toLowerCase().includes(q);
+    return k.title.toLowerCase().includes(q) || (t.area[k.area] || t.area.other).toLowerCase().includes(q) || (k.body || "").toLowerCase().includes(q);
   }).sort((a, b) => {
     if (sort === "updated") return new Date(b.ts) - new Date(a.ts);
     return a.title.localeCompare(b.title);
   });
   const sel = docs.find((d) => d.id === selectedId) || docsAll.find((d) => d.id === selectedId);
-  // No real mapping exists from a detected Sejm act to a specific KB document —
-  // that link was fabricated demo data, not derivable from the real scan/API.
-  const relatedChanges = [];
-  const extIcon = (ext) => ext === "pdf" ? "file-text" : (ext === "xlsx" || ext === "xls") ? "file-spreadsheet" : "file";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -93,18 +74,18 @@ export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, role, kbDoc
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
         <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} iconLeft={<Icon name="search" size={16} />} /></div>
         <div style={{ width: 200 }}><Select value={sort} onChange={(e) => setSort(e.target.value)} options={[{ value: "title", label: t.sortTitle }, { value: "updated", label: t.sortUpdated }]} /></div>
-        {role !== "viewer" && <Button variant="primary" iconLeft={<Icon name="plus" size={16} />} onClick={() => setAdding((v) => !v)}>{t.kbAddDoc}</Button>}
+        <Button variant="primary" iconLeft={<Icon name="plus" size={16} />} disabled={!writable} onClick={() => setAdding((v) => !v)}>{t.kbAddDoc}</Button>
       </div>
       {adding && (
         <Card padding="lg">
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <Input label={t.kbDocTitle} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
-            <div style={{ width: 220 }}><Select label={t.filterArea} value={newArea} onChange={(e) => setNewArea(e.target.value)} options={Object.keys(t.area).map((k) => ({ value: k, label: t.area[k] }))} /></div>
+            <div style={{ width: 260 }}><Select label={t.filterArea} value={newArea} onChange={(e) => setNewArea(e.target.value)} options={Object.keys(t.area).map((k) => ({ value: k, label: t.area[k] }))} /></div>
             <Textarea rows={5} label={t.kbDocBody} value={newBody} onChange={(e) => setNewBody(e.target.value)} />
             {addError && <span style={{ fontSize: 12.5, color: "var(--danger-600)" }}>{addError}</span>}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <Button variant="ghost" onClick={() => setAdding(false)}>{t.kbAddCancel}</Button>
-              <Button variant="primary" disabled={!newTitle.trim() || !newBody.trim()} onClick={submitNew}>{t.kbAddSave}</Button>
+              <Button variant="primary" disabled={!newTitle.trim() || !newBody.trim() || saving} onClick={submitNew}>{saving ? "…" : t.kbAddSave}</Button>
             </div>
           </div>
         </Card>
@@ -137,8 +118,9 @@ export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, role, kbDoc
                 </div>
                 <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14.5, marginTop: 12 }}>{k.title}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                  <Badge tone={areaTone(ws, k.area)}>{(t.area[k.area] || t.area.other)}</Badge>
-                  <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{formatDate(k.ts)}</span>
+                  <Badge tone={areaTone(ws, k.area)}>{t.area[k.area] || t.area.other}</Badge>
+                  <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{formatDate(k.ts, lang)}</span>
+                  {(k.comments || []).length > 0 && <span style={{ fontSize: 11.5, color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: 3 }}><Icon name="message-square" size={11} />{k.comments.length}</span>}
                 </div>
               </Card>
             );
@@ -154,103 +136,34 @@ export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, role, kbDoc
                 </div>
                 <div style={{ flex: 1 }}>
                   <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-2xl)", color: "var(--text-heading)" }}>{sel.title}</h2>
-                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{t.updated}: {formatDate(sel.ts)}</div>
+                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{t.updated}: {formatDate(sel.ts, lang)}</div>
                 </div>
                 <IconButton label={favorites.has(sel.id) ? t.removeFavorite : t.addFavorite} onClick={() => toggleFavorite(sel.id)}>
                   <Icon name="star" size={18} style={favorites.has(sel.id) ? { fill: "var(--amber-600)", color: "var(--amber-600)" } : {}} />
                 </IconButton>
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingBottom: 14, borderBottom: "1px solid var(--border-subtle)" }}>
-                <Badge tone={areaTone(ws, sel.area)}>{(t.area[sel.area] || t.area.other)}</Badge>
+                <Badge tone={areaTone(ws, sel.area)}>{t.area[sel.area] || t.area.other}</Badge>
               </div>
               <p style={{ margin: 0, color: "var(--text-body)", fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{sel.body}</p>
-              {relatedChanges.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, marginBottom: 8 }}>{t.relatedChanges}</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {relatedChanges.map((c) => (
-                      <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "var(--surface-sunken)", borderRadius: "var(--radius-sm)" }}>
-                        <Icon name="scale" size={14} />
-                        <span style={{ flex: 1, fontSize: 12.5, color: "var(--text-heading)" }}>{c.title[lang]}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                  <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-                    <Icon name="paperclip" size={13} />{t.attachments}{(HRBP_KB_ATTACHMENTS[sel.id] || []).length > 0 ? ` · ${(HRBP_KB_ATTACHMENTS[sel.id] || []).length}` : ""}
-                  </div>
-                </div>
-                {(HRBP_KB_ATTACHMENTS[sel.id] || []).length === 0 ? (
-                  <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted)" }}>{t.noAttachments}</p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {(HRBP_KB_ATTACHMENTS[sel.id] || []).map((a) => (
-                      <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: "var(--surface-sunken)", borderRadius: "var(--radius-sm)" }}>
-                        <div style={{ width: 32, height: 32, borderRadius: "var(--radius-sm)", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 32px" }}>
-                          <Icon name={extIcon(a.ext)} size={16} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</div>
-                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{a.size} · {t.uploadedBy} {a.by} · {a.ts}</div>
-                        </div>
-                        <IconButton label={t.download} onClick={() => downloadAttachment(a)}><Icon name="download" size={15} /></IconButton>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div>
-                <button onClick={() => setHistoryOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, marginBottom: historyOpen ? 12 : 0 }}>
-                  <Icon name="history" size={13} />{historyOpen ? t.hideVersionHistory : t.versionHistory}{(HRBP_KB_VERSIONS[sel.id] || []).length > 0 ? ` · ${(HRBP_KB_VERSIONS[sel.id] || []).length}` : ""}
-                  <Icon name={historyOpen ? "chevron-up" : "chevron-down"} size={13} style={{ marginLeft: "auto" }} />
-                </button>
-                {historyOpen && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {(HRBP_KB_VERSIONS[sel.id] || []).map((ver, i) => (
-                      <div key={ver.v} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                        <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--surface-sunken)", color: i === 0 ? "var(--brand)" : "var(--text-muted)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 22px", marginTop: 1, fontSize: 10, fontWeight: 700 }}>
-                          {ver.v.replace("v", "")}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-heading)" }}>{ver.v}</span>
-                            {i === 0 && <Badge tone="brand">{t.currentVersion}</Badge>}
-                            <span style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>{ver.ts}</span>
-                          </div>
-                          <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 2 }}>{ver.author} — {ver.note[lang] || ver.note.pl}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
               <div style={{ paddingTop: 16, borderTop: "1px solid var(--border-subtle)" }}>
                 <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                  <Icon name="message-square" size={13} />{t.discussion}{(comments[sel.id] || []).length > 0 ? ` · ${(comments[sel.id] || []).length}` : ""}
+                  <Icon name="message-square" size={13} />{t.discussion}{(sel.comments || []).length > 0 ? ` · ${sel.comments.length}` : ""}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 14 }}>
-                  {(comments[sel.id] || []).length === 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+                  {(sel.comments || []).length === 0 ? (
                     <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted)" }}>{t.noComments}</p>
-                  ) : (comments[sel.id] || []).map((c) => (
-                    <div key={c.id} style={{ display: "flex", gap: 10 }}>
-                      <Avatar name={c.author} size="sm" />
-                      <div style={{ flex: 1, background: "var(--surface-sunken)", borderRadius: "var(--radius-sm)", padding: "9px 12px" }}>
-                        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 3 }}>
-                          <span style={{ fontWeight: 600, fontSize: 12.5, color: "var(--text-heading)" }}>{c.author}</span>
-                          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{c.ts}</span>
-                        </div>
-                        <p style={{ margin: 0, fontSize: 13, color: "var(--text-body)", lineHeight: 1.5 }}>{c.text[lang] || c.text.pl}</p>
-                      </div>
+                  ) : sel.comments.map((c) => (
+                    <div key={c.id} style={{ background: "var(--surface-sunken)", borderRadius: "var(--radius-sm)", padding: "9px 12px" }}>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 3 }}>{formatDate(c.ts, lang)}</div>
+                      <p style={{ margin: 0, fontSize: 13, color: "var(--text-body)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{c.text}</p>
                     </div>
                   ))}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <Textarea rows={2} placeholder={t.commentPlaceholder} value={draft} onChange={(e) => setDraft(e.target.value)} />
+                  <Textarea rows={2} placeholder={t.commentPlaceholder} value={draft} onChange={(e) => setDraft(e.target.value)} disabled={!writable} />
                   <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                    <Button variant="primary" iconLeft={<Icon name="send" size={15} />} disabled={!draft.trim()} onClick={() => postComment(sel.id)}>{t.postComment}</Button>
+                    <Button variant="primary" iconLeft={<Icon name="send" size={15} />} disabled={!draft.trim() || posting || !writable} onClick={() => postComment(sel.id)}>{t.postComment}</Button>
                   </div>
                 </div>
               </div>

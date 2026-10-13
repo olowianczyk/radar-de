@@ -47,11 +47,19 @@ api/                                 funkcje Vercel (CommonJS)
 scripts/sync-sources.mjs             generator api/_sources.js
 ```
 
-Persystencja: jeden plik JSON na dział w Vercel Blob (`hrbp-state.json` dla HR,
-`hrbp-state-compliance.json`, `hrbp-state-legal.json`): `sources` (lastChecked,
-found), `history` (wykryte akty per źródło), `kb` (dokumenty), `lastRun`.
-Statusy przeglądu, ulubione i przeczytane powiadomienia są **tylko w
-localStorage przeglądarki użytkownika**.
+Persystencja: Vercel Blob, osobny dokument JSON na dział **i na obszar**
+(`hrbp/<dział>/scan.json` — lastChecked/found + historia wykrytych aktów,
+`kb.json` — dokumenty z komentarzami, `triage.json` — wspólne statusy przeglądu,
+`config.json` — włączone/wyłączone i dodane źródła, honorowane przez cron).
+Podział ogranicza wyścigi: skan nigdy nie nadpisze statusu, który ktoś właśnie
+ustawił. Stary pojedynczy `hrbp-state*.json` jest czytany w locie i migrowany.
+Tylko w przeglądarce użytkownika: ulubione, przeczytane powiadomienia, język, motyw.
+
+Zasada „działa albo mówi, że nie działa”: każde wywołanie `/api` zwraca błąd
+z kodem (`storage_unavailable` → 503, gdy brak `BLOB_READ_WRITE_TOKEN`), a UI
+pokazuje go w pasku komunikatów i wyłącza przyciski zapisu. Skan zwraca
+`persisted: false`, jeśli wyniki nie zostały zapisane. Nic nie jest zapisywane
+„na niby” w pamięci przeglądarki.
 
 ## Uruchomienie i wdrożenie
 
@@ -67,7 +75,7 @@ Zmienne środowiskowe na Vercelu:
 
 | Zmienna | Po co |
 |---|---|
-| `BLOB_READ_WRITE_TOKEN` | podpięty Blob Store (Storage → Blob) — bez niego skan działa, ale nic się nie zapisuje |
+| `BLOB_READ_WRITE_TOKEN` | podpięty Blob Store (Storage → Blob). **Wymagany** — bez niego aplikacja pokazuje czerwony komunikat, zapis jest wyłączony, a cron zwraca 503 |
 | `CRON_SECRET` | opcjonalnie; gdy ustawiona, `GET /api/scan-all` wymaga `Authorization: Bearer …` (Vercel Cron dodaje go sam) |
 
 Build: `vercel.json` buduje `app/` do `dist/app` i kopiuje landing do `dist/`.

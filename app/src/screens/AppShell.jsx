@@ -3,8 +3,8 @@
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
 import { LoadingState } from "../components/Loading.jsx";
-import { WORKSPACES, initialSources, tFor } from "../workspaces.js";
-import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc } from "../isapIntegration.js";
+import { WORKSPACES, initialSources, isManualSource, tFor } from "../workspaces.js";
+import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc, addKbComment, saveTriage, saveSourceConfig } from "../isapIntegration.js";
 
 function useSources(ws) {
   return React.useState(() => initialSources(ws));
@@ -121,23 +121,47 @@ function useDarkMode() {
   return [dark, setDark];
 }
 
-function useRole() {
-  const [role, setRole] = React.useState(() => {
-    try { return localStorage.getItem("hrbp-role") || "hrbp"; } catch (e) { return "hrbp"; }
-  });
-  React.useEffect(() => {
-    try { localStorage.setItem("hrbp-role", role); } catch (e) {}
-  }, [role]);
-  return [role, setRole];
+// Default on/off state of a source as shipped in workspaces.js (custom ones
+// default to on). Overrides are only stored where the team deviated from it.
+function defaultActive(ws, s) {
+  const base = ws.sources.find((x) => x.id === s.id);
+  if (!base) return true;
+  return base.kind === "manual" ? false : base.active !== false;
 }
 
-export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, children, role: roleProp, setRole: setRoleProp, onSelectChange, onSelectKb }) {
+function deriveConfig(ws, sources) {
+  const overrides = {};
+  const custom = [];
+  sources.forEach((s) => {
+    if (isManualSource(s)) return;
+    const isCatalogue = ws.sources.some((x) => x.id === s.id);
+    if (!isCatalogue) custom.push({ id: s.id, name: s.name, keyword: s.keyword, title: s.title, publisher: s.publisher || "DU", area: s.area, type: s.type });
+    if (s.active !== defaultActive(ws, s)) overrides[String(s.id)] = { active: s.active };
+  });
+  return { overrides, custom };
+}
+
+function applyConfig(ws, base, config) {
+  const overrides = (config && config.overrides) || {};
+  const custom = Array.isArray(config && config.custom) ? config.custom : [];
+  const fromCatalogue = base.map((s) => {
+    const o = overrides[String(s.id)];
+    return o && typeof o.active === "boolean" && !isManualSource(s) ? { ...s, active: o.active } : s;
+  });
+  const extra = custom
+    .filter((c) => !fromCatalogue.some((s) => s.id === c.id))
+    .map((c) => {
+      const o = overrides[String(c.id)];
+      return { ...c, url: "https://isap.sejm.gov.pl", lastChecked: null, found: 0, scope: null, active: o && typeof o.active === "boolean" ? o.active : true };
+    });
+  return [...fromCatalogue, ...extra];
+}
+
+export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, children, onSelectChange, onSelectKb }) {
   const isMobile = useIsMobile();
   const [dark, setDark] = useDarkMode();
-  const [internalRole, setInternalRole] = useRole();
-  const role = roleProp != null ? roleProp : internalRole;
-  const setRole = setRoleProp || setInternalRole;
-  const [sources, setSources] = useSources(ws);
+  const t = tFor(lang, ws);
+  const [sources, setSourcesRaw] = useSources(ws);
   const [sourceHistory, setSourceHistory] = React.useState({});
   const [scanning, setScanning] = React.useState(false);
   // Shared "from/to" scan period — empty means the default incremental scan
@@ -145,51 +169,94 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
   // specific period on the Sejm/ELI API instead.
   const [scanFrom, setScanFrom] = React.useState("");
   const [scanTo, setScanTo] = React.useState("");
-  // User's triage decisions (mark reviewed/implemented) — client-side only.
-  // ponytail: localStorage, move into Blob state when multi-device matters.
-  const [statusMap, setStatusMap] = React.useState(() => {
-    try { return JSON.parse(localStorage.getItem(wsKey("hrbp-triage", ws.id)) || "{}"); } catch (e) { return {}; }
-  });
+  // One visible message at a time: errors are never only console.error'd.
+  // { tone: "error"|"warn"|"ok", text, detail? }
+  const [notice, setNotice] = React.useState(null);
+  // "ok" | "storage" (API up, no Blob store) | "down" (no API at all) | null while loading
+  const [backend, setBackend] = React.useState(null);
+  const reportError = React.useCallback((text, e) => {
+    const detail = e ? (e.status === 503 ? t.notice.storage : `${e.code || ""} ${e.message || ""}`.trim()) : undefined;
+    setNotice({ tone: "error", text, detail });
+  }, [t]);
+
+  // Team-shared review statuses (triage doc on the server).
+  const [statusMap, setStatusMap] = React.useState({});
   const setChangeStatus = React.useCallback((ids, st) => {
-    setStatusMap((prev) => {
-      const ts = new Date().toISOString().slice(0, 10);
-      const next = { ...prev };
-      (Array.isArray(ids) ? ids : [ids]).forEach((id) => { next[id] = { st, ts }; });
-      try { localStorage.setItem(wsKey("hrbp-triage", ws.id), JSON.stringify(next)); } catch (e) {}
+    const list = Array.isArray(ids) ? ids : [ids];
+    return saveTriage(ws.id, list, st)
+      .then((map) => setStatusMap(map))
+      .catch((e) => reportError(t.notice.saveTriage, e));
+  }, [ws.id, t, reportError]);
+
+  // Source config (on/off + custom) is persisted server-side so the cron
+  // honours it; the UI updates optimistically and reverts on failure.
+  const setSources = React.useCallback((updater) => {
+    setSourcesRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      const before = deriveConfig(ws, prev);
+      const after = deriveConfig(ws, next);
+      if (JSON.stringify(before) !== JSON.stringify(after)) {
+        saveSourceConfig(ws.id, after).catch((e) => {
+          setSourcesRaw(prev);
+          reportError(t.notice.saveConfig, e);
+        });
+      }
       return next;
     });
-  }, [ws.id]);
+  }, [ws, t, reportError]);
+
   const [lastScanFound, setLastScanFound] = React.useState(null);
   const [initialLoading, setInitialLoading] = React.useState(true);
   const [kbDocs, setKbDocs] = React.useState([]);
   React.useEffect(() => {
     fetchPersistedState(ws.id).then((state) => {
-      if (!state.sources.length) return; // no run yet (or no Blob store attached) — keep seed data
-      setSources((prev) => prev.map((s) => {
-        const p = state.sources.find((x) => x.id === s.id);
+      setBackend(state.storage ? "ok" : "storage");
+      if (!state.storage) setNotice({ tone: "error", text: t.notice.storage });
+      setSourcesRaw((prev) => applyConfig(ws, prev, state.config).map((s) => {
+        const p = (state.sources || []).find((x) => x.id === s.id);
         return p ? { ...s, lastChecked: p.lastChecked, found: p.found } : s;
       }));
-      if (Object.keys(state.history).length) {
-        setSourceHistory((prev) => {
-          const next = { ...prev };
-          Object.entries(state.history).forEach(([id, events]) => { next[id] = events; });
-          return next;
-        });
-      }
-    }).catch((e) => console.error("Persisted state fetch failed:", e)) // under plain vite dev/preview /api doesn't exist — falls back to seed data
-      .finally(() => setInitialLoading(false));
-    fetchKbDocs(ws.id).then(setKbDocs).catch((e) => console.error("KB docs fetch failed:", e)); // same plain-vite-dev caveat as above
-  }, [ws.id]);
-  const addKb = React.useCallback((doc) => addKbDoc(ws.id, doc).then((saved) => setKbDocs((prev) => [saved, ...prev])), [ws.id]);
+      setSourceHistory(state.history || {});
+      setStatusMap(state.triage || {});
+      // One-time migration of statuses set before they were shared: push the
+      // browser-local map to the server if the server has none yet.
+      try {
+        const legacyKey = wsKey("hrbp-triage", ws.id);
+        const legacy = JSON.parse(localStorage.getItem(legacyKey) || "{}");
+        const groups = {};
+        Object.entries(legacy).forEach(([id, v]) => { if (v && v.st) (groups[v.st] = groups[v.st] || []).push(id); });
+        if (state.storage && Object.keys(state.triage || {}).length === 0 && Object.keys(groups).length) {
+          Object.entries(groups).reduce((pr, [st, ids]) => pr.then(() => saveTriage(ws.id, ids, st).then(setStatusMap)), Promise.resolve())
+            .then(() => localStorage.removeItem(legacyKey))
+            .catch((e) => reportError(t.notice.saveTriage, e));
+        } else if (state.storage) {
+          localStorage.removeItem(legacyKey);
+        }
+      } catch (e) { /* localStorage unavailable — nothing to migrate */ }
+      return fetchKbDocs(ws.id).then(setKbDocs).catch((e) => reportError(t.notice.loadKb, e));
+    }).catch((e) => {
+      setBackend(e.status === 503 ? "storage" : "down");
+      setNotice({ tone: "error", text: e.status === 503 ? t.notice.storage : t.notice.backendDown, detail: e.status === 503 ? undefined : `${e.code || ""} ${e.message || ""}`.trim() });
+    }).finally(() => setInitialLoading(false));
+  }, [ws.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const addKb = React.useCallback((doc) => addKbDoc(ws.id, doc).then((saved) => { setKbDocs((prev) => [saved, ...prev]); return saved; }), [ws.id]);
+  const addComment = React.useCallback((docId, text) => addKbComment(ws.id, docId, text)
+    .then((doc) => setKbDocs((prev) => prev.map((d) => (d.id === doc.id ? doc : d))))
+    .catch((e) => { reportError(t.notice.saveComment, e); throw e; }), [ws.id, t, reportError]);
   const runScan = React.useCallback(() => {
     if (scanning) return;
     setScanning(true);
+    setNotice(null);
     // "From" alone is a valid period (backend defaults "to" = today); swap if reversed.
     const [f, to] = scanFrom && scanTo && scanFrom > scanTo ? [scanTo, scanFrom] : [scanFrom, scanTo];
     const range = f ? { from: f, to: to || undefined } : undefined;
-    forceScan(ws.id, sources.filter((s) => s.active), range).then((results) => {
-      setLastScanFound(results.reduce((n, r) => n + (r.found || 0), 0));
-      setSources((prev) => prev.map((s) => {
+    const scanned = sources.filter((s) => s.active && !isManualSource(s));
+    forceScan(ws.id, scanned, range).then((data) => {
+      const results = data.results || [];
+      const found = results.reduce((n, r) => n + (r.found || 0), 0);
+      const errored = results.filter((r) => r.error).length;
+      setLastScanFound(found);
+      setSourcesRaw((prev) => prev.map((s) => {
         const r = results.find((x) => x.id === s.id);
         return r ? { ...s, lastChecked: r.lastChecked, found: r.found, error: r.error || null } : s;
       }));
@@ -205,16 +272,17 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
         });
         return next;
       });
+      const fmt = (s) => s.replace("{found}", String(found)).replace("{n}", String(errored || scanned.length));
+      if (!data.persisted) setNotice({ tone: "error", text: fmt(t.notice.scanNotPersisted), detail: data.persistError === "storage_unavailable" ? t.notice.storage : data.persistError });
+      else if (errored === results.length) setNotice({ tone: "error", text: t.notice.scanFailed, detail: results[0] && results[0].error });
+      else if (errored) setNotice({ tone: "warn", text: fmt(t.notice.scanPartial) });
+      else setNotice({ tone: "ok", text: fmt(t.notice.scanOk) });
       setScanning(false);
     }).catch((e) => {
-      // /api/scan-all only exists once deployed to Vercel (or under `vercel dev`) —
-      // plain `vite dev`/`vite preview` has no backend routes, so this is expected
-      // to fail locally with a 404. Don't leave the button stuck spinning either way.
-      console.error("Scan failed:", e);
+      reportError(t.notice.scanFailed, e);
       setScanning(false);
     });
-  }, [ws.id, scanning, sources, scanFrom, scanTo]);
-  const t = tFor(lang, ws);
+  }, [ws.id, scanning, sources, scanFrom, scanTo, t, reportError]);
   const [notifOpen, setNotifOpen] = React.useState(false);
   const notifRef = React.useRef(null);
   React.useEffect(() => {
@@ -268,9 +336,9 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
             {t.nav[active] || t.app}
           </div>
           {!isMobile && (
-            <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em", color: role === "viewer" ? "var(--amber-600)" : "var(--brand)", background: role === "viewer" ? "var(--amber-100)" : "var(--brand-soft)", padding: "4px 10px", borderRadius: "var(--radius-pill)" }}>
-              <Icon name={role === "viewer" ? "eye" : "shield-check"} size={12} />
-              {role === "viewer" ? t.roleViewer : t.persona}
+            <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--brand)", background: "var(--brand-soft)", padding: "4px 10px", borderRadius: "var(--radius-pill)" }}>
+              <Icon name={ws.icon} size={12} />
+              {t.persona}
             </span>
           )}
           <div style={{ flex: 1 }} />
@@ -281,7 +349,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
             </span>
           )}
           {!isMobile && (
-            <IconButton label={t.checkNow} onClick={runScan} disabled={scanning}>
+            <IconButton label={t.checkNow} onClick={runScan} disabled={scanning || backend === "down"}>
               <Icon name={scanning ? "loader-2" : "refresh-cw"} size={16} className={scanning ? "hrbp-spin" : ""} />
             </IconButton>
           )}
@@ -337,9 +405,24 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
           )}
           <IconButton label={t.nav.settings} active={active === "settings"} onClick={() => setActive("settings")}><Icon name="settings" size={18} /></IconButton>
         </header>
+        {notice && (
+          <div role={notice.tone === "ok" ? "status" : "alert"} style={{
+            display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", fontSize: 13, lineHeight: 1.5, flex: "0 0 auto",
+            background: notice.tone === "error" ? "var(--danger-100)" : notice.tone === "warn" ? "var(--warning-100)" : "var(--success-100)",
+            color: notice.tone === "error" ? "var(--danger-600)" : notice.tone === "warn" ? "var(--warning-700)" : "var(--success-600)",
+            borderBottom: "1px solid var(--border-subtle)",
+          }}>
+            <Icon name={notice.tone === "error" ? "alert-octagon" : notice.tone === "warn" ? "alert-triangle" : "check-circle-2"} size={16} style={{ marginTop: 1 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600 }}>{notice.text}</div>
+              {notice.detail && <div style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, opacity: 0.85, marginTop: 2, wordBreak: "break-word" }}>{t.notice.detail}: {notice.detail}</div>}
+            </div>
+            <button onClick={() => setNotice(null)} aria-label={t.notice.dismiss} style={{ border: "none", background: "transparent", cursor: "pointer", color: "inherit", padding: 2, display: "inline-flex" }}><Icon name="x" size={14} /></button>
+          </div>
+        )}
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb }) : children}
+            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, backend, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment }) : children}
           </div>
         </main>
       </div>

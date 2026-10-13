@@ -27,7 +27,7 @@ function periodRange(period, customDate) {
   return [null, null];
 }
 
-function ScanBanner({ t, sources, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo, lastScanFound }) {
+function ScanBanner({ t, backend, sources, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo, lastScanFound }) {
   return (
     <div style={{ display: "flex", alignItems: "flex-end", gap: 10, background: "var(--brand-soft)", color: "var(--on-brand-soft)", padding: "10px 16px", borderRadius: "var(--radius-md)", fontSize: 13, flexWrap: "wrap" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingBottom: 10 }}>
@@ -40,14 +40,14 @@ function ScanBanner({ t, sources, scanning, runScan, scanFrom, setScanFrom, scan
       <div style={{ flex: 1 }} />
       <Input type="date" label={t.periodFrom} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} style={{ width: 140 }} />
       <Input type="date" label={t.periodTo} value={scanTo} onChange={(e) => setScanTo(e.target.value)} style={{ width: 140 }} />
-      <Button variant="secondary" size="sm" disabled={scanning} onClick={runScan} iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={14} className={scanning ? "hrbp-spin" : ""} />}>
+      <Button variant="secondary" size="sm" disabled={scanning || backend === "down"} onClick={runScan} iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={14} className={scanning ? "hrbp-spin" : ""} />}>
         {scanning ? t.scanning : t.checkNow}
       </Button>
     </div>
   );
 }
 
-export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, role, sources, scanning, runScan, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound }) {
+export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, backend, sources, scanning, runScan, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound }) {
   const t = tFor(lang, ws);
   const [period, setPeriod] = React.useState("all");
   const [customDate, setCustomDate] = React.useState("");
@@ -109,7 +109,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, r
           return (f[new Intl.PluralRules(lang).select(n)] || f.many || f.other).replace("{n}", String(n));
         })()}</p>
       </div>
-      <ScanBanner t={t} sources={sources} scanning={scanning} runScan={runScan} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} lastScanFound={lastScanFound} />
+      <ScanBanner t={t} backend={backend} sources={sources} scanning={scanning} runScan={runScan} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} lastScanFound={lastScanFound} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
         <StatCard label={t.kpi.new} value={String(newCount)} accent="danger" icon={<Icon name="sparkles" size={18} />} />
         <StatCard label={t.kpi.pending} value={String(pendingCount)} accent="petrol" icon={<Icon name="clock" size={18} />} />
@@ -148,7 +148,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, r
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "10px 16px", background: "var(--brand-soft)", borderRadius: "var(--radius-md)" }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: "var(--on-brand-soft)" }}>{t.selectedCount.replace("{n}", String(selected.size))}</span>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}>
-            {role !== "viewer" && <Button variant="primary" size="sm" iconLeft={<Icon name="check" size={14} />} onClick={() => { setChangeStatus([...selected], "progress"); setSelected(new Set()); }}>{t.bulkMarkReviewed}</Button>}
+            <Button variant="primary" size="sm" disabled={backend !== "ok"} iconLeft={<Icon name="check" size={14} />} onClick={() => { setChangeStatus([...selected], "progress"); setSelected(new Set()); }}>{t.bulkMarkReviewed}</Button>
             <Button variant="secondary" size="sm" iconLeft={<Icon name="file-spreadsheet" size={14} />} onClick={exportSelectedCsv}>{t.exportCsv}</Button>
             <Button variant="secondary" size="sm" iconLeft={<Icon name="file-down" size={14} />} onClick={exportSelectedPdf}>{t.exportPdf}</Button>
             <Button variant="ghost" size="sm" iconLeft={<Icon name="x" size={14} />} onClick={() => setSelected(new Set())}>{t.clearSelection}</Button>
@@ -184,7 +184,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, r
                     <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{c.act} · {c.date}</div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-                    <StatusPill status={HRBP_STATUS_MAP[c.status]} lang={lang} />
+                    <StatusPill status={HRBP_STATUS_MAP[c.status]} lang={lang} label={t.st[c.status]} />
                     <Badge tone={areaTone(ws, c.area)}>{t.area[c.area] || t.area.other}</Badge>
                   </div>
                 </div>
@@ -203,7 +203,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, r
                   <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-2xl)", color: "var(--text-heading)" }}>{sel.title[lang]}</h2>
                   <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{sel.act}</div>
                 </div>
-                <StatusPill status={HRBP_STATUS_MAP[sel.status]} lang={lang} />
+                <StatusPill status={HRBP_STATUS_MAP[sel.status]} lang={lang} label={t.st[sel.status]} />
               </div>
               <div style={{ display: "flex", gap: 24, padding: "14px 0", borderTop: "1px solid var(--border-subtle)", borderBottom: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
                 <Meta label={t.published} value={sel.date} />
@@ -221,17 +221,11 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, r
                 </div>
               )}
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                {role !== "viewer" && (
-                  <React.Fragment>
-                    {sel.status !== "progress" && sel.status !== "done" && <Button variant="primary" iconLeft={<Icon name="check" size={16} />} onClick={() => setChangeStatus(sel.id, "progress")}>{t.markReviewed}</Button>}
-                    {sel.status !== "done" && <Button variant="ghost" iconLeft={<Icon name="file-check-2" size={16} />} onClick={() => setChangeStatus(sel.id, "done")}>{t.updateDoc}</Button>}
-                    {sel.status !== "urgent" && sel.status !== "done" && <Button variant="ghost" iconLeft={<Icon name="alert-triangle" size={16} />} onClick={() => setChangeStatus(sel.id, "urgent")}>{t.markUrgent}</Button>}
-                  </React.Fragment>
-                )}
+                {sel.status !== "progress" && sel.status !== "done" && <Button variant="primary" disabled={backend !== "ok"} iconLeft={<Icon name="check" size={16} />} onClick={() => setChangeStatus(sel.id, "progress")}>{t.markReviewed}</Button>}
+                {sel.status !== "done" && <Button variant="ghost" disabled={backend !== "ok"} iconLeft={<Icon name="file-check-2" size={16} />} onClick={() => setChangeStatus(sel.id, "done")}>{t.updateDoc}</Button>}
+                {sel.status !== "urgent" && sel.status !== "done" && <Button variant="ghost" disabled={backend !== "ok"} iconLeft={<Icon name="alert-triangle" size={16} />} onClick={() => setChangeStatus(sel.id, "urgent")}>{t.markUrgent}</Button>}
                 <Button variant="secondary" iconLeft={<Icon name="printer" size={16} />} onClick={() => openPrint([sel])}>{t.print}</Button>
-                {role === "viewer" && (
-                  <span style={{ fontSize: 11.5, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5 }}><Icon name="eye" size={13} />{t.readOnlyNotice}</span>
-                )}
+                <span style={{ fontSize: 11.5, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5 }}><Icon name="users" size={13} />{t.statusShared}</span>
               </div>
             </div>
           ) : (

@@ -210,6 +210,16 @@ module.exports = {
       title: "o gospodarce opakowaniami"
     },
     {
+      id: 27,
+      title: "o bateriach i akumulatorach",
+      active: false
+    },
+    {
+      id: 28,
+      title: "o zużytym sprzęcie elektrycznym i elektronicznym",
+      active: false
+    },
+    {
       id: 29,
       title: "o podatku od towarów i usług"
     },
@@ -237,6 +247,11 @@ module.exports = {
     {
       id: 35,
       title: "o Krajowej Administracji Skarbowej"
+    },
+    {
+      id: 36,
+      title: "o podatku od czynności cywilnoprawnych",
+      active: false
     }
   ],
   legal: [
@@ -369,12 +384,37 @@ module.exports = {
       title: "Prawo bankowe"
     },
     {
+      id: 32,
+      title: "o fundacji rodzinnej",
+      active: false
+    },
+    {
       id: 33,
       title: "Prawo restrukturyzacyjne"
     },
     {
       id: 34,
       title: "Prawo upadłościowe"
+    },
+    {
+      id: 35,
+      title: "o ofercie publicznej",
+      active: false
+    },
+    {
+      id: 36,
+      title: "o obrocie instrumentami finansowymi",
+      active: false
+    },
+    {
+      id: 37,
+      title: "o obligacjach",
+      active: false
+    },
+    {
+      id: 38,
+      title: "o nadzorze nad rynkiem finansowym",
+      active: false
     },
     {
       id: 39,
@@ -423,6 +463,46 @@ module.exports = {
     {
       id: 49,
       title: "o nabywaniu nieruchomości przez cudzoziemców"
+    },
+    {
+      id: 50,
+      title: "o planowaniu i zagospodarowaniu przestrzennym",
+      active: false
+    },
+    {
+      id: 51,
+      title: "Prawo budowlane",
+      active: false
+    },
+    {
+      id: 52,
+      title: "Prawo ochrony środowiska",
+      active: false
+    },
+    {
+      id: 53,
+      title: "o udostępnianiu informacji o środowisku",
+      active: false
+    },
+    {
+      id: 54,
+      title: "o odpadach",
+      active: false
+    },
+    {
+      id: 55,
+      title: "Prawo wodne",
+      active: false
+    },
+    {
+      id: 56,
+      title: "Prawo energetyczne",
+      active: false
+    },
+    {
+      id: 57,
+      title: "o odnawialnych źródłach energii",
+      active: false
     },
     {
       id: 58,

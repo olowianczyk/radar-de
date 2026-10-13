@@ -1,7 +1,8 @@
-// Settings — profile, account and preferences. Reachable via the top-bar gear icon
-// or the sidebar footer (avatar + name).
+// Settings — interface preferences (language, dark mode), both stored in this
+// browser. There is no account and no permission model: the tool is an open
+// link by design, so nothing here pretends otherwise.
 import React from "react";
-import { Card, Avatar, Select, Switch, Button, Badge, Icon } from "../components/index.js";
+import { Card, Avatar, Select, Switch, Badge, Icon } from "../components/index.js";
 import { tFor } from "../workspaces.js";
 
 function Row({ label, children }) {
@@ -13,28 +14,10 @@ function Row({ label, children }) {
   );
 }
 
-export function Settings({ lang, ws, setLang, dark, setDark, role, setRole, setActive }) {
+export function Settings({ lang, ws, setLang, dark, setDark }) {
   const [saved, setSaved] = React.useState(false);
-  const [localDark, setLocalDark] = React.useState(() => {
-    try { return localStorage.getItem("hrbp-theme") === "dark"; } catch (e) { return false; }
-  });
-  const effectiveDark = dark != null ? dark : localDark;
-  const applyDark = setDark || ((v) => {
-    setLocalDark(v);
-    document.documentElement.setAttribute("data-theme", v ? "dark" : "light");
-    try { localStorage.setItem("hrbp-theme", v ? "dark" : "light"); } catch (e) {}
-  });
-  const [localRole, setLocalRole] = React.useState(() => {
-    try { return localStorage.getItem("hrbp-role") || "hrbp"; } catch (e) { return "hrbp"; }
-  });
-  const effectiveRole = role != null ? role : localRole;
-  const applyRole = setRole || ((r) => {
-    setLocalRole(r);
-    try { localStorage.setItem("hrbp-role", r); } catch (e) {}
-  });
   const tRoot = tFor(lang, ws);
   const t = tRoot.settings;
-
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
 
   return (
@@ -48,29 +31,22 @@ export function Settings({ lang, ws, setLang, dark, setDark, role, setRole, setA
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <Row label={t.role}><span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-heading)" }}>{tRoot.persona}</span></Row>
           <Row label={t.dept}><Badge tone="brand">{tRoot.wsLabel}</Badge></Row>
         </div>
       </Card>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <Card padding="lg" header={tRoot.permissions}>
-          <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "var(--text-muted)" }}>{tRoot.permissionsSub}</p>
-          <Select value={effectiveRole} onChange={(e) => { applyRole(e.target.value); flash(); }}
-            options={[{ value: "hrbp", label: tRoot.roleHrbp }, { value: "viewer", label: tRoot.roleViewer }]} />
-        </Card>
-
         <Card padding="lg" header={t.preferences}>
           <Row label={t.language}>
             <Select value={lang} onChange={(e) => { setLang(e.target.value); flash(); }}
               options={[{ value: "pl", label: "Polski" }, { value: "de", label: "Deutsch" }, { value: "en", label: "English" }]}
               style={{ width: 150 }} />
           </Row>
-          <Row label={t.darkMode}><Switch checked={effectiveDark} onChange={(v) => { applyDark(v); flash(); }} /></Row>
+          <Row label={t.darkMode}><Switch checked={!!dark} onChange={(v) => { setDark(v); flash(); }} /></Row>
         </Card>
 
         {saved && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--green-700)", background: "var(--green-100)", padding: "9px 12px", borderRadius: "var(--radius-sm)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--success-600)", background: "var(--success-100)", padding: "9px 12px", borderRadius: "var(--radius-sm)" }}>
             <Icon name="check-circle-2" size={14} />{t.saved}
           </div>
         )}
