@@ -55,14 +55,14 @@ document.getElementById("sheets").innerHTML = list.map((c) => {
   return `
   <div class="sheet">
   <div class="top">
-    <span class="brand">HR Business Partner Platform</span>
-    <span class="eyebrow">${t.app}</span>
+    <span class="brand">${esc(c.product || t.app)}</span>
+    <span class="eyebrow">${esc(c.wsLabel ? `${c.wsLabel} · ${c.appTitle || ""}` : t.app)}</span>
   </div>
   <h1>${esc(c.title[lang] || c.title.pl)}</h1>
   <div class="act">${esc(c.act)}</div>
   <div class="badges">
     <span class="badge" style="background:${sBg};color:${sFg}">${stLabel}</span>
-    <span class="badge" style="background:${aBg};color:${aFg}">${t.area[c.area]}</span>
+    <span class="badge" style="background:${aBg};color:${aFg}">${esc(c.areaLabel || t.area[c.area] || "")}</span>
   </div>
   <div class="grid">
     <div><div class="l">${t.published}</div><div class="v">${esc(c.date)}</div></div>
@@ -71,7 +71,7 @@ document.getElementById("sheets").innerHTML = list.map((c) => {
   </div>
   <p class="summary">${esc(c.summary[lang] || c.summary.pl)}</p>
   ${affected.length ? `<div class="affected"><h3>${t.affected}</h3>${affected.map((d) => `<div class="doc">• ${d.title[lang] || d.title.pl}</div>`).join("")}</div>` : ""}
-  <div class="footer"><span>${now}</span><span>HR Business Partner Platform — Monitoring zmian w prawie pracy</span></div>
+  <div class="footer"><span>${now}</span><span>${esc(c.product || t.app)}${c.wsLabel ? " — " + esc(c.wsLabel) : ""}</span></div>
   </div>`;
 }).join("") || `<div class="sheet"><p class="summary">${esc(t.feedEmptyTitle)}</p></div>`;
 </script>

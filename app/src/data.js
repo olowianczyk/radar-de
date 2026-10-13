@@ -1,4 +1,5 @@
-// HR Business Partner Platform — Legal-change monitoring: trilingual strings + demo data.
+// Legal-change monitoring platform (HR / Compliance / Legal) — shared trilingual UI strings.
+// Department-specific content (sources, areas) lives in workspaces.js.
 export const HRBP_I18N = {
   pl: {
     app: "Monitoring zmian w prawie pracy", nav: { feed: "Zmiany w przepisach", kb: "Baza wiedzy", sources: "Monitorowane źródła", settings: "Ustawienia" },
@@ -20,11 +21,11 @@ export const HRBP_I18N = {
     updated: "Ostatnia aktualizacja", relatedChanges: "Powiązane zmiany w przepisach", kbEmpty: "Wybierz dokument, aby zobaczyć treść",
     discussion: "Dyskusja", commentPlaceholder: "Dodaj komentarz lub pytanie do tego dokumentu…", postComment: "Dodaj komentarz", noComments: "Brak komentarzy — rozpocznij dyskusję.", commentsCount: "{n} komentarzy",
     attachments: "Załączniki", noAttachments: "Brak załączników.", addAttachment: "Dodaj załącznik", uploadedBy: "Dodane przez", download: "Pobierz",
-    sourcesTitle: "Monitorowane źródła", sourcesSub: "Akty prawne z ISAP (isap.sejm.gov.pl) — zawsze tekst ujednolicony — skanowane automatycznie pod kątem zmian",
+    sourcesTitle: "Monitorowane źródła", sourcesSub: "Akty z Dziennika Ustaw przez publiczne API Sejmu — skanowane automatycznie. Zakres każdego źródła jest opisany poniżej.",
     lastChecked: "Ostatnie sprawdzenie", changesFound: "Wykryte zmiany", monitoring: "Monitorowanie",
     checkNow: "Sprawdź teraz", scanning: "Skanowanie…", scanDone: "Skanowanie zakończone", loading: "Wczytywanie danych…",
     periodLabel: "Okres", periodAll: "Wszystkie", periodCustom: "Niestandardowy zakres", periodFrom: "Od dnia", periodTo: "Do dnia",
-    autoScan: "automatyczne skanowanie codziennie o 06:00", print: "Drukuj",
+    autoScan: "automatyczne skanowanie codziennie nad ranem (04:00 UTC)", print: "Drukuj",
     periodQuarter: "Ostatni kwartał", period6m: "Ostatnie 6 miesięcy", periodYear: "Ostatni rok",
     periodPrevYear: "Poprzedni rok", periodCurYear: "Bieżący rok",
     history: "Historia", hideHistory: "Ukryj historię", evDetected: "Wykryto zmianę",
@@ -36,6 +37,23 @@ export const HRBP_I18N = {
     roleHrbp: "HR Business Partner", roleViewer: "Tylko podgląd",
     permissions: "Uprawnienia", permissionsSub: "Poziom dostępu decyduje, jakie akcje można wykonywać w systemie.",
     readOnlyNotice: "Tryb tylko do odczytu — zmiana ustawień wymaga roli HR Business Partner.",
+    product: "Monitor zmian w prawie", workspace: "Dział", switchWorkspace: "Zmień dział",
+    scopeHowTitle: "Jak działa skanowanie", scopeHowShow: "Pokaż szczegóły", scopeHowHide: "Ukryj szczegóły",
+    scopeHow: [
+      "Źródło danych: wyłącznie Dziennik Ustaw (Dz.U.) przez publiczne API Sejmu (api.sejm.gov.pl). Monitor Polski, prawo UE, orzecznictwo, projekty ustaw i wytyczne urzędów nie są objęte.",
+      "Dopasowanie: po oficjalnym słowie kluczowym nadanym aktowi przez Bibliotekę Sejmową (zamknięty słownik) albo po fragmencie tytułu aktu. Nigdy po treści aktu.",
+      "Okres: od ostatniego sprawdzenia danego źródła do dziś, według daty ogłoszenia aktu. Pierwsze skanowanie sięga do 1 stycznia bieżącego roku. Możesz wymusić inny zakres dat.",
+      "Limit: do 100 aktów na źródło i skanowanie — przy bardzo szerokim zakresie dat najstarsze wyniki mogą zostać pominięte.",
+      "Każda wykryta zmiana ma przy sobie dokładne zapytanie, które ją znalazło — możesz je otworzyć i zweryfikować samodzielnie.",
+    ],
+    scopeTitle: "Zakres przeszukiwania", scopeRegister: "Rejestr", scopeRegisterValue: "Dziennik Ustaw (Dz.U.)",
+    scopeMatch: "Dopasowanie", scopeMatchKeyword: "słowo kluczowe Sejmu", scopeMatchTitle: "tytuł zawiera",
+    scopeNext: "Następne skanowanie obejmie", scopeSinceLast: "od {d} do dziś", scopeSinceYearStart: "od 1 stycznia {y} do dziś (pierwsze skanowanie)",
+    scopeLimit: "Limit", scopeLimitValue: "100 aktów na skanowanie", scopeOpenQuery: "Otwórz zapytanie w API Sejmu", scopeNote: "Uwagi",
+    kwChecking: "sprawdzam słownik Sejmu…", kwValid: "słowo istnieje w słowniku Sejmu", kwInvalid: "brak w słowniku Sejmu — to źródło nic nie znajdzie", kwUnknown: "nie udało się sprawdzić słownika Sejmu", kwSuggest: "Podobne w słowniku",
+    noAutoScan: "Bez automatycznego skanowania", actType: "Typ aktu",
+    foundVia: "Jak to znaleziono", foundViaQuery: "Zapytanie", foundViaDate: "data ogłoszenia",
+    addSourceTitle: "Nowe źródło", srcName: "Nazwa źródła", srcMode: "Tryb dopasowania", srcTerm: "Słowo kluczowe", srcTermTitle: "Fragment tytułu aktu", srcArea: "Obszar", srcAdd: "Dodaj źródło", srcCancel: "Anuluj", srcRemove: "Usuń źródło",
     notifications: "Powiadomienia", notificationsEmpty: "Brak nowych powiadomień", notifKbNeedsUpdate: "Dokument wymaga aktualizacji", markAllRead: "Oznacz wszystkie jako przeczytane",
   },
   de: {
@@ -58,11 +76,11 @@ export const HRBP_I18N = {
     updated: "Zuletzt aktualisiert", relatedChanges: "Zugehörige Rechtsänderungen", kbEmpty: "Wählen Sie ein Dokument für den Inhalt",
     discussion: "Diskussion", commentPlaceholder: "Kommentar oder Frage zu diesem Dokument hinzufügen…", postComment: "Kommentar posten", noComments: "Keine Kommentare — starten Sie die Diskussion.", commentsCount: "{n} Kommentare",
     attachments: "Anhänge", noAttachments: "Keine Anhänge.", addAttachment: "Anhang hinzufügen", uploadedBy: "Hochgeladen von", download: "Herunterladen",
-    sourcesTitle: "Überwachte Quellen", sourcesSub: "Rechtsakte aus ISAP (isap.sejm.gov.pl) — stets konsolidierter Text — automatisch auf Änderungen gescannt",
+    sourcesTitle: "Überwachte Quellen", sourcesSub: "Akte aus dem Gesetzblatt (Dz.U.) über die öffentliche Sejm-API — automatisch gescannt. Der Suchumfang jeder Quelle ist unten beschrieben.",
     lastChecked: "Zuletzt geprüft", changesFound: "Gefundene Änderungen", monitoring: "Überwachung",
     checkNow: "Jetzt prüfen", scanning: "Scanne…", scanDone: "Scan abgeschlossen", loading: "Daten werden geladen…",
     periodLabel: "Zeitraum", periodAll: "Alle", periodCustom: "Benutzerdefinierter Zeitraum", periodFrom: "Ab dem", periodTo: "Bis zum",
-    autoScan: "automatischer Scan täglich um 06:00", print: "Drucken",
+    autoScan: "automatischer Scan täglich früh morgens (04:00 UTC)", print: "Drucken",
     periodQuarter: "Letztes Quartal", period6m: "Letzte 6 Monate", periodYear: "Letztes Jahr",
     periodPrevYear: "Vorjahr", periodCurYear: "Laufendes Jahr",
     history: "Verlauf", hideHistory: "Verlauf ausblenden", evDetected: "Änderung erkannt",
@@ -74,6 +92,23 @@ export const HRBP_I18N = {
     roleHrbp: "HR Business Partner", roleViewer: "Nur Ansicht",
     permissions: "Berechtigungen", permissionsSub: "Die Zugriffsebene bestimmt, welche Aktionen im System möglich sind.",
     readOnlyNotice: "Nur-Lese-Modus — Änderungen erfordern die Rolle HR Business Partner.",
+    product: "Rechtsänderungs-Monitor", workspace: "Abteilung", switchWorkspace: "Abteilung wechseln",
+    scopeHowTitle: "So funktioniert der Scan", scopeHowShow: "Details anzeigen", scopeHowHide: "Details ausblenden",
+    scopeHow: [
+      "Datenquelle: ausschließlich das Gesetzblatt (Dz.U.) über die öffentliche Sejm-API (api.sejm.gov.pl). Monitor Polski, EU-Recht, Rechtsprechung, Gesetzentwürfe und Behördenleitlinien sind nicht erfasst.",
+      "Treffer: über das offizielle, von der Sejm-Bibliothek vergebene Schlagwort (geschlossener Thesaurus) oder über einen Teil des Titels. Nie über den Text des Akts.",
+      "Zeitraum: vom letzten Scan der jeweiligen Quelle bis heute, nach Verkündungsdatum. Der erste Scan reicht bis zum 1. Januar des laufenden Jahres. Ein anderer Zeitraum kann erzwungen werden.",
+      "Limit: bis zu 100 Akte pro Quelle und Scan — bei sehr weitem Zeitraum können die ältesten Treffer fehlen.",
+      "Jede erkannte Änderung trägt die genaue Abfrage, die sie gefunden hat — sie lässt sich öffnen und selbst prüfen.",
+    ],
+    scopeTitle: "Suchumfang", scopeRegister: "Register", scopeRegisterValue: "Gesetzblatt (Dz.U.)",
+    scopeMatch: "Treffer", scopeMatchKeyword: "Sejm-Schlagwort", scopeMatchTitle: "Titel enthält",
+    scopeNext: "Nächster Scan umfasst", scopeSinceLast: "vom {d} bis heute", scopeSinceYearStart: "vom 1. Januar {y} bis heute (erster Scan)",
+    scopeLimit: "Limit", scopeLimitValue: "100 Akte pro Scan", scopeOpenQuery: "Abfrage in der Sejm-API öffnen", scopeNote: "Hinweise",
+    kwChecking: "Sejm-Thesaurus wird geprüft…", kwValid: "Schlagwort existiert im Sejm-Thesaurus", kwInvalid: "nicht im Sejm-Thesaurus — diese Quelle findet nichts", kwUnknown: "Thesaurus konnte nicht geprüft werden", kwSuggest: "Ähnlich im Thesaurus",
+    noAutoScan: "Kein automatischer Scan", actType: "Aktart",
+    foundVia: "So gefunden", foundViaQuery: "Abfrage", foundViaDate: "Verkündungsdatum",
+    addSourceTitle: "Neue Quelle", srcName: "Name der Quelle", srcMode: "Trefferart", srcTerm: "Schlagwort", srcTermTitle: "Titelfragment", srcArea: "Bereich", srcAdd: "Quelle hinzufügen", srcCancel: "Abbrechen", srcRemove: "Quelle entfernen",
     notifications: "Benachrichtigungen", notificationsEmpty: "Keine neuen Benachrichtigungen", notifKbNeedsUpdate: "Dokument benötigt Aktualisierung", markAllRead: "Alle als gelesen markieren",
   },
   en: {
@@ -96,11 +131,11 @@ export const HRBP_I18N = {
     updated: "Last updated", relatedChanges: "Related legal changes", kbEmpty: "Select a document to see its content",
     discussion: "Discussion", commentPlaceholder: "Add a comment or question about this document…", postComment: "Post comment", noComments: "No comments yet — start the discussion.", commentsCount: "{n} comments",
     attachments: "Attachments", noAttachments: "No attachments.", addAttachment: "Add attachment", uploadedBy: "Uploaded by", download: "Download",
-    sourcesTitle: "Monitored sources", sourcesSub: "Legal acts from ISAP (isap.sejm.gov.pl) — always the consolidated text — scanned automatically for changes",
+    sourcesTitle: "Monitored sources", sourcesSub: "Acts from the Journal of Laws (Dz.U.) via the public Sejm API — scanned automatically. Each source’s search scope is described below.",
     lastChecked: "Last checked", changesFound: "Changes found", monitoring: "Monitoring",
     checkNow: "Check now", scanning: "Scanning…", scanDone: "Scan complete", loading: "Loading data…",
     periodLabel: "Period", periodAll: "All", periodCustom: "Custom range", periodFrom: "From", periodTo: "To",
-    autoScan: "automatic scan daily at 06:00", print: "Print",
+    autoScan: "automatic scan daily in the early morning (04:00 UTC)", print: "Print",
     periodQuarter: "Last quarter", period6m: "Last 6 months", periodYear: "Last year",
     periodPrevYear: "Previous year", periodCurYear: "Current year",
     history: "History", hideHistory: "Hide history", evDetected: "Change detected",
@@ -112,6 +147,23 @@ export const HRBP_I18N = {
     roleHrbp: "HR Business Partner", roleViewer: "View only",
     permissions: "Permissions", permissionsSub: "Access level determines which actions are available in the system.",
     readOnlyNotice: "Read-only mode — changes require the HR Business Partner role.",
+    product: "Legal change monitor", workspace: "Department", switchWorkspace: "Switch department",
+    scopeHowTitle: "How scanning works", scopeHowShow: "Show details", scopeHowHide: "Hide details",
+    scopeHow: [
+      "Data source: only the Journal of Laws (Dz.U.) via the public Sejm API (api.sejm.gov.pl). Monitor Polski, EU law, case law, draft bills and agency guidance are not covered.",
+      "Matching: by the official subject keyword assigned to the act by the Sejm Library (closed thesaurus), or by a fragment of the act’s title. Never by the act’s text.",
+      "Period: from each source’s last check until today, by announcement date. The first scan reaches back to 1 January of the current year. You can force a different date range.",
+      "Limit: up to 100 acts per source per scan — with a very wide date range the oldest hits may be dropped.",
+      "Every detected change carries the exact query that found it — open it and verify for yourself.",
+    ],
+    scopeTitle: "Search scope", scopeRegister: "Register", scopeRegisterValue: "Journal of Laws (Dz.U.)",
+    scopeMatch: "Matching", scopeMatchKeyword: "Sejm keyword", scopeMatchTitle: "title contains",
+    scopeNext: "Next scan covers", scopeSinceLast: "from {d} to today", scopeSinceYearStart: "from 1 January {y} to today (first scan)",
+    scopeLimit: "Limit", scopeLimitValue: "100 acts per scan", scopeOpenQuery: "Open query in the Sejm API", scopeNote: "Notes",
+    kwChecking: "checking the Sejm thesaurus…", kwValid: "keyword exists in the Sejm thesaurus", kwInvalid: "not in the Sejm thesaurus — this source will find nothing", kwUnknown: "could not check the Sejm thesaurus", kwSuggest: "Similar in the thesaurus",
+    noAutoScan: "No automatic scan", actType: "Act type",
+    foundVia: "How it was found", foundViaQuery: "Query", foundViaDate: "announcement date",
+    addSourceTitle: "New source", srcName: "Source name", srcMode: "Match mode", srcTerm: "Keyword", srcTermTitle: "Title fragment", srcArea: "Area", srcAdd: "Add source", srcCancel: "Cancel", srcRemove: "Remove source",
     notifications: "Notifications", notificationsEmpty: "No new notifications", notifKbNeedsUpdate: "Document needs update", markAllRead: "Mark all as read",
   },
 };
@@ -121,26 +173,6 @@ export const HRBP_I18N = {
 // fed by /api/scan-all + /api/state. This used to be 6 fabricated demo entries with
 // invented Dz.U. positions and summaries; removed because they read as real legal
 // facts but weren't.
-
-// `keyword` maps a source to the real Sejm/ELI API taxonomy term (see /api/_lib.js) —
-// verified live against api.sejm.gov.pl before wiring in. PIP has no ELI equivalent
-// (it's guidance, not a Dziennik Ustaw act), so it has no keyword and stays manual.
-// `area` is our own HR-topic categorization of the source, not a legal fact.
-export const HRBP_SOURCES = [
-  { id: 1, name: "Kodeks pracy — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "kodeks pracy", area: "contracts", lastChecked: null, found: 0, active: true },
-  { id: 2, name: "Ustawa o PPK — tekst ujednolicony", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "pracownicze plany kapitałowe", area: "pay", lastChecked: null, found: 0, active: true },
-  { id: 3, name: "Rozporządzenia MRPiPS ws. BHP", type: "Rozporządzenie", url: "https://isap.sejm.gov.pl", keyword: "BHP", area: "safety", lastChecked: null, found: 0, active: true },
-  { id: 4, name: "Ustawa o zatrudnianiu cudzoziemców", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "cudzoziemcy", area: "contracts", lastChecked: null, found: 0, active: true },
-  { id: 5, name: "Ustawa o związkach zawodowych", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "związki zawodowe", area: "other", lastChecked: null, found: 0, active: true },
-  { id: 6, name: "Państwowa Inspekcja Pracy — wytyczne", type: "Wytyczne", url: "https://www.pip.gov.pl", keyword: null, area: "safety", lastChecked: null, found: 0, active: false },
-  { id: 7, name: "Urlopy macierzyńskie, rodzicielskie, wychowawcze", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "urlop rodzicielski", area: "leave", lastChecked: null, found: 0, active: true },
-  { id: 8, name: "Rozporządzenie o minimalnym wynagrodzeniu", type: "Rozporządzenie", url: "https://isap.sejm.gov.pl", keyword: "minimalne wynagrodzenie za pracę", area: "pay", lastChecked: null, found: 0, active: true },
-  { id: 9, name: "Czas pracy — praca zdalna, elastyczny czas pracy", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "czas pracy", area: "contracts", lastChecked: null, found: 0, active: true },
-  { id: 10, name: "Ochrona danych osobowych pracowników (RODO)", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "ochrona danych osobowych", area: "other", lastChecked: null, found: 0, active: true },
-  { id: 11, name: "Emerytury pomostowe i składki ZUS", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "emerytury pomostowe", area: "social", lastChecked: null, found: 0, active: true },
-  { id: 12, name: "Przeciwdziałanie mobbingowi i dyskryminacji w zatrudnieniu", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "mobbing", area: "contracts", lastChecked: null, found: 0, active: true },
-  { id: 13, name: "Zatrudnianie osób niepełnosprawnych (PFRON)", type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword: "zatrudnianie osób niepełnosprawnych", area: "other", lastChecked: null, found: 0, active: true },
-];
 
 // No seed history — real per-source history comes back from /api/state once a
 // scan (cron or manual) has actually run. Empty until then, not invented.
@@ -154,5 +186,4 @@ export const HRBP_KB = [];
 export const HRBP_KB_COMMENTS = {};
 export const HRBP_KB_ATTACHMENTS = {};
 export const HRBP_KB_VERSIONS = {};
-export const HRBP_AREA_TONE = { leave: "brand", pay: "blue", safety: "amber", contracts: "neutral", social: "green", other: "neutral" };
 export const HRBP_STATUS_MAP = { new: "new", progress: "progress", waiting: "waiting", urgent: "urgent", done: "done" };

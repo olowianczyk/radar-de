@@ -2,7 +2,7 @@
 // or the sidebar footer (avatar + name).
 import React from "react";
 import { Card, Avatar, Select, Switch, Button, Badge, Icon } from "../components/index.js";
-import { HRBP_I18N } from "../data.js";
+import { tFor } from "../workspaces.js";
 
 function Row({ label, children }) {
   return (
@@ -13,7 +13,7 @@ function Row({ label, children }) {
   );
 }
 
-export function Settings({ lang, setLang, dark, setDark, role, setRole, setActive }) {
+export function Settings({ lang, ws, setLang, dark, setDark, role, setRole, setActive }) {
   const [saved, setSaved] = React.useState(false);
   const [localDark, setLocalDark] = React.useState(() => {
     try { return localStorage.getItem("hrbp-theme") === "dark"; } catch (e) { return false; }
@@ -32,7 +32,7 @@ export function Settings({ lang, setLang, dark, setDark, role, setRole, setActiv
     setLocalRole(r);
     try { localStorage.setItem("hrbp-role", r); } catch (e) {}
   });
-  const tRoot = HRBP_I18N[lang];
+  const tRoot = tFor(lang, ws);
   const t = tRoot.settings;
 
   const flash = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
@@ -41,15 +41,15 @@ export function Settings({ lang, setLang, dark, setDark, role, setRole, setActiv
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
       <Card padding="lg">
         <div style={{ display: "flex", alignItems: "center", gap: 16, paddingBottom: 18, borderBottom: "1px solid var(--border-subtle)" }}>
-          <Avatar name="HR Partner" size="lg" tone={1} />
+          <Avatar name={tRoot.persona} size="lg" tone={1} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-heading)", fontFamily: "var(--font-display)" }}>HR Partner</div>
-            <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>HR Business Partner</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-heading)", fontFamily: "var(--font-display)" }}>{tRoot.persona}</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>{tRoot.app}</div>
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <Row label={t.role}><span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-heading)" }}>HR Business Partner</span></Row>
-          <Row label={t.dept}><Badge tone="brand">HR</Badge></Row>
+          <Row label={t.role}><span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-heading)" }}>{tRoot.persona}</span></Row>
+          <Row label={t.dept}><Badge tone="brand">{tRoot.wsLabel}</Badge></Row>
         </div>
       </Card>
 

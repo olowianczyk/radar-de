@@ -3,7 +3,8 @@
 import React from "react";
 import { Card, Badge, Input, Icon, Button, Avatar, Textarea, IconButton, Tabs, Select } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
-import { HRBP_I18N, HRBP_KB_COMMENTS, HRBP_KB_ATTACHMENTS, HRBP_KB_VERSIONS, HRBP_AREA_TONE } from "../data.js";
+import { HRBP_KB_COMMENTS, HRBP_KB_ATTACHMENTS, HRBP_KB_VERSIONS } from "../data.js";
+import { tFor, areaTone } from "../workspaces.js";
 
 function formatDate(iso) {
   const d = new Date(iso);
@@ -28,8 +29,9 @@ function downloadAttachment(a) {
   link.click();
   URL.revokeObjectURL(url);
 }
-export function KnowledgeBase({ lang, selectedId, setSelectedId, role, kbDocs, addKb }) {
-  const t = HRBP_I18N[lang];
+export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, role, kbDocs, addKb }) {
+  const t = tFor(lang, ws);
+  const favKey = ws.id === "hr" ? "hrbp-kb-favorites" : `hrbp-kb-favorites-${ws.id}`;
   const docsAll = kbDocs || [];
   const [query, setQuery] = React.useState("");
   const [tab, setTab] = React.useState("all");
@@ -48,13 +50,13 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role, kbDocs, a
       .catch((e) => setAddError(e.message));
   };
   const [favorites, setFavorites] = React.useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("hrbp-kb-favorites") || "[]")); } catch (e) { return new Set(); }
+    try { return new Set(JSON.parse(localStorage.getItem(favKey) || "[]")); } catch (e) { return new Set(); }
   });
   const toggleFavorite = (id) => {
     setFavorites((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
-      try { localStorage.setItem("hrbp-kb-favorites", JSON.stringify([...next])); } catch (e) {}
+      try { localStorage.setItem(favKey, JSON.stringify([...next])); } catch (e) {}
       return next;
     });
   };
@@ -74,7 +76,7 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role, kbDocs, a
     if (tab === "favorites" && !favorites.has(k.id)) return false;
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    return k.title.toLowerCase().includes(q) || t.area[k.area].toLowerCase().includes(q);
+    return k.title.toLowerCase().includes(q) || ((t.area[k.area] || t.area.other) || t.area.other).toLowerCase().includes(q);
   }).sort((a, b) => {
     if (sort === "updated") return new Date(b.ts) - new Date(a.ts);
     return a.title.localeCompare(b.title);
@@ -135,7 +137,7 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role, kbDocs, a
                 </div>
                 <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14.5, marginTop: 12 }}>{k.title}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                  <Badge tone={HRBP_AREA_TONE[k.area]}>{t.area[k.area]}</Badge>
+                  <Badge tone={areaTone(ws, k.area)}>{(t.area[k.area] || t.area.other)}</Badge>
                   <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{formatDate(k.ts)}</span>
                 </div>
               </Card>
@@ -159,7 +161,7 @@ export function KnowledgeBase({ lang, selectedId, setSelectedId, role, kbDocs, a
                 </IconButton>
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingBottom: 14, borderBottom: "1px solid var(--border-subtle)" }}>
-                <Badge tone={HRBP_AREA_TONE[sel.area]}>{t.area[sel.area]}</Badge>
+                <Badge tone={areaTone(ws, sel.area)}>{(t.area[sel.area] || t.area.other)}</Badge>
               </div>
               <p style={{ margin: 0, color: "var(--text-body)", fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{sel.body}</p>
               {relatedChanges.length > 0 && (

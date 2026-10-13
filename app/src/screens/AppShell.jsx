@@ -1,12 +1,19 @@
-// AppShell — sidebar + top bar + PL/DE/EN language switcher. Composes SidebarNav.
+// AppShell — sidebar (with department switcher) + top bar + PL/DE/EN language
+// switcher. Composes SidebarNav. Mounted once per workspace (see App.jsx key=).
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
 import { LoadingState } from "../components/Loading.jsx";
-import { HRBP_I18N, HRBP_SOURCES, HRBP_SOURCE_HISTORY } from "../data.js";
+import { WORKSPACES, initialSources, tFor } from "../workspaces.js";
 import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc } from "../isapIntegration.js";
 
-function useSources() {
-  return React.useState(HRBP_SOURCES);
+function useSources(ws) {
+  return React.useState(() => initialSources(ws));
+}
+
+// Per-workspace localStorage key. HR keeps the legacy un-suffixed key so
+// triage decisions made before workspaces existed aren't lost.
+function wsKey(base, wsId) {
+  return wsId === "hr" ? base : `${base}-${wsId}`;
 }
 
 function LangSwitch({ lang, setLang }) {
@@ -25,10 +32,44 @@ function LangSwitch({ lang, setLang }) {
   );
 }
 
-function Wordmark() {
+function Wordmark({ t }) {
   return (
     <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700, letterSpacing: ".03em", textTransform: "uppercase", color: "var(--text-heading)", lineHeight: 1.25 }}>
-      HR Business Partner Platform
+      {t.product}
+    </div>
+  );
+}
+
+// Department switcher — one app, three workspaces. Vertical list in the sidebar,
+// a compact <select> in the mobile top bar.
+function WorkspaceSwitch({ ws, setWorkspace, lang, t, compact }) {
+  if (compact) {
+    return (
+      <select aria-label={t.switchWorkspace} value={ws.id} onChange={(e) => setWorkspace(e.target.value)} style={{
+        border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-sm)", background: "var(--surface-sunken)", color: "var(--text-heading)",
+        fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 700, padding: "5px 8px", maxWidth: 140,
+      }}>
+        {WORKSPACES.map((w) => <option key={w.id} value={w.id}>{w.label[lang] || w.label.pl}</option>)}
+      </select>
+    );
+  }
+  return (
+    <div role="group" aria-label={t.switchWorkspace} style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 12 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text-muted)", padding: "0 4px 4px" }}>{t.workspace}</div>
+      {WORKSPACES.map((w) => {
+        const isActive = w.id === ws.id;
+        return (
+          <button key={w.id} type="button" onClick={() => setWorkspace(w.id)} aria-pressed={isActive} style={{
+            display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", padding: "7px 8px", border: "1px solid",
+            borderColor: isActive ? "var(--brand)" : "transparent", borderRadius: "var(--radius-sm)", cursor: "pointer",
+            background: isActive ? "var(--brand-soft)" : "transparent", color: isActive ? "var(--on-brand-soft)" : "var(--text-body)",
+            fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: isActive ? 700 : 500,
+          }}>
+            <Icon name={w.icon} size={15} />
+            <span style={{ flex: 1 }}>{w.label[lang] || w.label.pl}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -90,14 +131,14 @@ function useRole() {
   return [role, setRole];
 }
 
-export function AppShell({ lang, setLang, active, setActive, children, role: roleProp, setRole: setRoleProp, onSelectChange, onSelectKb }) {
+export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, children, role: roleProp, setRole: setRoleProp, onSelectChange, onSelectKb }) {
   const isMobile = useIsMobile();
   const [dark, setDark] = useDarkMode();
   const [internalRole, setInternalRole] = useRole();
   const role = roleProp != null ? roleProp : internalRole;
   const setRole = setRoleProp || setInternalRole;
-  const [sources, setSources] = useSources();
-  const [sourceHistory, setSourceHistory] = React.useState(HRBP_SOURCE_HISTORY);
+  const [sources, setSources] = useSources(ws);
+  const [sourceHistory, setSourceHistory] = React.useState({});
   const [scanning, setScanning] = React.useState(false);
   // Shared "from/to" scan period — empty means the default incremental scan
   // (since each source's own last-checked time). Set both to search a
@@ -107,22 +148,22 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   // User's triage decisions (mark reviewed/implemented) — client-side only.
   // ponytail: localStorage, move into Blob state when multi-device matters.
   const [statusMap, setStatusMap] = React.useState(() => {
-    try { return JSON.parse(localStorage.getItem("hrbp-triage") || "{}"); } catch (e) { return {}; }
+    try { return JSON.parse(localStorage.getItem(wsKey("hrbp-triage", ws.id)) || "{}"); } catch (e) { return {}; }
   });
   const setChangeStatus = React.useCallback((ids, st) => {
     setStatusMap((prev) => {
       const ts = new Date().toISOString().slice(0, 10);
       const next = { ...prev };
       (Array.isArray(ids) ? ids : [ids]).forEach((id) => { next[id] = { st, ts }; });
-      try { localStorage.setItem("hrbp-triage", JSON.stringify(next)); } catch (e) {}
+      try { localStorage.setItem(wsKey("hrbp-triage", ws.id), JSON.stringify(next)); } catch (e) {}
       return next;
     });
-  }, []);
+  }, [ws.id]);
   const [lastScanFound, setLastScanFound] = React.useState(null);
   const [initialLoading, setInitialLoading] = React.useState(true);
   const [kbDocs, setKbDocs] = React.useState([]);
   React.useEffect(() => {
-    fetchPersistedState().then((state) => {
+    fetchPersistedState(ws.id).then((state) => {
       if (!state.sources.length) return; // no run yet (or no Blob store attached) — keep seed data
       setSources((prev) => prev.map((s) => {
         const p = state.sources.find((x) => x.id === s.id);
@@ -137,16 +178,16 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
       }
     }).catch((e) => console.error("Persisted state fetch failed:", e)) // under plain vite dev/preview /api doesn't exist — falls back to seed data
       .finally(() => setInitialLoading(false));
-    fetchKbDocs().then(setKbDocs).catch((e) => console.error("KB docs fetch failed:", e)); // same plain-vite-dev caveat as above
-  }, []);
-  const addKb = React.useCallback((doc) => addKbDoc(doc).then((saved) => setKbDocs((prev) => [saved, ...prev])), []);
+    fetchKbDocs(ws.id).then(setKbDocs).catch((e) => console.error("KB docs fetch failed:", e)); // same plain-vite-dev caveat as above
+  }, [ws.id]);
+  const addKb = React.useCallback((doc) => addKbDoc(ws.id, doc).then((saved) => setKbDocs((prev) => [saved, ...prev])), [ws.id]);
   const runScan = React.useCallback(() => {
     if (scanning) return;
     setScanning(true);
     // "From" alone is a valid period (backend defaults "to" = today); swap if reversed.
     const [f, to] = scanFrom && scanTo && scanFrom > scanTo ? [scanTo, scanFrom] : [scanFrom, scanTo];
     const range = f ? { from: f, to: to || undefined } : undefined;
-    forceScan(sources.filter((s) => s.active), range).then((results) => {
+    forceScan(ws.id, sources.filter((s) => s.active), range).then((results) => {
       setLastScanFound(results.reduce((n, r) => n + (r.found || 0), 0));
       setSources((prev) => prev.map((s) => {
         const r = results.find((x) => x.id === s.id);
@@ -172,8 +213,8 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
       console.error("Scan failed:", e);
       setScanning(false);
     });
-  }, [scanning, sources, scanFrom, scanTo]);
-  const t = HRBP_I18N[lang];
+  }, [ws.id, scanning, sources, scanFrom, scanTo]);
+  const t = tFor(lang, ws);
   const [notifOpen, setNotifOpen] = React.useState(false);
   const notifRef = React.useRef(null);
   React.useEffect(() => {
@@ -187,9 +228,9 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
   const notifKb = kbDocs.filter((k) => k.needsUpdate);
   const notifTotal = notifChanges.length + notifKb.length;
   const [readIds, setReadIds] = React.useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("hrbp-notifs-read") || "[]")); } catch (e) { return new Set(); }
+    try { return new Set(JSON.parse(localStorage.getItem(wsKey("hrbp-notifs-read", ws.id)) || "[]")); } catch (e) { return new Set(); }
   });
-  const persistRead = (next) => { setReadIds(next); try { localStorage.setItem("hrbp-notifs-read", JSON.stringify([...next])); } catch (e) {} };
+  const persistRead = (next) => { setReadIds(next); try { localStorage.setItem(wsKey("hrbp-notifs-read", ws.id), JSON.stringify([...next])); } catch (e) {} };
   const markRead = (key) => { if (readIds.has(key)) return; persistRead(new Set(readIds).add(key)); };
   const markAllRead = () => { const next = new Set(readIds); notifChanges.forEach((c) => next.add(`c${c.id}`)); notifKb.forEach((k) => next.add(`k${k.id}`)); persistRead(next); };
   const unreadTotal = notifChanges.filter((c) => !readIds.has(`c${c.id}`)).length + notifKb.filter((k) => !readIds.has(`k${k.id}`)).length;
@@ -204,13 +245,13 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
       {!isMobile && (
         <SidebarNav
           items={items} activeId={active} onSelect={setActive}
-          header={<Wordmark />}
+          header={<div><Wordmark t={t} /><WorkspaceSwitch ws={ws} setWorkspace={setWorkspace} lang={lang} t={t} /></div>}
           footer={
             <button onClick={() => setActive("settings")} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", border: "none", background: "transparent", cursor: "pointer", padding: 0, textAlign: "left" }}>
-              <Avatar name="HR Partner" size="sm" tone={1} />
+              <Avatar name={t.persona} size="sm" tone={1} />
               <div style={{ lineHeight: 1.2, overflow: "hidden" }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-heading)", whiteSpace: "nowrap" }}>HR Partner</div>
-                <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>HR Business Partner</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-heading)", whiteSpace: "nowrap" }}>{t.persona}</div>
+                <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{t.wsLabel} · {t.app}</div>
               </div>
             </button>
           }
@@ -221,14 +262,14 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
           height: "var(--topbar-h)", flex: "0 0 var(--topbar-h)", display: "flex", alignItems: "center",
           gap: isMobile ? 10 : 16, padding: isMobile ? "0 14px" : "0 24px", background: "var(--surface)", borderBottom: "1px solid var(--border-subtle)",
         }}>
-          {isMobile && <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, letterSpacing: ".03em", textTransform: "uppercase", color: "var(--text-heading)", whiteSpace: "nowrap" }}>HR BP Platform</span>}
+          {isMobile && <WorkspaceSwitch ws={ws} setWorkspace={setWorkspace} lang={lang} t={t} compact />}
           <div style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: isMobile ? 13.5 : 15, color: "var(--text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {t.nav[active] || t.app}
           </div>
           {!isMobile && (
             <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em", color: role === "viewer" ? "var(--amber-600)" : "var(--brand)", background: role === "viewer" ? "var(--amber-100)" : "var(--brand-soft)", padding: "4px 10px", borderRadius: "var(--radius-pill)" }}>
               <Icon name={role === "viewer" ? "eye" : "shield-check"} size={12} />
-              {role === "viewer" ? t.roleViewer : t.roleHrbp}
+              {role === "viewer" ? t.roleViewer : t.persona}
             </span>
           )}
           <div style={{ flex: 1 }} />
@@ -297,7 +338,7 @@ export function AppShell({ lang, setLang, active, setActive, children, role: rol
         </header>
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb }) : children}
+            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, role, setRole, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb }) : children}
           </div>
         </main>
       </div>

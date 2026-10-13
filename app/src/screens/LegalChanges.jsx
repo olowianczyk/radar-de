@@ -2,7 +2,8 @@
 import React from "react";
 import { Card, StatCard, StatusPill, Badge, Button, Input, Tabs, Icon, Select, Checkbox } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
-import { HRBP_I18N, HRBP_KB, HRBP_STATUS_MAP, HRBP_AREA_TONE } from "../data.js";
+import { HRBP_STATUS_MAP } from "../data.js";
+import { tFor, areaTone } from "../workspaces.js";
 import { latestIsapCheck } from "../isapIntegration.js";
 
 function parseDMY(s) {
@@ -26,8 +27,7 @@ function periodRange(period, customDate) {
   return [null, null];
 }
 
-function ScanBanner({ lang, sources, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo, lastScanFound }) {
-  const t = HRBP_I18N[lang];
+function ScanBanner({ t, sources, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo, lastScanFound }) {
   return (
     <div style={{ display: "flex", alignItems: "flex-end", gap: 10, background: "var(--brand-soft)", color: "var(--on-brand-soft)", padding: "10px 16px", borderRadius: "var(--radius-md)", fontSize: 13, flexWrap: "wrap" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingBottom: 10 }}>
@@ -47,8 +47,8 @@ function ScanBanner({ lang, sources, scanning, runScan, scanFrom, setScanFrom, s
   );
 }
 
-export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role, sources, scanning, runScan, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound }) {
-  const t = HRBP_I18N[lang];
+export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, role, sources, scanning, runScan, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound }) {
+  const t = tFor(lang, ws);
   const [period, setPeriod] = React.useState("all");
   const [customDate, setCustomDate] = React.useState("");
   const [tab, setTab] = React.useState("all");
@@ -78,7 +78,10 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
   // print.html is a separate static page — hand it the rows via localStorage
   // (real scan data lives only in React state, not in any static file).
   const openPrint = (rows) => {
-    try { localStorage.setItem("hrbp-print", JSON.stringify(rows)); } catch (e) {}
+    // Area labels are workspace-specific, so resolve them here — print.html only
+    // has the shared dictionary.
+    const printable = rows.map((c) => ({ ...c, areaLabel: t.area[c.area] || t.area.other, product: t.product, wsLabel: t.wsLabel, appTitle: t.app }));
+    try { localStorage.setItem("hrbp-print", JSON.stringify(printable)); } catch (e) {}
     window.open(`${printBase || "print.html"}?lang=${lang}`, "_blank");
   };
   const exportPdf = () => openPrint(filtered);
@@ -86,7 +89,7 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
   const exportSelectedPdf = () => openPrint(filtered.filter((c) => selected.has(c.id)));
   function exportCsvFor(rows) {
     const header = t.csvHeader;
-    const data = rows.map((c) => [c.act, c.title[lang], t.area[c.area], t.st[c.status], c.date, c.effective, c.source]);
+    const data = rows.map((c) => [c.act, c.title[lang], t.area[c.area] || t.area.other, t.st[c.status], c.date, c.effective, c.source]);
     const esc = (v) => `"${String(v).replace(/"/g, '""')}"`;
     const csv = [header, ...data].map((r) => r.map(esc).join(",")).join("\r\n");
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
@@ -106,7 +109,7 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
           return (f[new Intl.PluralRules(lang).select(n)] || f.many || f.other).replace("{n}", String(n));
         })()}</p>
       </div>
-      <ScanBanner lang={lang} sources={sources} scanning={scanning} runScan={runScan} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} lastScanFound={lastScanFound} />
+      <ScanBanner t={t} sources={sources} scanning={scanning} runScan={runScan} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} lastScanFound={lastScanFound} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
         <StatCard label={t.kpi.new} value={String(newCount)} accent="danger" icon={<Icon name="sparkles" size={18} />} />
         <StatCard label={t.kpi.pending} value={String(pendingCount)} accent="petrol" icon={<Icon name="clock" size={18} />} />
@@ -182,7 +185,7 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
                     <StatusPill status={HRBP_STATUS_MAP[c.status]} lang={lang} />
-                    <Badge tone={HRBP_AREA_TONE[c.area]}>{t.area[c.area]}</Badge>
+                    <Badge tone={areaTone(ws, c.area)}>{t.area[c.area] || t.area.other}</Badge>
                   </div>
                 </div>
               </Card>
@@ -208,15 +211,13 @@ export function LegalChanges({ lang, selectedId, setSelectedId, printBase, role,
                 <Meta label={t.source} value={/^https?:/.test(sel.source) ? <a href={sel.source} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>ISAP ↗</a> : sel.source} small />
               </div>
               <p style={{ margin: 0, color: "var(--text-body)", fontSize: 14, lineHeight: 1.6 }}>{sel.summary[lang]}</p>
-              {sel.affected.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, marginBottom: 8 }}>{t.affected}</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {sel.affected.map((docId) => {
-                      const doc = HRBP_KB.find((k) => k.id === docId);
-                      return doc ? <Badge key={docId} tone="neutral"><Icon name={doc.icon} size={11} /> {doc.title[lang]}</Badge> : null;
-                    })}
+              {sel.matchedBy && (
+                <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Icon name="crosshair" size={12} />{t.foundVia}</div>
+                  <div style={{ fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.55 }}>
+                    {t.source}: <strong>{sel.matchedBy.sourceName}</strong> · {sel.matchedBy.mode === "keyword" ? t.scopeMatchKeyword : t.scopeMatchTitle} <span style={{ fontFamily: "var(--font-mono)" }}>„{sel.matchedBy.term}”</span> · {t.scopeRegisterValue} · {t.foundViaDate} {sel.date}{sel.actType ? <> · {t.actType}: {sel.actType}</> : null}
                   </div>
+                  <a href={sel.matchedBy.queryUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="external-link" size={12} />{t.scopeOpenQuery}</a>
                 </div>
               )}
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>

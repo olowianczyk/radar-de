@@ -1,35 +1,197 @@
-// Monitored sources — legal acts/gazettes scanned automatically; toggle monitoring per source.
+// Monitored sources — legal acts scanned automatically via the Sejm/ELI API.
+// The point of this screen is transparency: for every source it spells out
+// exactly what is searched (register, match mode and term, date window, limit),
+// whether its keyword even exists in the Sejm thesaurus, and links the literal
+// API query so anyone can replay it.
 import React from "react";
-import { Card, Badge, Switch, Icon, Button, IconButton, Input } from "../components/index.js";
-import { HRBP_I18N } from "../data.js";
+import { Card, Badge, Switch, Icon, Button, IconButton, Input, Select } from "../components/index.js";
+import { tFor } from "../workspaces.js";
+import { fetchKeywords, sourceQueryUrl, nextScanRange } from "../isapIntegration.js";
 
-export function Sources({ lang, role, sources, setSources, sourceHistory, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo }) {
+function fmtIso(iso, lang) {
+  const [y, m, d] = (iso || "").split("-");
+  if (!y) return iso || "";
+  return lang === "en" ? `${d}/${m}/${y}` : `${d}.${m}.${y}`;
+}
+
+// Thesaurus lookup state: undefined = loading, null = fetch failed, Set = loaded.
+function useKeywordThesaurus() {
+  const [kw, setKw] = React.useState(undefined);
+  React.useEffect(() => {
+    let alive = true;
+    fetchKeywords()
+      .then((list) => { if (alive) setKw(list); })
+      .catch(() => { if (alive) setKw(null); }); // plain vite dev has no /api — degrade to "unknown"
+    return () => { alive = false; };
+  }, []);
+  const set = React.useMemo(() => (Array.isArray(kw) ? new Set(kw.map((k) => k.toLowerCase())) : kw), [kw]);
+  const suggest = React.useCallback((term) => {
+    if (!Array.isArray(kw) || !term) return [];
+    const stem = term.toLowerCase().split(/\s+/)[0].slice(0, 6);
+    if (stem.length < 3) return [];
+    return kw.filter((k) => k.toLowerCase().includes(stem)).slice(0, 4);
+  }, [kw]);
+  return { set, suggest };
+}
+
+function KeywordStatus({ source, thesaurus, t }) {
+  if (!source.keyword) return null;
+  const { set, suggest } = thesaurus;
+  let tone, icon, label;
+  if (set === undefined) { tone = "var(--text-muted)"; icon = "loader-2"; label = t.kwChecking; }
+  else if (set === null) { tone = "var(--text-muted)"; icon = "help-circle"; label = t.kwUnknown; }
+  else if (set.has(source.keyword.toLowerCase())) { tone = "var(--success-600)"; icon = "check-circle-2"; label = t.kwValid; }
+  else { tone = "var(--danger-600)"; icon = "alert-triangle"; label = t.kwInvalid; }
+  const sugg = set && !set.has(source.keyword.toLowerCase()) ? suggest(source.keyword) : [];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: tone }}>
+        <Icon name={icon} size={12} className={set === undefined ? "hrbp-spin" : ""} />{label}
+      </span>
+      {sugg.length > 0 && (
+        <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{t.kwSuggest}: {sugg.map((k) => `„${k}”`).join(", ")}</span>
+      )}
+    </div>
+  );
+}
+
+function ScopeRow({ label, children }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 150 }}>
+      <span style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600 }}>{label}</span>
+      <span style={{ fontSize: 13, color: "var(--text-heading)", fontWeight: 600 }}>{children}</span>
+    </div>
+  );
+}
+
+function ScopePanel({ source, lang, t, thesaurus }) {
+  const range = nextScanRange(source);
+  const note = source.scope ? (source.scope[lang] || source.scope.pl) : null;
+  const scannable = !!(source.keyword || source.title);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px", background: "var(--surface-card)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 700, color: "var(--text-heading)" }}>
+        <Icon name="crosshair" size={14} />{t.scopeTitle}
+      </div>
+      {scannable ? (
+        <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+          <ScopeRow label={t.scopeRegister}>{t.scopeRegisterValue}</ScopeRow>
+          <ScopeRow label={t.scopeMatch}>
+            <span style={{ fontWeight: 500, color: "var(--text-muted)" }}>{source.keyword ? t.scopeMatchKeyword : t.scopeMatchTitle}</span>{" "}
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5 }}>„{source.keyword || source.title}”</span>
+            <KeywordStatus source={source} thesaurus={thesaurus} t={t} />
+          </ScopeRow>
+          <ScopeRow label={t.scopeNext}>
+            {range.first ? t.scopeSinceYearStart.replace("{y}", range.from.slice(0, 4)) : t.scopeSinceLast.replace("{d}", fmtIso(range.from, lang))}
+          </ScopeRow>
+          <ScopeRow label={t.scopeLimit}>{t.scopeLimitValue}</ScopeRow>
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--amber-600)" }}><Icon name="radar" size={13} />{t.noAutoScan}</div>
+      )}
+      {note && (
+        <div style={{ fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.55 }}>
+          <span style={{ fontWeight: 600, color: "var(--text-heading)" }}>{t.scopeNote}: </span>{note}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+        {scannable && (
+          <a href={sourceQueryUrl(source, range.from, range.to)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <Icon name="external-link" size={12} />{t.scopeOpenQuery}
+          </a>
+        )}
+        {source.url && (
+          <a href={source.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <Icon name="external-link" size={12} />{/isap/.test(source.url) ? "ISAP" : source.url.replace(/^https?:\/\//, "")}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HowItWorks({ t }) {
+  const [open, setOpen] = React.useState(() => {
+    try { return localStorage.getItem("hrbp-scope-how") !== "collapsed"; } catch (e) { return true; }
+  });
+  const toggle = () => setOpen((v) => { try { localStorage.setItem("hrbp-scope-how", v ? "collapsed" : "open"); } catch (e) {} return !v; });
+  return (
+    <Card padding="lg" style={{ background: "var(--brand-soft)", borderColor: "transparent" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Icon name="info" size={18} style={{ color: "var(--brand)" }} />
+        <div style={{ flex: 1, fontWeight: 700, fontSize: 14, color: "var(--on-brand-soft)" }}>{t.scopeHowTitle}</div>
+        <Button variant="ghost" size="sm" onClick={toggle} iconLeft={<Icon name={open ? "chevron-up" : "chevron-down"} size={14} />}>{open ? t.scopeHowHide : t.scopeHowShow}</Button>
+      </div>
+      {open && (
+        <ol style={{ margin: "12px 0 0", paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, fontSize: 13, lineHeight: 1.55, color: "var(--on-brand-soft)" }}>
+          {t.scopeHow.map((line, i) => <li key={i}>{line}</li>)}
+        </ol>
+      )}
+    </Card>
+  );
+}
+
+function AddSourceForm({ t, ws, onAdd, onCancel }) {
+  const [name, setName] = React.useState("");
+  const [mode, setMode] = React.useState("keyword");
+  const [term, setTerm] = React.useState("");
+  const [area, setArea] = React.useState("other");
+  const valid = name.trim() && term.trim();
+  return (
+    <Card padding="lg">
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-heading)" }}>{t.addSourceTitle}</div>
+        <Input label={t.srcName} value={name} onChange={(e) => setName(e.target.value)} />
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ width: 220 }}>
+            <Select label={t.srcMode} value={mode} onChange={(e) => setMode(e.target.value)} options={[{ value: "keyword", label: t.scopeMatchKeyword }, { value: "title", label: t.scopeMatchTitle }]} />
+          </div>
+          <div style={{ flex: 1, minWidth: 220 }}><Input label={mode === "keyword" ? t.srcTerm : t.srcTermTitle} value={term} onChange={(e) => setTerm(e.target.value)} /></div>
+          <div style={{ width: 220 }}>
+            <Select label={t.srcArea} value={area} onChange={(e) => setArea(e.target.value)} options={Object.keys(ws.areas).map((k) => ({ value: k, label: t.area[k] }))} />
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{t.scopeHow[1]}</div>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <Button variant="ghost" onClick={onCancel}>{t.srcCancel}</Button>
+          <Button variant="primary" disabled={!valid} onClick={() => onAdd({ name: name.trim(), mode, term: term.trim(), area })}>{t.srcAdd}</Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+export function Sources({ lang, ws, role, sources, setSources, sourceHistory, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo }) {
   const [expanded, setExpanded] = React.useState(null);
+  const [adding, setAdding] = React.useState(false);
+  const thesaurus = useKeywordThesaurus();
+  const t = tFor(lang, ws);
   // Only "detected" events are ever recorded (see api/_lib.js scanSources) —
   // toggling monitoring is a local UI flag, not a history event.
-  const eventMeta = {
-    detected: { icon: "sparkles", color: "var(--brand)", label: (t) => t.evDetected },
-  };
+  const eventMeta = { detected: { icon: "sparkles", color: "var(--brand)", label: (tt) => tt.evDetected } };
   const toggle = (id) => setSources((prev) => prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s)));
-  const t = HRBP_I18N[lang];
+  const defaultIds = new Set(ws.sources.map((s) => s.id));
 
-  // ponytail: window.prompt over a form — two fields, native covers it.
-  const addSource = () => {
-    const name = window.prompt(t.sourcesTitle + " — nazwa aktu / źródła:");
-    if (!name || !name.trim()) return;
-    const keyword = (window.prompt("Słowo kluczowe wyszukiwania w API Sejmu (puste = źródło bez automatycznego skanu):") || "").trim() || null;
+  const addSource = ({ name, mode, term, area }) => {
     const id = Math.max(0, ...sources.map((s) => s.id)) + 1;
-    setSources((prev) => [...prev, { id, name: name.trim(), type: "Ustawa", url: "https://isap.sejm.gov.pl", keyword, area: "other", lastChecked: null, found: 0, active: true }]);
+    setSources((prev) => [...prev, {
+      id, name, type: "Ustawa", url: "https://isap.sejm.gov.pl", area,
+      keyword: mode === "keyword" ? term : null, title: mode === "title" ? term : null,
+      lastChecked: null, found: 0, active: true, scope: null,
+    }]);
+    setAdding(false);
+    setExpanded(id);
   };
+  const removeSource = (id) => setSources((prev) => prev.filter((s) => s.id !== id));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 14 }}>{t.sourcesSub}</p>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Button variant="secondary" iconLeft={<Icon name="plus" size={16} />} disabled={role === "viewer"} onClick={addSource}>+ {t.sourcesTitle}</Button>
-        </div>
+        <Button variant="secondary" iconLeft={<Icon name="plus" size={16} />} disabled={role === "viewer"} onClick={() => setAdding((v) => !v)}>{t.addSourceTitle}</Button>
       </div>
+      <HowItWorks t={t} />
+      {adding && <AddSourceForm t={t} ws={ws} onAdd={addSource} onCancel={() => setAdding(false)} />}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ width: 160 }}><Input type="date" label={t.periodFrom} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} /></div>
         <div style={{ width: 160 }}><Input type="date" label={t.periodTo} value={scanTo} onChange={(e) => setScanTo(e.target.value)} /></div>
@@ -47,6 +209,8 @@ export function Sources({ lang, role, sources, setSources, sourceHistory, scanni
         {sources.map((s, i) => {
           const isOpen = expanded === s.id;
           const hist = sourceHistory[s.id] || [];
+          const scannable = !!(s.keyword || s.title);
+          const kwBad = s.keyword && thesaurus.set && !thesaurus.set.has(s.keyword.toLowerCase());
           return (
             <React.Fragment key={s.id}>
               <div style={{
@@ -58,22 +222,37 @@ export function Sources({ lang, role, sources, setSources, sourceHistory, scanni
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14 }}>{s.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{t.lastChecked}: {s.lastChecked || "—"}</div>
-                  {s.error && <div style={{ fontSize: 11.5, color: "var(--red-600, #c0392b)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{s.error}</div>}
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    {scannable ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: kwBad ? "var(--danger-600)" : "var(--success-500)", flex: "0 0 7px" }} />
+                        {s.keyword ? t.scopeMatchKeyword : t.scopeMatchTitle}: <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-heading)" }}>„{s.keyword || s.title}”</span>
+                      </span>
+                    ) : (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--amber-600)" }}><Icon name="radar" size={12} />{t.noAutoScan}</span>
+                    )}
+                    <span>· {t.lastChecked}: {s.lastChecked || "—"}</span>
+                  </div>
+                  {s.error && <div style={{ fontSize: 11.5, color: "var(--danger-600)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{s.error}</div>}
                 </div>
                 <Badge tone="neutral">{s.type}</Badge>
-                {s.url && <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: "var(--brand)", display: "flex", alignItems: "center", gap: 4, flex: "0 0 auto" }}><Icon name="external-link" size={12} />ISAP</a>}
+                <Badge tone="neutral">{t.area[s.area] || t.area.other}</Badge>
                 <div style={{ minWidth: 90, textAlign: "center" }}>
                   <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 20, color: hist.length ? "var(--brand)" : "var(--ink-300)" }}>{hist.length}</div>
                   <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".04em" }}>{t.changesFound}</div>
                 </div>
                 <Switch checked={s.active} onChange={() => toggle(s.id)} disabled={role === "viewer"} />
-                <IconButton label={t.history} active={isOpen} onClick={() => setExpanded(isOpen ? null : s.id)}>
-                  <Icon name={isOpen ? "chevron-up" : "history"} size={16} />
+                <IconButton label={t.scopeTitle} active={isOpen} onClick={() => setExpanded(isOpen ? null : s.id)}>
+                  <Icon name={isOpen ? "chevron-up" : "crosshair"} size={16} />
                 </IconButton>
               </div>
               {isOpen && (
-                <div style={{ padding: "4px 20px 18px 74px", display: "flex", flexDirection: "column", gap: 10, background: "var(--surface-sunken)" }}>
+                <div style={{ padding: "4px 20px 18px 74px", display: "flex", flexDirection: "column", gap: 12, background: "var(--surface-sunken)" }}>
+                  <ScopePanel source={s} lang={lang} t={t} thesaurus={thesaurus} />
+                  {!defaultIds.has(s.id) && role !== "viewer" && (
+                    <div><Button variant="ghost" size="sm" iconLeft={<Icon name="trash-2" size={14} />} onClick={() => removeSource(s.id)}>{t.srcRemove}</Button></div>
+                  )}
+                  {hist.length > 0 && <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-heading)", marginTop: 4 }}>{t.history}</div>}
                   {hist.map((ev, j) => {
                     const meta = eventMeta[ev.type] || eventMeta.detected;
                     return (
@@ -82,7 +261,7 @@ export function Sources({ lang, role, sources, setSources, sourceHistory, scanni
                           <Icon name={meta.icon} size={12} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-heading)" }}>{meta.label(t)}</div>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-heading)" }}>{meta.label(t)}{ev.actType ? <span style={{ fontWeight: 500, color: "var(--text-muted)" }}> · {ev.actType}</span> : null}</div>
                           <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
                             {ev.url ? <a href={ev.url} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>{ev.note}</a> : ev.note}
                           </div>

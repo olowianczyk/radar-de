@@ -6,8 +6,10 @@
 // forceScan() calls OUR OWN backend (/api/scan-all, see /api/_lib.js at the repo
 // root) rather than the Sejm API directly — the frontend no longer talks to the
 // third party itself. The backend also runs on a daily Vercel Cron independent of
-// any browser being open (see vercel.json).
+// any browser being open (see vercel.json), for every workspace.
 //
+const SEJM_SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
+
 function parseDMYHM(s) {
   const [datePart, timePart] = (s || "").split(" ");
   const [d, m, y] = (datePart || "").split(".").map(Number);
@@ -19,35 +21,66 @@ export function latestIsapCheck(sources) {
   return sources.reduce((latest, s) => (parseDMYHM(s.lastChecked) > parseDMYHM(latest) ? s.lastChecked : latest), sources[0]?.lastChecked || "");
 }
 
-// Manually forces the scan that otherwise only runs automatically at 06:00 (via
-// the Vercel Cron hitting this same backend endpoint — see vercel.json). Calls
-// our own /api/scan-all with each active source's real keyword + lastChecked, so
-// the check is scoped to "what's new since we last looked", not a fixed window.
-// Reads back whatever /api/scan-all last persisted (manual run or the daily
-// cron) so a page load after an overnight cron run shows real, current state
-// instead of the seed data — see /api/state.js and _lib.js's loadState/saveState.
-export async function fetchPersistedState() {
-  const res = await fetch("/api/state");
+// Reads back whatever /api/scan-all last persisted for this workspace (manual
+// run or the daily cron) so a page load after an overnight cron run shows real,
+// current state instead of the seed data — see /api/state.js.
+export async function fetchPersistedState(ws) {
+  const res = await fetch(`/api/state?ws=${encodeURIComponent(ws)}`);
   if (!res.ok) throw new Error(`state fetch failed: ${res.status}`);
   return res.json();
 }
 
-export async function fetchKbDocs() {
-  const res = await fetch("/api/kb");
+export async function fetchKbDocs(ws) {
+  const res = await fetch(`/api/kb?ws=${encodeURIComponent(ws)}`);
   if (!res.ok) throw new Error(`kb fetch failed: ${res.status}`);
   const data = await res.json();
   return data.docs || [];
 }
 
-export async function addKbDoc({ title, area, body }) {
+export async function addKbDoc(ws, { title, area, body }) {
   const res = await fetch("/api/kb", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, area, body }),
+    body: JSON.stringify({ workspace: ws, title, area, body }),
   });
   if (!res.ok) throw new Error(`kb add failed: ${res.status}`);
   const data = await res.json();
   return data.doc;
+}
+
+// The Sejm's closed subject-keyword thesaurus (via our /api/keywords proxy).
+// Used only to tell the user whether a keyword-mode source can match anything.
+export async function fetchKeywords() {
+  const res = await fetch("/api/keywords");
+  if (!res.ok) throw new Error(`keywords fetch failed: ${res.status}`);
+  const data = await res.json();
+  return data.keywords || [];
+}
+
+// Exactly the query the backend runs for a source (see /api/_lib.js
+// buildSearchParams) — surfaced in the UI so "what did we actually search"
+// is never a guess. `dateFrom`/`dateTo` as YYYY-MM-DD.
+export function sourceQueryUrl(source, dateFrom, dateTo) {
+  const params = new URLSearchParams({ publisher: "DU", limit: "100" });
+  if (source.keyword) params.set("keyword", source.keyword);
+  else if (source.title) params.set("title", source.title);
+  if (dateFrom) params.set("dateFrom", dateFrom);
+  if (dateTo) params.set("dateTo", dateTo);
+  return `${SEJM_SEARCH_URL}?${params.toString()}`;
+}
+
+export function isoToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+// What the NEXT incremental scan of this source will cover — mirrors the
+// backend's fallback chain (lastChecked → start of year).
+export function nextScanRange(source) {
+  const datePart = (source.lastChecked || "").split(" ")[0];
+  const [d, m, y] = datePart.split(".").map(Number);
+  if (d) return { from: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`, to: isoToday(), first: false };
+  return { from: `${new Date().getFullYear()}-01-01`, to: isoToday(), first: true };
 }
 
 // Builds the "legal changes" feed from real scan history instead of hand-written
@@ -58,6 +91,7 @@ export async function addKbDoc({ title, area, body }) {
 // no effective date until someone reviews it — no fabricated placeholder values.
 // `statusMap` (optional) = user's persisted triage decisions keyed by change id:
 // { [id]: { st: "progress"|"done"|…, ts: "YYYY-MM-DD" } }. Untriaged stays "new".
+// `matchedBy` records how the source found it, for the "How it was found" panel.
 export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
   const changes = [];
   Object.entries(sourceHistory || {}).forEach(([sourceId, events]) => {
@@ -67,19 +101,29 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
       const summary = { pl: e.note, de: e.note, en: e.note };
       const id = e.eli || `${sourceId}-${e.ts}`;
       const triage = (statusMap || {})[id];
+      const date = (e.ts || "").split(" ")[0];
+      const [dd, mm, yy] = date.split(".");
+      const iso = dd && mm && yy ? `${yy}-${mm}-${dd}` : undefined;
       changes.push({
         id,
         eli: e.eli,
         act: source.name,
         area: source.area,
+        actType: e.actType,
         status: triage ? triage.st : "new",
         statusTs: triage ? triage.ts : null,
-        date: (e.ts || "").split(" ")[0],
+        date,
         effective: "—",
         source: e.url || source.url,
         title: { pl: e.note, de: e.note, en: e.note },
         summary,
         affected: [],
+        matchedBy: {
+          sourceName: source.name,
+          mode: source.keyword ? "keyword" : "title",
+          term: source.keyword || source.title || "",
+          queryUrl: sourceQueryUrl(source, iso, iso),
+        },
       });
     });
   });
@@ -89,12 +133,13 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
 
 // `range`, when given ({from, to} as YYYY-MM-DD), overrides each source's
 // "since last checked" default with a user-picked period.
-export async function forceScan(activeSources, range) {
+export async function forceScan(ws, activeSources, range) {
   const res = await fetch("/api/scan-all", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      sources: activeSources.map((s) => ({ id: s.id, keyword: s.keyword, lastChecked: s.lastChecked })),
+      workspace: ws,
+      sources: activeSources.map((s) => ({ id: s.id, keyword: s.keyword, title: s.title, lastChecked: s.lastChecked })),
       ...(range ? { dateFrom: range.from, dateTo: range.to } : {}),
     }),
   });
@@ -102,4 +147,3 @@ export async function forceScan(activeSources, range) {
   const data = await res.json();
   return data.results;
 }
-
