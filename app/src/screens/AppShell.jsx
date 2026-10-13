@@ -239,6 +239,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
     { id: "feed", label: t.nav.feed, icon: <Icon name="scale" size={18} />, badge: newCount },
     { id: "kb", label: t.nav.kb, icon: <Icon name="book-open" size={18} /> },
     { id: "sources", label: t.nav.sources, icon: <Icon name="radar" size={18} /> },
+    { id: "help", label: t.nav.help, icon: <Icon name="help-circle" size={18} /> },
   ];
   return (
     <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "100vh", background: "var(--canvas)", overflow: "hidden" }}>

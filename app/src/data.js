@@ -2,7 +2,7 @@
 // Department-specific content (sources, areas) lives in workspaces.js.
 export const HRBP_I18N = {
   pl: {
-    app: "Monitoring zmian w prawie pracy", nav: { feed: "Zmiany w przepisach", kb: "Baza wiedzy", sources: "Monitorowane źródła", settings: "Ustawienia" },
+    app: "Monitoring zmian w prawie pracy", nav: { feed: "Zmiany w przepisach", kb: "Baza wiedzy", sources: "Monitorowane źródła", help: "Instrukcja", settings: "Ustawienia" },
     greet: "Dzień dobry", greetSubForms: { one: "Wykryto {n} nową zmianę w przepisach wymagającą przeglądu", few: "Wykryto {n} nowe zmiany w przepisach wymagające przeglądu", many: "Wykryto {n} nowych zmian w przepisach wymagających przeglądu" },
     kpi: { new: "Nowe zmiany", pending: "Do wdrożenia", tracked: "Monitorowane akty", updated: "Wdrożone w tym mies." },
     recent: "Najnowsze zmiany", all: "Wszystkie zmiany",
@@ -62,7 +62,7 @@ export const HRBP_I18N = {
     notifications: "Powiadomienia", notificationsEmpty: "Brak nowych powiadomień", notifKbNeedsUpdate: "Dokument wymaga aktualizacji", markAllRead: "Oznacz wszystkie jako przeczytane",
   },
   de: {
-    app: "Überwachung arbeitsrechtlicher Änderungen", nav: { feed: "Rechtsänderungen", kb: "Wissensbasis", sources: "Überwachte Quellen", settings: "Einstellungen" },
+    app: "Überwachung arbeitsrechtlicher Änderungen", nav: { feed: "Rechtsänderungen", kb: "Wissensbasis", sources: "Überwachte Quellen", help: "Anleitung", settings: "Einstellungen" },
     greet: "Guten Morgen", greetSubForms: { one: "{n} neue Rechtsänderung zur Prüfung erkannt", other: "{n} neue Rechtsänderungen zur Prüfung erkannt" },
     kpi: { new: "Neue Änderungen", pending: "Zur Umsetzung", tracked: "Überwachte Rechtsakte", updated: "Umgesetzt diesen Monat" },
     recent: "Neueste Änderungen", all: "Alle Änderungen",
@@ -122,7 +122,7 @@ export const HRBP_I18N = {
     notifications: "Benachrichtigungen", notificationsEmpty: "Keine neuen Benachrichtigungen", notifKbNeedsUpdate: "Dokument benötigt Aktualisierung", markAllRead: "Alle als gelesen markieren",
   },
   en: {
-    app: "Labor-law change monitoring", nav: { feed: "Legal changes", kb: "Knowledge base", sources: "Monitored sources", settings: "Settings" },
+    app: "Labor-law change monitoring", nav: { feed: "Legal changes", kb: "Knowledge base", sources: "Monitored sources", help: "User guide", settings: "Settings" },
     greet: "Good morning", greetSubForms: { one: "{n} new legal change detected for review", other: "{n} new legal changes detected for review" },
     kpi: { new: "New changes", pending: "Pending rollout", tracked: "Tracked acts", updated: "Implemented this month" },
     recent: "Recent changes", all: "View all",
