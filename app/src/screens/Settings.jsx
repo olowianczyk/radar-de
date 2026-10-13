@@ -3,7 +3,10 @@
 // link by design, so nothing here pretends otherwise.
 import React from "react";
 import { Card, Avatar, Select, Switch, Badge, Icon } from "../components/index.js";
-import { tFor } from "../workspaces.js";
+import { tFor, ACCENTS, WORKSPACES } from "../workspaces.js";
+
+// Representative swatch per accent (light-theme primary) — purely for the picker.
+const SWATCH = { teal: "#00727e", ocean: "#1f5fa8", plum: "#6b3fa0", terracotta: "#b4472c", forest: "#2f6b3f", graphite: "#3d4a52" };
 
 function Row({ label, children }) {
   return (
@@ -14,7 +17,8 @@ function Row({ label, children }) {
   );
 }
 
-export function Settings({ lang, ws, setLang, dark, setDark }) {
+export function Settings({ lang, ws, setLang, appearance }) {
+  const { theme, setTheme, accent, setAccent, effectiveAccent } = appearance;
   const [saved, setSaved] = React.useState(false);
   const tRoot = tFor(lang, ws);
   const t = tRoot.settings;
@@ -42,7 +46,37 @@ export function Settings({ lang, ws, setLang, dark, setDark }) {
               options={[{ value: "pl", label: "Polski" }, { value: "de", label: "Deutsch" }, { value: "en", label: "English" }]}
               style={{ width: 150 }} />
           </Row>
-          <Row label={t.darkMode}><Switch checked={!!dark} onChange={(v) => { setDark(v); flash(); }} /></Row>
+          <Row label={t.theme}>
+            <div role="radiogroup" aria-label={t.theme} style={{ display: "flex", background: "var(--surface-sunken)", borderRadius: "var(--radius-pill)", padding: 3, gap: 2 }}>
+              {["light", "dark", "system"].map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={theme === m} onClick={() => { setTheme(m); flash(); }} style={{
+                  border: "none", cursor: "pointer", padding: "6px 12px", borderRadius: "var(--radius-pill)", fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600,
+                  background: theme === m ? "var(--brand)" : "transparent", color: theme === m ? "var(--on-brand)" : "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: 6,
+                }}><Icon name={m === "light" ? "sun" : m === "dark" ? "moon" : "monitor"} size={13} />{t.themes[m]}</button>
+              ))}
+            </div>
+          </Row>
+          <div style={{ padding: "13px 0" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 10 }}>
+              <span style={{ fontSize: 13.5, color: "var(--text-body)" }}>{t.accent}</span>
+              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{accent === "auto" ? `${t.accentAuto} · ${tRoot.accents[effectiveAccent]}` : tRoot.accents[accent]}</span>
+            </div>
+            <div role="radiogroup" aria-label={t.accent} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" role="radio" aria-checked={accent === "auto"} title={t.accentAuto} onClick={() => { setAccent("auto"); flash(); }} style={{
+                height: 34, padding: "0 12px", borderRadius: "var(--radius-pill)", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600,
+                border: `2px solid ${accent === "auto" ? "var(--brand)" : "var(--border-default)"}`, background: "var(--surface)", color: "var(--text-heading)", display: "inline-flex", alignItems: "center", gap: 6,
+              }}>
+                <span style={{ display: "inline-flex" }}>{WORKSPACES.map((w) => <span key={w.id} style={{ width: 10, height: 10, borderRadius: "50%", background: SWATCH[w.accent], marginLeft: -2, border: "1px solid var(--surface)" }} />)}</span>
+                {t.accentAuto}
+              </button>
+              {ACCENTS.map((a) => (
+                <button key={a} type="button" role="radio" aria-checked={accent === a} aria-label={tRoot.accents[a]} title={tRoot.accents[a]} onClick={() => { setAccent(a); flash(); }} style={{
+                  width: 34, height: 34, borderRadius: "50%", cursor: "pointer", background: SWATCH[a],
+                  border: `3px solid ${accent === a ? "var(--text-heading)" : "var(--surface)"}`, boxShadow: "0 0 0 1px var(--border-default)",
+                }} />
+              ))}
+            </div>
+          </div>
         </Card>
 
         {saved && (

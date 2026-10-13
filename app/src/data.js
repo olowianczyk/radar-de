@@ -30,7 +30,9 @@ export const HRBP_I18N = {
     feedEmptyTitle: "Brak zmian w tej kategorii", feedEmptySub: "Gdy system wykryje nową zmianę pasującą do tego filtra, pojawi się tutaj.",
     kbNoResults: "Brak wyników", kbNoResultsSub: "Nie znaleziono dokumentów pasujących do wyszukiwania.",
     kbEmptyAll: "Brak dokumentów", kbEmptyAllSub: "Baza wiedzy jest pusta — dodaj pierwszy dokument.",
-    settings: { title: "Ustawienia", profile: "Profil", preferences: "Preferencje", role: "Stanowisko", dept: "Dział", language: "Język interfejsu", darkMode: "Tryb ciemny", saved: "Zapisano zmiany" },
+    settings: { title: "Ustawienia", profile: "Profil", preferences: "Preferencje", role: "Stanowisko", dept: "Dział", language: "Język interfejsu", darkMode: "Tryb ciemny", theme: "Motyw", themes: { light: "Jasny", dark: "Ciemny", system: "Jak w systemie" }, accent: "Kolor akcentu", accentAuto: "Wg działu", saved: "Zapisano zmiany" },
+    accents: { teal: "Morski", ocean: "Niebieski", plum: "Śliwkowy", terracotta: "Terakota", forest: "Leśny", graphite: "Grafitowy" },
+    actStatus: "Status aktu wg ISAP", actStatusAsOf: "stan na dzień wykrycia {d}", actStatusNote: "Pobrane z API Sejmu w chwili wykrycia i nieaktualizowane później. Aktualny status sprawdź w ISAP (link obok).", inForceLabel: "Obowiązywanie", inForceValues: { IN_FORCE: "obowiązuje", NOT_IN_FORCE: "nie obowiązuje", UNKNOWN: "brak danych" }, changeDate: "Ostatnia zmiana w ISAP", reviewStatus: "Status przeglądu (ustawiany ręcznie)", howListWorks: "Jak powstaje ta lista i co oznaczają statusy?", noData: "brak danych",
     product: "Monitor zmian w prawie", workspace: "Dział", switchWorkspace: "Zmień dział",
     scopeHowTitle: "Jak działa skanowanie", scopeHowShow: "Pokaż szczegóły", scopeHowHide: "Ukryj szczegóły",
     scopeHow: [
@@ -99,7 +101,9 @@ export const HRBP_I18N = {
     feedEmptyTitle: "Keine Änderungen in dieser Kategorie", feedEmptySub: "Sobald das System eine passende Änderung erkennt, erscheint sie hier.",
     kbNoResults: "Keine Ergebnisse", kbNoResultsSub: "Es wurden keine Dokumente zu dieser Suche gefunden.",
     kbEmptyAll: "Keine Dokumente", kbEmptyAllSub: "Die Wissensbasis ist leer — fügen Sie das erste Dokument hinzu.",
-    settings: { title: "Einstellungen", profile: "Profil", preferences: "Einstellungen", role: "Position", dept: "Abteilung", language: "Sprache", darkMode: "Dunkelmodus", saved: "Änderungen gespeichert" },
+    settings: { title: "Einstellungen", profile: "Profil", preferences: "Einstellungen", role: "Position", dept: "Abteilung", language: "Sprache", darkMode: "Dunkelmodus", theme: "Design", themes: { light: "Hell", dark: "Dunkel", system: "Wie System" }, accent: "Akzentfarbe", accentAuto: "Je Abteilung", saved: "Änderungen gespeichert" },
+    accents: { teal: "Petrol", ocean: "Blau", plum: "Pflaume", terracotta: "Terrakotta", forest: "Waldgrün", graphite: "Graphit" },
+    actStatus: "Status des Akts laut ISAP", actStatusAsOf: "Stand am Erkennungstag {d}", actStatusNote: "Bei der Erkennung aus der Sejm-API übernommen und danach nicht aktualisiert. Aktuellen Status in ISAP prüfen (Link daneben).", inForceLabel: "Geltung", inForceValues: { IN_FORCE: "in Kraft", NOT_IN_FORCE: "nicht in Kraft", UNKNOWN: "keine Angabe" }, changeDate: "Letzte Änderung in ISAP", reviewStatus: "Prüfstatus (manuell gesetzt)", howListWorks: "Wie entsteht diese Liste und was bedeuten die Status?", noData: "keine Angabe",
     product: "Rechtsänderungs-Monitor", workspace: "Abteilung", switchWorkspace: "Abteilung wechseln",
     scopeHowTitle: "So funktioniert der Scan", scopeHowShow: "Details anzeigen", scopeHowHide: "Details ausblenden",
     scopeHow: [
@@ -168,7 +172,9 @@ export const HRBP_I18N = {
     feedEmptyTitle: "No changes in this category", feedEmptySub: "Once the system detects a matching legal change, it will appear here.",
     kbNoResults: "No results", kbNoResultsSub: "No documents matched your search.",
     kbEmptyAll: "No documents", kbEmptyAllSub: "The knowledge base is empty — add the first document.",
-    settings: { title: "Settings", profile: "Profile", preferences: "Preferences", role: "Role", dept: "Department", language: "Interface language", darkMode: "Dark mode", saved: "Changes saved" },
+    settings: { title: "Settings", profile: "Profile", preferences: "Preferences", role: "Role", dept: "Department", language: "Interface language", darkMode: "Dark mode", theme: "Theme", themes: { light: "Light", dark: "Dark", system: "Follow system" }, accent: "Accent colour", accentAuto: "Per department", saved: "Changes saved" },
+    accents: { teal: "Teal", ocean: "Ocean", plum: "Plum", terracotta: "Terracotta", forest: "Forest", graphite: "Graphite" },
+    actStatus: "Act status per ISAP", actStatusAsOf: "as of detection day {d}", actStatusNote: "Taken from the Sejm API at detection time and not updated afterwards. Check the current status in ISAP (link alongside).", inForceLabel: "In force", inForceValues: { IN_FORCE: "in force", NOT_IN_FORCE: "not in force", UNKNOWN: "no data" }, changeDate: "Last change in ISAP", reviewStatus: "Review status (set manually)", howListWorks: "How is this list built and what do the statuses mean?", noData: "no data",
     product: "Legal change monitor", workspace: "Department", switchWorkspace: "Switch department",
     scopeHowTitle: "How scanning works", scopeHowShow: "Show details", scopeHowHide: "Hide details",
     scopeHow: [

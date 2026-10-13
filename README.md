@@ -16,7 +16,9 @@ Działa z linku, bez logowania. Pełna instrukcja dla użytkownika jest w aplika
 | **Limit** | 100 aktów na zapytanie. |
 | **Dedup** | po identyfikatorze ELI; ten sam akt z kilku źródeł/skanów pojawia się raz. Każdy wpis pamięta, które zapytanie go znalazło (`via`). |
 | **Harmonogram** | Vercel Cron, codziennie `0 4 * * *` UTC, wszystkie trzy działy. |
-| **Co NIE robi** | nie ocenia istotności, nie ustala wejścia w życie, nie czyta treści aktu. |
+| **Status aktu** | z każdym wykrytym aktem zapisywana jest migawka z API: `status` (np. obowiązujący/uchylony), `inForce`, `entryIntoForce`, `changeDate` — stan na dzień wykrycia, nieaktualizowany później (UI mówi to wprost i linkuje ISAP). |
+| **Status przeglądu** | Nowe → W przeglądzie / Pilne → Wdrożone; wyłącznie ręczny, wspólny dla działu, zapisany w `triage.json`. „Nowe” znaczy tylko „nikt nie oznaczył”. |
+| **Co NIE robi** | nie ocenia istotności, nie czyta treści aktu, nie śledzi późniejszych losów aktu. |
 
 ## Które źródła są monitorowane
 
@@ -60,6 +62,14 @@ z kodem (`storage_unavailable` → 503, gdy brak `BLOB_READ_WRITE_TOKEN`), a UI
 pokazuje go w pasku komunikatów i wyłącza przyciski zapisu. Skan zwraca
 `persisted: false`, jeśli wyniki nie zostały zapisane. Nic nie jest zapisywane
 „na niby” w pamięci przeglądarki.
+
+## Wygląd
+
+Motyw jasny / ciemny / jak w systemie oraz sześć akcentów kolorystycznych
+(`app/public/tokens/accents.css`, atrybut `data-accent` na `<html>`). Domyślnie
+akcent zależy od działu (HR morski, Compliance śliwkowy, Dział prawny niebieski),
+żeby było widać, w którym dziale się jest; w Ustawieniach można wybrać stały kolor.
+Preferencje są per przeglądarka.
 
 ## Uruchomienie i wdrożenie
 

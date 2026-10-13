@@ -29,6 +29,8 @@ import { HRBP_I18N } from "./data.js";
 
 const ISAP = "https://isap.sejm.gov.pl";
 const TONES = ["brand", "blue", "amber", "green", "neutral"];
+// Accent palettes defined in public/tokens/accents.css ("teal" is the base palette).
+export const ACCENTS = ["teal", "ocean", "plum", "terracotta", "forest", "graphite"];
 
 const tr = (pl, en, de) => ({ pl, en, de });
 // Automatic source. `o` carries { title?, keyword?, publisher?, type?, active? }.
@@ -44,6 +46,7 @@ export const WORKSPACES = [
   {
     id: "hr",
     icon: "users",
+    accent: "teal",
     label: tr("HR", "HR", "HR"),
     title: tr("Prawo pracy", "Labour law", "Arbeitsrecht"),
     persona: tr("HR Business Partner", "HR Business Partner", "HR Business Partner"),
@@ -99,6 +102,7 @@ export const WORKSPACES = [
   {
     id: "compliance",
     icon: "shield-check",
+    accent: "plum",
     label: tr("Compliance", "Compliance", "Compliance"),
     title: tr("Zgodność regulacyjna", "Regulatory compliance", "Regulatorische Compliance"),
     persona: tr("Compliance Officer", "Compliance Officer", "Compliance Officer"),
@@ -186,6 +190,7 @@ export const WORKSPACES = [
   {
     id: "legal",
     icon: "scale",
+    accent: "ocean",
     label: tr("Dział prawny", "Legal", "Rechtsabteilung"),
     title: tr("Prawo cywilne, handlowe i procesowe", "Civil, commercial and procedural law", "Zivil-, Handels- und Verfahrensrecht"),
     persona: tr("Radca prawny", "Legal counsel", "Justiziar/in"),

@@ -3,7 +3,7 @@
 // tables are rendered from workspaces.js, so they can never drift from what
 // the scanner actually runs.
 import React from "react";
-import { Card, Badge, Icon, Button } from "../components/index.js";
+import { Card, Badge, Icon, Button, StatusPill } from "../components/index.js";
 import { tFor, isManualSource } from "../workspaces.js";
 
 const HELP = {
@@ -26,7 +26,37 @@ const HELP = {
       "Automatyczny skan uruchamia się codziennie nad ranem (04:00 UTC, czyli 05:00/06:00 czasu polskiego). Wynik zobaczysz przy następnym otwarciu aplikacji — przeglądarka nie musi być włączona.",
       "Pierwsze skanowanie każdego źródła sięga do 1 stycznia bieżącego roku; kolejne obejmują tylko okres od ostatniego sprawdzenia.",
       "Ten sam akt wykryty przez kilka źródeł lub kilka skanów pojawia się raz (rozpoznawany po identyfikatorze ELI).",
-      "Narzędzie wykrywa publikację aktu. Nie ocenia, czy zmiana jest istotna, nie ustala daty wejścia w życie i nie czyta treści — to zadanie osoby, która przegląda zmianę.",
+      "Narzędzie wykrywa publikację aktu. Nie ocenia, czy zmiana jest istotna, i nie czyta treści — to zadanie osoby, która przegląda zmianę. Status aktu i datę wejścia w życie pokazuje dokładnie tak, jak podało je API Sejmu w dniu wykrycia (szczegóły w sekcji „Dwa różne statusy”).",
+    ],
+    pipelineTitle: "Krok po kroku: jak powstaje wpis w feedzie",
+    pipelineIntro: "Dokładny przebieg jednego skanowania — od harmonogramu do karty w feedzie. Każdy etap jest deterministyczny i możesz go odtworzyć ręcznie linkiem „Otwórz zapytanie w API Sejmu”.",
+    pipeline: [
+      ["Start skanowania", "Codziennie o 04:00 UTC uruchamia go harmonogram (Vercel Cron) dla wszystkich trzech działów. Dodatkowo każdy może kliknąć „Sprawdź teraz” — wtedy skanowane są źródła aktywne w danym dziale. Oba skany działają identycznie."],
+      ["Ustalenie okna dat dla każdego źródła", "Dla każdego aktywnego źródła liczy się okno „od – do” według DATY OGŁOSZENIA aktu: „od” = data ostatniego sprawdzenia tego źródła (pole „Ostatnie sprawdzenie”), „do” = dziś. Źródło sprawdzane po raz pierwszy ma „od” = 1 stycznia bieżącego roku. Jeśli w formularzu podasz własne daty „Od dnia / Do dnia”, zastępują one to okno dla wszystkich źródeł w tym jednym skanie."],
+      ["Zapytania do API Sejmu", "Dla każdego źródła wysyłane są 1–2 zapytania do api.sejm.gov.pl/eli/acts/search: po słowie kluczowym (parametr keyword — oficjalne hasło nadane aktowi przez Bibliotekę Sejmową) i/lub po fragmencie tytułu (parametr title). Zawsze z rejestrem (publisher=DU albo MP), oknem dat (dateFrom/dateTo) i limitem 100 wyników. Treść aktów nie jest pobierana ani czytana."],
+      ["Odpowiedź: lista aktów", "API zwraca akty ogłoszone w oknie dat, które pasują do zapytania. Z każdego aktu zapisujemy: tytuł, identyfikator ELI, adres publikacyjny (Dz.U. rok poz.), datę ogłoszenia, typ aktu (ustawa, rozporządzenie, obwieszczenie…), status aktu wg ISAP, informację czy obowiązuje, datę wejścia w życie i datę ostatniej zmiany w ISAP, jeśli API je podaje."],
+      ["Deduplikacja i zapis", "Akt jest rozpoznawany po identyfikatorze ELI. Jeśli ten sam akt znalazło słowo kluczowe i tytuł, albo wykryły go dwa źródła, albo pojawił się w poprzednim skanie — trafia do historii tylko raz. Historia źródła i nowa data „Ostatnie sprawdzenie” zapisują się w magazynie danych. Jeśli zapis się nie uda, zobaczysz czerwony komunikat „wyniki NIE zostały zapisane”."],
+      ["Karta w feedzie", "Każdy wpis w historii źródła = jedna karta w „Zmianach w przepisach”. Tytuł, data, typ i status aktu pochodzą 1:1 z API; obszar prawa pochodzi z konfiguracji źródła (to nasza klasyfikacja, nie Sejmu). Karta zaczyna ze statusem przeglądu „Nowe”, bo nikt jej jeszcze nie oznaczył."],
+      ["Co się dzieje, gdy nic nie wykryto", "Jeśli w oknie dat nie ogłoszono pasującego aktu, źródło dostaje tylko nową datę „Ostatnie sprawdzenie” i licznik 0. To normalny wynik. Jeśli natomiast API Sejmu odpowiedziało błędem, źródło pokazuje czerwony komunikat błędu, a pasek u góry informuje, ile źródeł zawiodło — takie źródło NIE jest uznane za sprawdzone."],
+    ],
+    twoStatusesTitle: "Dwa różne „statusy” — nie myl ich",
+    reviewStatusTitle: "Status przeglądu (ustawiany ręcznie, wspólny dla działu)",
+    reviewStatusIntro: "Mówi o tym, co WASZ zespół zrobił ze zmianą. Narzędzie nigdy nie zmienia go samo.",
+    reviewStatuses: [
+      ["Nowe", "Nikt jeszcze nie oznaczył tej zmiany. To jedyny status nadawany automatycznie — i oznacza wyłącznie „nieprzejrzane”, nie „ważne”."],
+      ["W przeglądzie", "Ktoś analizuje zmianę (przycisk „Oznacz jako przejrzane” lub akcja zbiorcza)."],
+      ["Pilne", "Zespół uznał, że wymaga natychmiastowej reakcji. Trafia do powiadomień razem z „Nowe”."],
+      ["Wdrożone", "Sprawa zamknięta — działania wykonane lub uznano, że zmiana nie dotyczy firmy. Znika z listy nowych; w KPI „Wdrożone w tym miesiącu” liczy się data oznaczenia."],
+    ],
+    legalStatusTitle: "Status aktu wg ISAP (pobierany z API, migawka)",
+    legalStatusBody: "W szczegółach zmiany, w ramce „Status aktu wg ISAP”, widzisz to, co API Sejmu podało o samym akcie w dniu wykrycia: status (np. „obowiązujący”, „akt jednorazowy”, „uchylony”), czy obowiązuje, datę wejścia w życie i datę ostatniej zmiany. To jest migawka z dnia skanu — narzędzie NIE sprawdza później, czy akt został zmieniony, uchylony albo czy wszedł w życie. Dlatego przy ramce zawsze jest data wykrycia i link do ISAP, gdzie zobaczysz stan bieżący. Jeśli API nie podało danego pola, widzisz „brak danych”, a nie wartość domyślną.",
+    notCheckedTitle: "Czego skan NIE sprawdza",
+    notChecked: [
+      "Treści aktu ani tego, co konkretnie się zmieniło — tylko fakt ogłoszenia aktu pasującego do źródła.",
+      "Istotności zmiany dla firmy — to ocena człowieka; dlatego istnieje status przeglądu.",
+      "Późniejszych losów aktu (nowelizacje, uchylenie, wejście w życie po dacie wykrycia) — patrz wyżej, migawka.",
+      "Aktów spoza Dz.U. i M.P.: prawa UE, orzeczeń, decyzji urzędów, projektów ustaw — są na liście źródeł ręcznych.",
+      "Aktów starszych niż okno dat: pierwsze skanowanie zaczyna się od 1 stycznia bieżącego roku; starsze znajdziesz ręcznym skanem z własnym zakresem dat.",
     ],
     sourcesTitle: "Które źródła są monitorowane w tym dziale",
     sourcesIntro: "Poniższe listy są generowane z rzeczywistej konfiguracji skanera — to dokładnie to, co jest sprawdzane.",
@@ -65,7 +95,37 @@ const HELP = {
       "The automatic scan runs daily in the early morning (04:00 UTC). You see the result the next time you open the app — no browser needs to be running.",
       "The first scan of each source reaches back to 1 January of the current year; later scans cover only the period since the last check.",
       "The same act detected by several sources or several scans appears once (recognised by its ELI identifier).",
-      "The tool detects publication of an act. It does not judge whether the change matters, does not determine the effective date and does not read the text — that is the reviewer's job.",
+      "The tool detects publication of an act. It does not judge whether the change matters and does not read the text — that is the reviewer's job. The act's status and entry-into-force date are shown exactly as the Sejm API reported them on the detection day (see “Two different statuses”).",
+    ],
+    pipelineTitle: "Step by step: how a feed entry is produced",
+    pipelineIntro: "The exact course of one scan — from the schedule to a card in the feed. Every step is deterministic and you can replay it by hand with “Open query in the Sejm API”.",
+    pipeline: [
+      ["Scan start", "Every day at 04:00 UTC the schedule (Vercel Cron) runs it for all three departments. Anyone can also click “Check now” — that scans the sources active in that department. Both scans behave identically."],
+      ["Date window per source", "For each active source a “from – to” window is computed by the act’s ANNOUNCEMENT DATE: “from” = that source’s last check (the “Last checked” field), “to” = today. A source checked for the first time gets “from” = 1 January of the current year. Dates you enter in “From / To” replace this window for all sources in that one scan."],
+      ["Queries to the Sejm API", "For each source 1–2 requests go to api.sejm.gov.pl/eli/acts/search: by keyword (parameter keyword — the official subject heading assigned by the Sejm Library) and/or by title fragment (parameter title). Always with the register (publisher=DU or MP), the date window (dateFrom/dateTo) and a limit of 100 results. The acts’ text is neither fetched nor read."],
+      ["Response: a list of acts", "The API returns acts announced within the window that match the query. From each act we store: title, ELI identifier, publication address (Dz.U. year item), announcement date, act type (statute, regulation, notice…), the act’s status per ISAP, whether it is in force, entry-into-force date and last-change date, where the API provides them."],
+      ["Deduplication and saving", "An act is identified by its ELI. If keyword and title both found it, or two sources did, or it appeared in a previous scan — it enters the history once. The source history and the new “Last checked” date are saved to the data store. If saving fails you see a red “results were NOT saved” message."],
+      ["Card in the feed", "Each history entry = one card in “Legal changes”. Title, date, type and act status come 1:1 from the API; the legal area comes from the source configuration (our classification, not the Sejm’s). The card starts with review status “New” because nobody has marked it yet."],
+      ["When nothing is detected", "If no matching act was announced in the window, the source only gets a new “Last checked” date and a count of 0. That is a normal result. If the Sejm API answered with an error, the source shows a red error and the top bar says how many sources failed — such a source is NOT considered checked."],
+    ],
+    twoStatusesTitle: "Two different “statuses” — don’t confuse them",
+    reviewStatusTitle: "Review status (set manually, shared by the department)",
+    reviewStatusIntro: "Says what YOUR team did with the change. The tool never changes it on its own.",
+    reviewStatuses: [
+      ["New", "Nobody has marked this change yet. The only status assigned automatically — and it means “unreviewed”, not “important”."],
+      ["In review", "Someone is analysing the change (“Mark reviewed” or the bulk action)."],
+      ["Urgent", "The team decided it needs an immediate reaction. Appears in notifications together with “New”."],
+      ["Implemented", "Closed — actions done, or the change was judged not to concern the company. Leaves the new list; the “Implemented this month” KPI counts the marking date."],
+    ],
+    legalStatusTitle: "Act status per ISAP (from the API, a snapshot)",
+    legalStatusBody: "In the change details, the “Act status per ISAP” box shows what the Sejm API reported about the act itself on the detection day: status (e.g. “in force”, “one-off act”, “repealed”), whether it is in force, entry-into-force date and last-change date. It is a snapshot from the scan day — the tool does NOT check later whether the act was amended, repealed or entered into force. That is why the box always carries the detection date and an ISAP link for the current state. If the API did not provide a field you see “no data”, not a default value.",
+    notCheckedTitle: "What the scan does NOT check",
+    notChecked: [
+      "The act’s text or what exactly changed — only the fact that a matching act was announced.",
+      "Whether the change matters to the company — that is a human judgement; hence the review status.",
+      "The act’s later fate (amendments, repeal, entry into force after detection) — see snapshot above.",
+      "Anything outside Dz.U. and M.P.: EU law, rulings, agency decisions, draft bills — these are on the manual-source list.",
+      "Acts older than the window: the first scan starts at 1 January of the current year; older ones via a manual scan with your own date range.",
     ],
     sourcesTitle: "Which sources this department monitors",
     sourcesIntro: "The lists below are generated from the scanner's actual configuration — this is exactly what is checked.",
@@ -104,7 +164,37 @@ const HELP = {
       "Der automatische Scan läuft täglich früh morgens (04:00 UTC). Das Ergebnis sehen Sie beim nächsten Öffnen — kein Browser muss laufen.",
       "Der erste Scan jeder Quelle reicht bis zum 1. Januar des laufenden Jahres; spätere Scans decken nur den Zeitraum seit der letzten Prüfung ab.",
       "Derselbe Akt, von mehreren Quellen oder Scans erkannt, erscheint einmal (erkannt an der ELI-Kennung).",
-      "Das Tool erkennt die Verkündung eines Akts. Es bewertet nicht, ob die Änderung relevant ist, ermittelt kein Inkrafttreten und liest den Text nicht — das ist Aufgabe der prüfenden Person.",
+      "Das Tool erkennt die Verkündung eines Akts. Es bewertet nicht, ob die Änderung relevant ist, und liest den Text nicht — das ist Aufgabe der prüfenden Person. Status und Inkrafttreten des Akts werden genau so gezeigt, wie die Sejm-API sie am Erkennungstag meldete (siehe „Zwei verschiedene Status“).",
+    ],
+    pipelineTitle: "Schritt für Schritt: So entsteht ein Feed-Eintrag",
+    pipelineIntro: "Der genaue Ablauf eines Scans — vom Zeitplan bis zur Karte im Feed. Jeder Schritt ist deterministisch und lässt sich mit „Abfrage in der Sejm-API öffnen“ von Hand nachvollziehen.",
+    pipeline: [
+      ["Scan-Start", "Täglich um 04:00 UTC startet ihn der Zeitplan (Vercel Cron) für alle drei Abteilungen. Zusätzlich kann jeder „Jetzt prüfen“ klicken — dann werden die in der Abteilung aktiven Quellen gescannt. Beide Scans arbeiten identisch."],
+      ["Zeitfenster je Quelle", "Für jede aktive Quelle wird ein „von – bis“-Fenster nach dem VERKÜNDUNGSDATUM des Akts berechnet: „von“ = letzte Prüfung dieser Quelle (Feld „Zuletzt geprüft“), „bis“ = heute. Eine erstmals geprüfte Quelle erhält „von“ = 1. Januar des laufenden Jahres. Eigene Daten in „Von / Bis“ ersetzen dieses Fenster für alle Quellen in diesem einen Scan."],
+      ["Abfragen an die Sejm-API", "Je Quelle gehen 1–2 Anfragen an api.sejm.gov.pl/eli/acts/search: nach Schlagwort (Parameter keyword — das offizielle, von der Sejm-Bibliothek vergebene Schlagwort) und/oder nach Titelfragment (Parameter title). Immer mit Register (publisher=DU oder MP), Zeitfenster (dateFrom/dateTo) und Limit 100. Der Text der Akte wird weder geladen noch gelesen."],
+      ["Antwort: Liste von Akten", "Die API liefert im Fenster verkündete Akte, die zur Abfrage passen. Je Akt speichern wir: Titel, ELI-Kennung, Fundstelle (Dz.U. Jahr Pos.), Verkündungsdatum, Aktart (Gesetz, Verordnung, Bekanntmachung …), Status laut ISAP, ob in Kraft, Inkrafttreten und letzte Änderung, soweit die API sie liefert."],
+      ["Deduplizierung und Speichern", "Ein Akt wird an seiner ELI erkannt. Haben Schlagwort und Titel ihn beide gefunden, zwei Quellen, oder war er schon im vorigen Scan — kommt er nur einmal in den Verlauf. Quellenverlauf und neues „Zuletzt geprüft“ werden im Datenspeicher abgelegt. Schlägt das fehl, erscheint rot „Ergebnisse wurden NICHT gespeichert“."],
+      ["Karte im Feed", "Jeder Verlaufseintrag = eine Karte unter „Rechtsänderungen“. Titel, Datum, Art und Aktstatus kommen 1:1 aus der API; das Rechtsgebiet stammt aus der Quellenkonfiguration (unsere Einordnung, nicht die des Sejm). Die Karte beginnt mit Prüfstatus „Neu“, weil sie noch niemand markiert hat."],
+      ["Wenn nichts erkannt wird", "Wurde im Fenster kein passender Akt verkündet, erhält die Quelle nur ein neues „Zuletzt geprüft“ und den Zähler 0. Das ist ein normales Ergebnis. Antwortete die Sejm-API mit einem Fehler, zeigt die Quelle rot den Fehler und der Balken oben nennt die Zahl fehlgeschlagener Quellen — eine solche Quelle gilt NICHT als geprüft."],
+    ],
+    twoStatusesTitle: "Zwei verschiedene „Status“ — nicht verwechseln",
+    reviewStatusTitle: "Prüfstatus (manuell gesetzt, abteilungsweit gemeinsam)",
+    reviewStatusIntro: "Sagt, was IHR Team mit der Änderung gemacht hat. Das Tool ändert ihn nie von selbst.",
+    reviewStatuses: [
+      ["Neu", "Noch niemand hat diese Änderung markiert. Der einzige automatisch vergebene Status — und er bedeutet „ungeprüft“, nicht „wichtig“."],
+      ["In Prüfung", "Jemand analysiert die Änderung („Als geprüft markieren“ oder Sammelaktion)."],
+      ["Dringend", "Das Team hält sofortiges Handeln für nötig. Erscheint zusammen mit „Neu“ in den Benachrichtigungen."],
+      ["Umgesetzt", "Abgeschlossen — Maßnahmen erledigt oder als nicht einschlägig bewertet. Verlässt die Neu-Liste; die KPI „Umgesetzt diesen Monat“ zählt das Markierungsdatum."],
+    ],
+    legalStatusTitle: "Status des Akts laut ISAP (aus der API, Momentaufnahme)",
+    legalStatusBody: "In den Details zeigt der Kasten „Status des Akts laut ISAP“, was die Sejm-API am Erkennungstag über den Akt selbst meldete: Status (z. B. „geltend“, „Einmalakt“, „aufgehoben“), ob in Kraft, Inkrafttreten und letzte Änderung. Es ist eine Momentaufnahme vom Scan-Tag — das Tool prüft später NICHT, ob der Akt geändert, aufgehoben oder in Kraft getreten ist. Deshalb trägt der Kasten immer das Erkennungsdatum und einen ISAP-Link zum aktuellen Stand. Lieferte die API ein Feld nicht, steht dort „keine Angabe“, kein Standardwert.",
+    notCheckedTitle: "Was der Scan NICHT prüft",
+    notChecked: [
+      "Den Text des Akts oder was sich konkret geändert hat — nur die Tatsache der Verkündung eines passenden Akts.",
+      "Ob die Änderung für das Unternehmen relevant ist — das ist menschliche Bewertung; dafür gibt es den Prüfstatus.",
+      "Das spätere Schicksal des Akts (Novellen, Aufhebung, Inkrafttreten nach der Erkennung) — siehe Momentaufnahme.",
+      "Alles außerhalb von Dz.U. und M.P.: EU-Recht, Urteile, Behördenentscheidungen, Gesetzentwürfe — siehe manuelle Quellen.",
+      "Akte älter als das Fenster: der erste Scan beginnt am 1. Januar des laufenden Jahres; Älteres per manuellem Scan mit eigenem Zeitraum.",
     ],
     sourcesTitle: "Welche Quellen diese Abteilung überwacht",
     sourcesIntro: "Die Listen unten werden aus der tatsächlichen Scanner-Konfiguration erzeugt — genau das wird geprüft.",
@@ -170,6 +260,53 @@ export function Help({ lang, ws }) {
         <ul style={{ margin: "14px 0 0", paddingLeft: 22, display: "flex", flexDirection: "column", gap: 8 }}>
           {[...t.scopeHow, ...h.howWorksExtra].map((line, i) => <li key={i} style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--text-body)" }}>{line}</li>)}
         </ul>
+      </Card>
+
+      <Card padding="lg">
+        <H2 icon="git-branch">{h.pipelineTitle}</H2>
+        <p style={{ margin: "8px 0 14px", fontSize: 13, color: "var(--text-muted)", lineHeight: 1.55 }}>{h.pipelineIntro}</p>
+        <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 0 }}>
+          {h.pipeline.map(([k, v], i) => (
+            <li key={k} style={{ display: "flex", gap: 14, position: "relative", paddingBottom: i < h.pipeline.length - 1 ? 16 : 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: "0 0 28px" }}>
+                <span style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--brand)", color: "var(--on-brand)", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 28px" }}>{i + 1}</span>
+                {i < h.pipeline.length - 1 && <span style={{ flex: 1, width: 2, background: "var(--border-default)", marginTop: 4 }} />}
+              </div>
+              <div style={{ flex: 1, paddingTop: 4 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)" }}>{k}</div>
+                <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--text-body)", marginTop: 3 }}>{v}</div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </Card>
+
+      <Card padding="lg">
+        <H2 icon="tags">{h.twoStatusesTitle}</H2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18, marginTop: 14 }}>
+          <div style={{ padding: 16, border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)", display: "flex", alignItems: "center", gap: 8 }}><Icon name="users" size={15} style={{ color: "var(--brand)" }} />{h.reviewStatusTitle}</div>
+            <p style={{ margin: "6px 0 12px", fontSize: 12.5, color: "var(--text-muted)" }}>{h.reviewStatusIntro}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {h.reviewStatuses.map(([k, v], i) => (
+                <div key={k} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <StatusPill status={["new", "progress", "urgent", "done"][i]} label={k} style={{ flex: "0 0 auto", marginTop: 2 }} />
+                  <span style={{ fontSize: 13, lineHeight: 1.55, color: "var(--text-body)" }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ padding: 16, border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)", display: "flex", alignItems: "center", gap: 8 }}><Icon name="landmark" size={15} style={{ color: "var(--brand)" }} />{h.legalStatusTitle}</div>
+            <p style={{ margin: "8px 0 0", fontSize: 13, lineHeight: 1.6, color: "var(--text-body)" }}>{h.legalStatusBody}</p>
+          </div>
+        </div>
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)", display: "flex", alignItems: "center", gap: 8 }}><Icon name="eye-off" size={15} style={{ color: "var(--danger-600)" }} />{h.notCheckedTitle}</div>
+          <ul style={{ margin: "8px 0 0", paddingLeft: 22, display: "flex", flexDirection: "column", gap: 6 }}>
+            {h.notChecked.map((line, i) => <li key={i} style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--text-body)" }}>{line}</li>)}
+          </ul>
+        </div>
       </Card>
 
       <Card padding="lg">

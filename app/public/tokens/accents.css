@@ -1,0 +1,56 @@
+/* Accent palettes, toggled via [data-accent="…"] on <html>. Each one remaps the
+   brand aliases only — neutrals, status colours and layout tokens stay put, so
+   every accent works in both the light and the dark theme. "teal" is the
+   default (colors.css) and needs no block here. Dark variants lift the primary
+   a step so text and icons keep ≥4.5:1 against the dark surfaces. */
+
+/* Ocean — blue */
+:root[data-accent="ocean"]{
+  --brand:#1f5fa8; --brand-hover:#174a85; --brand-soft:#e1ecf9; --on-brand-soft:#143d6b;
+  --brand-tint:#e1ecf9; --focus-ring:color-mix(in srgb,#1f5fa8 45%,transparent); --ring-color:color-mix(in srgb,#1f5fa8 22%,transparent);
+}
+:root[data-theme="dark"][data-accent="ocean"]{
+  --brand:#5b9be0; --brand-hover:#7fb2ea; --brand-soft:#17304a; --on-brand-soft:#a9cdf3; --brand-tint:#17304a;
+}
+
+/* Plum — violet */
+:root[data-accent="plum"]{
+  --brand:#6b3fa0; --brand-hover:#553281; --brand-soft:#ede5f7; --on-brand-soft:#4a2a70;
+  --brand-tint:#ede5f7; --focus-ring:color-mix(in srgb,#6b3fa0 45%,transparent); --ring-color:color-mix(in srgb,#6b3fa0 22%,transparent);
+}
+:root[data-theme="dark"][data-accent="plum"]{
+  --brand:#a98be0; --brand-hover:#bda5e8; --brand-soft:#2c2142; --on-brand-soft:#cdbcef; --brand-tint:#2c2142;
+}
+
+/* Terracotta — warm red-orange */
+:root[data-accent="terracotta"]{
+  --brand:#b4472c; --brand-hover:#923821; --brand-soft:#f9e6e0; --on-brand-soft:#7a2f1c;
+  --brand-tint:#f9e6e0; --focus-ring:color-mix(in srgb,#b4472c 45%,transparent); --ring-color:color-mix(in srgb,#b4472c 22%,transparent);
+}
+:root[data-theme="dark"][data-accent="terracotta"]{
+  --brand:#e5876c; --brand-hover:#eea18b; --brand-soft:#3d241c; --on-brand-soft:#f2b8a5; --brand-tint:#3d241c;
+}
+
+/* Forest — green */
+:root[data-accent="forest"]{
+  --brand:#2f6b3f; --brand-hover:#245430; --brand-soft:#e3f1e6; --on-brand-soft:#1f4a2b;
+  --brand-tint:#e3f1e6; --focus-ring:color-mix(in srgb,#2f6b3f 45%,transparent); --ring-color:color-mix(in srgb,#2f6b3f 22%,transparent);
+}
+:root[data-theme="dark"][data-accent="forest"]{
+  --brand:#6fbf83; --brand-hover:#8ccd9c; --brand-soft:#1b3323; --on-brand-soft:#a8dbb5; --brand-tint:#1b3323;
+}
+
+/* Graphite — neutral, for people who want no colour at all */
+:root[data-accent="graphite"]{
+  --brand:#3d4a52; --brand-hover:#2b353b; --brand-soft:#e7eaec; --on-brand-soft:#2b353b;
+  --brand-tint:#e7eaec; --focus-ring:color-mix(in srgb,#3d4a52 45%,transparent); --ring-color:color-mix(in srgb,#3d4a52 22%,transparent);
+}
+:root[data-theme="dark"][data-accent="graphite"]{
+  --brand:#aab7be; --brand-hover:#c3cdd2; --brand-soft:#2a3338; --on-brand-soft:#d3dbdf; --brand-tint:#2a3338;
+}
+
+/* Teal in dark mode was the one accent without a lifted primary — fix that here
+   so all six behave the same. */
+:root[data-theme="dark"][data-accent="teal"], :root[data-theme="dark"]:not([data-accent]){
+  --brand:#2aa6ae; --brand-hover:#5bc0c6;
+}

@@ -109,6 +109,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
           return (f[new Intl.PluralRules(lang).select(n)] || f.many || f.other).replace("{n}", String(n));
         })()}</p>
       </div>
+      <a href={`#/${ws.id}/help`} style={{ fontSize: 12.5, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 6, alignSelf: "flex-start", marginTop: -8 }}><Icon name="help-circle" size={14} />{t.howListWorks}</a>
       <ScanBanner t={t} backend={backend} sources={sources} scanning={scanning} runScan={runScan} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} lastScanFound={lastScanFound} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
         <StatCard label={t.kpi.new} value={String(newCount)} accent="danger" icon={<Icon name="sparkles" size={18} />} />
@@ -203,12 +204,27 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                   <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-2xl)", color: "var(--text-heading)" }}>{sel.title[lang]}</h2>
                   <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{sel.act}</div>
                 </div>
-                <StatusPill status={HRBP_STATUS_MAP[sel.status]} lang={lang} label={t.st[sel.status]} />
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                  <StatusPill status={HRBP_STATUS_MAP[sel.status]} lang={lang} label={t.st[sel.status]} />
+                  <span style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{t.reviewStatus}</span>
+                </div>
               </div>
               <div style={{ display: "flex", gap: 24, padding: "14px 0", borderTop: "1px solid var(--border-subtle)", borderBottom: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
                 <Meta label={t.published} value={sel.date} />
                 <Meta label={t.effective} value={sel.effective} />
                 <Meta label={t.source} value={/^https?:/.test(sel.source) ? <a href={sel.source} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>ISAP ↗</a> : sel.source} small />
+              </div>
+              <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icon name="landmark" size={12} />{t.actStatus} <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>— {t.actStatusAsOf.replace("{d}", sel.detectedOn || sel.date)}</span>
+                </div>
+                <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+                  <Meta label={t.actStatus} value={sel.legalStatus || t.noData} small />
+                  <Meta label={t.inForceLabel} value={t.inForceValues[sel.inForce] || sel.inForce || t.noData} small />
+                  <Meta label={t.effective} value={sel.effective} small />
+                  {sel.changeDate && <Meta label={t.changeDate} value={sel.changeDate.slice(0, 10).split("-").reverse().join(".")} small />}
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.5 }}>{t.actStatusNote}</div>
               </div>
               <p style={{ margin: 0, color: "var(--text-body)", fontSize: 14, lineHeight: 1.6 }}>{sel.summary[lang]}</p>
               {sel.matchedBy && (

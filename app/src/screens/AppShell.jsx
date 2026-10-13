@@ -3,7 +3,7 @@
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
 import { LoadingState } from "../components/Loading.jsx";
-import { WORKSPACES, initialSources, isManualSource, tFor } from "../workspaces.js";
+import { WORKSPACES, ACCENTS, initialSources, isManualSource, tFor } from "../workspaces.js";
 import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc, addKbComment, saveTriage, saveSourceConfig } from "../isapIntegration.js";
 
 function useSources(ws) {
@@ -110,15 +110,32 @@ function BottomTabBar({ items, activeId, onSelect }) {
   );
 }
 
-function useDarkMode() {
-  const [dark, setDark] = React.useState(() => {
-    try { return localStorage.getItem("hrbp-theme") === "dark"; } catch (e) { return false; }
-  });
+// Appearance is a per-browser preference: theme light | dark | system and an
+// accent palette (tokens/accents.css). accent "auto" follows the workspace's
+// own colour so each department is recognisable at a glance.
+const THEMES = ["light", "dark", "system"];
+function useAppearance(ws) {
+  const read = (k, allowed, fallback) => { try { const v = localStorage.getItem(k); return allowed.includes(v) ? v : fallback; } catch (e) { return fallback; } };
+  const [theme, setTheme] = React.useState(() => read("hrbp-theme", THEMES, "system"));
+  const [accent, setAccent] = React.useState(() => read("hrbp-accent", ["auto", ...ACCENTS], "auto"));
+  const [systemDark, setSystemDark] = React.useState(() => typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  React.useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = (e) => setSystemDark(e.matches);
+    mq.addEventListener ? mq.addEventListener("change", onChange) : mq.addListener(onChange);
+    return () => { mq.removeEventListener ? mq.removeEventListener("change", onChange) : mq.removeListener(onChange); };
+  }, []);
+  const dark = theme === "dark" || (theme === "system" && systemDark);
+  const effectiveAccent = accent === "auto" ? ws.accent || "teal" : accent;
   React.useEffect(() => {
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-    try { localStorage.setItem("hrbp-theme", dark ? "dark" : "light"); } catch (e) {}
-  }, [dark]);
-  return [dark, setDark];
+    document.documentElement.setAttribute("data-accent", effectiveAccent);
+    try { localStorage.setItem("hrbp-theme", theme); localStorage.setItem("hrbp-accent", accent); } catch (e) {}
+  }, [dark, theme, accent, effectiveAccent]);
+  // The top-bar toggle flips between explicit light and dark (leaving "system").
+  const setDark = React.useCallback((v) => setTheme((prev) => { const cur = prev === "dark" || (prev === "system" && systemDark); const next = typeof v === "function" ? v(cur) : v; return next ? "dark" : "light"; }), [systemDark]);
+  return { dark, setDark, theme, setTheme, accent, setAccent, effectiveAccent };
 }
 
 // Default on/off state of a source as shipped in workspaces.js (custom ones
@@ -159,7 +176,8 @@ function applyConfig(ws, base, config) {
 
 export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, children, onSelectChange, onSelectKb }) {
   const isMobile = useIsMobile();
-  const [dark, setDark] = useDarkMode();
+  const appearance = useAppearance(ws);
+  const { dark, setDark } = appearance;
   const t = tFor(lang, ws);
   const [sources, setSourcesRaw] = useSources(ws);
   const [sourceHistory, setSourceHistory] = React.useState({});
@@ -422,7 +440,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
         )}
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, backend, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment }) : children}
+            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, appearance, backend, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment }) : children}
           </div>
         </main>
       </div>

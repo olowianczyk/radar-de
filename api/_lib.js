@@ -259,6 +259,14 @@ async function scanSources(sources, range) {
             actType: item.type,
             via: q.mode,
             publisher,
+            // The act's own legal status AS REPORTED BY THE SEJM API AT SCAN
+            // TIME. Never re-checked afterwards — the UI says so and links ISAP.
+            legalStatus: item.status || null,
+            inForce: item.inForce || null,
+            entryIntoForce: item.entryIntoForce || null,
+            changeDate: item.changeDate || null,
+            displayAddress: item.displayAddress || null,
+            detectedOn: todayIso,
           });
         });
       } catch (e) {
