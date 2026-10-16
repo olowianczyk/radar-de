@@ -10,12 +10,13 @@ export function LoadingState({ label }) {
   );
 }
 
-export function EmptyState({ icon, title, subtitle }) {
+export function EmptyState({ icon, title, subtitle, action }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: "56px 20px", textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-sans)" }}>
-      <Icon name={icon || "inbox"} size={30} />
-      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-heading)" }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 12.5, maxWidth: 300, lineHeight: 1.5 }}>{subtitle}</div>}
+      <span style={{ width: 56, height: 56, borderRadius: 18, background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name={icon || "inbox"} size={26} /></span>
+      <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-heading)", marginTop: 4 }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 13, maxWidth: 340, lineHeight: 1.55 }}>{subtitle}</div>}
+      {action && <div style={{ marginTop: 8 }}>{action}</div>}
     </div>
   );
 }

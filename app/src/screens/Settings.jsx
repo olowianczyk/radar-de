@@ -3,10 +3,7 @@
 // link by design, so nothing here pretends otherwise.
 import React from "react";
 import { Card, Avatar, Select, Switch, Badge, Icon } from "../components/index.js";
-import { tFor, ACCENTS, WORKSPACES } from "../workspaces.js";
-
-// Representative swatch per accent (light-theme primary) — purely for the picker.
-const SWATCH = { teal: "#00727e", ocean: "#1f5fa8", plum: "#6b3fa0", terracotta: "#b4472c", forest: "#2f6b3f", graphite: "#3d4a52" };
+import { tFor, ACCENTS, WORKSPACES, ACCENT_SWATCH as SWATCH } from "../workspaces.js";
 
 function Row({ label, children }) {
   return (

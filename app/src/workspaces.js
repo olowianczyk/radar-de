@@ -30,7 +30,9 @@ import { HRBP_I18N } from "./data.js";
 const ISAP = "https://isap.sejm.gov.pl";
 const TONES = ["brand", "blue", "amber", "green", "neutral"];
 // Accent palettes defined in public/tokens/accents.css ("teal" is the base palette).
-export const ACCENTS = ["teal", "ocean", "plum", "terracotta", "forest", "graphite"];
+export const ACCENTS = ["teal", "ocean", "plum", "indigo", "forest", "terracotta", "sunset", "rose", "graphite"];
+// Light-theme primary of each accent — swatches in pickers and workspace dots.
+export const ACCENT_SWATCH = { teal: "#00727e", ocean: "#1f5fa8", plum: "#6b3fa0", indigo: "#3f4bb8", forest: "#2f6b3f", terracotta: "#b4472c", sunset: "#c2571a", rose: "#b02a5b", graphite: "#3d4a52" };
 
 const tr = (pl, en, de) => ({ pl, en, de });
 // Automatic source. `o` carries { title?, keyword?, publisher?, type?, active? }.

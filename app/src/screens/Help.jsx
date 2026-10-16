@@ -361,8 +361,19 @@ export function Help({ lang, ws }) {
   const byArea = areas.map((a) => [a, auto.filter((s) => s.area === a)]).filter(([, list]) => list.length);
   const matchLabel = (s) => [s.keyword ? `${t.scopeMatchKeyword} „${s.keyword}”` : null, s.title ? `${t.scopeMatchTitle} „${s.title}”` : null].filter(Boolean);
 
+  const toc = [["how", h.howTitle], ["works", h.howWorksTitle], ["pipeline", h.pipelineTitle], ["statuses", h.twoStatusesTitle], ["selection", h.selectionTitle], ["add-source", h.addTitle], ["sources", h.sourcesTitle], ["faq", h.faqTitle]];
+  const [activeId, setActiveId] = React.useState("how");
+  React.useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return undefined;
+    const obs = new IntersectionObserver((entries) => { entries.forEach((en) => { if (en.isIntersecting) setActiveId(en.target.id); }); }, { rootMargin: "-20% 0px -70% 0px" });
+    toc.forEach(([id]) => { const el = document.getElementById(id); if (el) obs.observe(el); });
+    return () => obs.disconnect();
+  }, [lang, ws.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const jump = (id) => (e) => { e.preventDefault(); const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 22, maxWidth: 960 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 200px", gap: 24, alignItems: "start" }} className="hrbp-help">
+    <style>{`@media (max-width: 1000px){ .hrbp-help{ grid-template-columns: minmax(0,1fr) !important } .hrbp-help-toc{ display:none } }`}</style>
+    <div style={{ display: "flex", flexDirection: "column", gap: 22, minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 260 }}>
           <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-3xl)", color: "var(--text-heading)", margin: 0 }}>{h.title}</h1>
@@ -374,6 +385,7 @@ export function Help({ lang, ws }) {
       <CoverageCard t={t} ws={ws} />
 
       <Card padding="lg">
+        <div id="how" />
         <H2 icon="list-checks">{h.howTitle}</H2>
         <ol style={{ margin: "14px 0 0", paddingLeft: 22, display: "flex", flexDirection: "column", gap: 10 }}>
           {h.how.map(([k, v]) => (
@@ -383,6 +395,7 @@ export function Help({ lang, ws }) {
       </Card>
 
       <Card padding="lg">
+        <div id="works" />
         <H2 icon="radar">{h.howWorksTitle}</H2>
         <ul style={{ margin: "14px 0 0", paddingLeft: 22, display: "flex", flexDirection: "column", gap: 8 }}>
           {[...t.scopeHow, ...h.howWorksExtra].map((line, i) => <li key={i} style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--text-body)" }}>{line}</li>)}
@@ -390,6 +403,7 @@ export function Help({ lang, ws }) {
       </Card>
 
       <Card padding="lg">
+        <div id="pipeline" />
         <H2 icon="git-branch">{h.pipelineTitle}</H2>
         <p style={{ margin: "8px 0 14px", fontSize: 13, color: "var(--text-muted)", lineHeight: 1.55 }}>{h.pipelineIntro}</p>
         <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 0 }}>
@@ -409,6 +423,7 @@ export function Help({ lang, ws }) {
       </Card>
 
       <Card padding="lg">
+        <div id="statuses" />
         <H2 icon="tags">{h.twoStatusesTitle}</H2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18, marginTop: 14 }}>
           <div style={{ padding: 16, border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
@@ -437,6 +452,7 @@ export function Help({ lang, ws }) {
       </Card>
 
       <Card padding="lg">
+        <div id="sources" />
         <H2 icon="crosshair">{h.sourcesTitle} — {t.wsLabel}</H2>
         <p style={{ margin: "8px 0 14px", fontSize: 13, color: "var(--text-muted)" }}>{h.sourcesIntro}</p>
         <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "var(--text-heading)" }}>{h.autoTitle} ({auto.length})</h3>
@@ -512,6 +528,7 @@ export function Help({ lang, ws }) {
       </Card>
 
       <Card padding="lg">
+        <div id="faq" />
         <H2 icon="help-circle">{h.faqTitle}</H2>
         <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 14 }}>
           {h.faq.map(([q, a]) => (
@@ -522,6 +539,11 @@ export function Help({ lang, ws }) {
           ))}
         </div>
       </Card>
+    </div>
+    <aside className="hrbp-help-toc" style={{ position: "sticky", top: 8 }}>
+      <div className="ui-eyebrow" style={{ padding: "0 10px 8px" }}>{t.tocTitle}</div>
+      <nav className="ui-toc">{toc.map(([id, label]) => <a key={id} href={`#${id}`} onClick={jump(id)} className={activeId === id ? "on" : ""}>{label}</a>)}</nav>
+    </aside>
     </div>
   );
 }

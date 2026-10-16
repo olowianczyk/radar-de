@@ -278,8 +278,24 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
   const eventMeta = { detected: { icon: "sparkles", color: "var(--brand)", label: (tt) => tt.evDetected } };
   const toggle = (id) => setSources((prev) => prev.map((s) => (s.id === id ? { ...s, active: !s.active } : s)));
   const defaultIds = new Set(ws.sources.map((s) => s.id));
-  const auto = sources.filter((s) => !isManualSource(s));
+  const allAuto = sources.filter((s) => !isManualSource(s));
   const manual = sources.filter(isManualSource);
+  const [filter, setFilter] = React.useState("all");
+  const [search, setSearch] = React.useState("");
+  const needle = search.trim().toLowerCase();
+  const auto = allAuto.filter((s) => {
+    if (filter === "DU" && (s.register === "SAOS" || s.publisher === "MP")) return false;
+    if (filter === "MP" && s.publisher !== "MP") return false;
+    if (filter === "SAOS" && s.register !== "SAOS") return false;
+    if (filter === "off" && s.active) return false;
+    if (filter === "errors" && !s.error) return false;
+    if (needle && !(`${s.name} ${s.keyword || ""} ${s.title || ""} ${s.referencedRegulation || ""} ${s.phrase || ""} ${t.area[s.area] || ""}`.toLowerCase().includes(needle))) return false;
+    return true;
+  });
+  const areaOrder = Object.keys(ws.areas);
+  auto.sort((a, b) => areaOrder.indexOf(a.area) - areaOrder.indexOf(b.area));
+  const counts = { all: allAuto.length, DU: allAuto.filter((s) => s.register !== "SAOS" && s.publisher !== "MP").length, MP: allAuto.filter((s) => s.publisher === "MP").length, SAOS: allAuto.filter((s) => s.register === "SAOS").length, off: allAuto.filter((s) => !s.active).length, errors: allAuto.filter((s) => s.error).length };
+  const stripeFor = (s) => (s.register === "SAOS" ? "var(--info-600)" : s.publisher === "MP" ? "var(--warning-500)" : "var(--brand)");
 
   const addSource = ({ name, mode, term, publisher, courtType, judgmentType, area }) => {
     const id = Math.max(1000, ...auto.map((s) => s.id)) + 1;
@@ -313,19 +329,30 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
           disabled={scanning || backend === "down"} onClick={runScan}>
           {scanning ? t.scanning : t.checkNow}
         </Button>
-        <span style={{ fontSize: 12.5, color: "var(--text-muted)", paddingBottom: 10 }}>{t.autoSourcesTitle}: {auto.filter((s) => s.active).length}/{auto.length} {t.activeSources}</span>
+        <span style={{ fontSize: 12.5, color: "var(--text-muted)", paddingBottom: 10 }}>{t.autoSourcesTitle}: {allAuto.filter((s) => s.active).length}/{allAuto.length} {t.activeSources}</span>
+      </div>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.srcFilter.search} value={search} onChange={(e) => setSearch(e.target.value)} iconLeft={<Icon name="search" size={15} />} /></div>
+        <div role="group" aria-label={t.srcFilter.all} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {[["all", t.srcFilter.all], ["DU", t.scopeRegisterValue.replace(/ \(.*\)$/, "")], ["MP", t.scopeRegisterMP.replace(/ \(.*\)$/, "")], ["SAOS", t.saos.registerShort], ["off", t.srcFilter.off], ["errors", t.srcFilter.errors]].map(([id, label]) => (
+            (id !== "errors" || counts.errors > 0) && <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)} className={`ui-chip${filter === id ? " ui-chip--on" : ""}`}>{label} <span style={{ opacity: .7 }}>{counts[id]}</span></button>
+          ))}
+        </div>
       </div>
       <Card padding="none">
+        {auto.length === 0 && <div style={{ padding: "28px 20px", textAlign: "center", fontSize: 13, color: "var(--text-muted)" }}>{t.srcFilter.none}</div>}
         {auto.map((s, i) => {
           const isOpen = expanded === s.id;
           const hist = sourceHistory[s.id] || [];
           const kwBad = keywordBad(s, thesaurus.set);
           const queries = sourceQueries(s);
+          const newArea = i === 0 || auto[i - 1].area !== s.area;
           return (
             <React.Fragment key={s.id}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", flexWrap: "wrap",
-                borderTop: i ? "1px solid var(--border-subtle)" : "none", opacity: s.active ? 1 : 0.55,
+              {newArea && <div className="ui-eyebrow" style={{ padding: "12px 20px 4px", borderTop: i ? "1px solid var(--border-subtle)" : "none", background: "var(--surface-sunken)" }}>{t.area[s.area] || t.area.other}</div>}
+              <div className="ui-stripe" style={{
+                "--stripe": stripeFor(s), display: "flex", alignItems: "center", gap: 16, padding: "14px 20px 14px 24px", flexWrap: "wrap",
+                borderTop: newArea ? "none" : "1px solid var(--border-subtle)", opacity: s.active ? 1 : 0.55, transition: "opacity var(--dur-base)",
               }}>
                 <div style={{ width: 38, height: 38, borderRadius: "var(--radius-sm)", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 38px" }}>
                   <Icon name="radar" size={18} />
@@ -346,7 +373,6 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
                   {s.error && <div style={{ fontSize: 11.5, color: "var(--danger-600)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{s.error}</div>}
                 </div>
                 {s.register !== "SAOS" && <Badge tone="neutral">{s.type}</Badge>}
-                <Badge tone="neutral">{t.area[s.area] || t.area.other}</Badge>
                 <div style={{ minWidth: 90, textAlign: "center" }}>
                   <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 20, color: hist.length ? "var(--brand)" : "var(--ink-300)" }}>{hist.length}</div>
                   <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".04em" }}>{t.changesFound}</div>

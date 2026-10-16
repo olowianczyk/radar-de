@@ -30,20 +30,21 @@ function periodRange(period, customDate) {
 
 function ScanBanner({ t, backend, sources, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo, lastScanFound }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 10, background: "var(--brand-soft)", color: "var(--on-brand-soft)", padding: "10px 16px", borderRadius: "var(--radius-md)", fontSize: 13, flexWrap: "wrap" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingBottom: 10 }}>
-        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success-500)", flex: "0 0 8px" }} />
-        <Icon name="radar" size={16} />
-        <span style={{ fontWeight: 600 }}>{t.monitoring}: {t.autoScan}</span>
-        <span style={{ opacity: 0.75 }}>· {t.lastChecked.toLowerCase()}: {latestIsapCheck(sources)}</span>
-        {lastScanFound != null && !scanning && <span style={{ fontWeight: 600 }}>· {t.scanDone} ({lastScanFound})</span>}
+    <div className="ui-card" style={{ display: "flex", alignItems: "flex-end", gap: 12, padding: "10px 16px", fontSize: 13, flexWrap: "wrap", borderRadius: "var(--radius-md)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingBottom: 10, color: "var(--text-body)", flex: "1 1 320px", minWidth: 0 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 9, background: backend === "ok" ? "var(--success-100)" : "var(--danger-100)", color: backend === "ok" ? "var(--success-600)" : "var(--danger-600)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="radar" size={15} /></span>
+        <span style={{ fontWeight: 600, color: "var(--text-heading)" }}>{t.monitoring}</span>
+        <span style={{ color: "var(--text-muted)" }}>{t.autoScan}</span>
+        <span style={{ color: "var(--text-muted)" }}>· {t.lastChecked.toLowerCase()}: <strong style={{ color: "var(--text-heading)", fontWeight: 600 }}>{latestIsapCheck(sources) || "—"}</strong></span>
+        {lastScanFound != null && !scanning && <span style={{ fontWeight: 600, color: "var(--success-600)" }}>· {t.scanDone} ({lastScanFound})</span>}
       </div>
-      <div style={{ flex: 1 }} />
-      <Input type="date" label={t.periodFrom} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} style={{ width: 140 }} />
-      <Input type="date" label={t.periodTo} value={scanTo} onChange={(e) => setScanTo(e.target.value)} style={{ width: 140 }} />
-      <Button variant="secondary" size="sm" disabled={scanning || backend === "down"} onClick={runScan} iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={14} className={scanning ? "hrbp-spin" : ""} />}>
-        {scanning ? t.scanning : t.checkNow}
-      </Button>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", flex: "0 0 auto" }}>
+        <Input type="date" label={t.periodFrom} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} wrapStyle={{ width: 150 }} />
+        <Input type="date" label={t.periodTo} value={scanTo} onChange={(e) => setScanTo(e.target.value)} wrapStyle={{ width: 150 }} />
+        <Button variant="primary" disabled={scanning || backend === "down"} onClick={() => runScan()} iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={15} className={scanning ? "hrbp-spin" : ""} />} style={{ marginBottom: 1 }}>
+          {scanning ? t.scanning : t.checkNow}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -104,21 +105,25 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-3xl)", color: "var(--text-heading)", margin: 0 }}>{t.greet}</h1>
-        <p style={{ margin: "6px 0 0", color: "var(--text-muted)", fontSize: 14 }}>{(() => {
-          const n = newCount + changes.filter(c=>c.status==="urgent").length;
-          const f = t.greetSubForms;
-          return (f[new Intl.PluralRules(lang).select(n)] || f.many || f.other).replace("{n}", String(n));
-        })()}</p>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <div className="ui-eyebrow" style={{ marginBottom: 6 }}>{new Date().toLocaleDateString(lang === "pl" ? "pl-PL" : lang === "de" ? "de-DE" : "en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · {t.wsLabel}</div>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-4xl)", color: "var(--text-heading)", margin: 0, letterSpacing: "-.01em" }}>{t.greet}</h1>
+          <p style={{ margin: "6px 0 0", color: "var(--text-body)", fontSize: 15 }}>{(() => {
+            const n = newCount + changes.filter(c=>c.status==="urgent").length;
+            const f = t.greetSubForms;
+            return (f[new Intl.PluralRules(lang).select(n)] || f.many || f.other).replace("{n}", String(n));
+          })()}</p>
+        </div>
       </div>
+      <FirstSteps t={t} ws={ws} changes={changes} backend={backend} runScan={runScan} />
       <CoverageCard t={t} ws={ws} sources={sources} variant="compact" />
       <ScanBanner t={t} backend={backend} sources={sources} scanning={scanning} runScan={runScan} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} lastScanFound={lastScanFound} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
-        <StatCard label={t.kpi.new} value={String(newCount)} accent="danger" icon={<Icon name="sparkles" size={18} />} />
-        <StatCard label={t.kpi.pending} value={String(pendingCount)} accent="petrol" icon={<Icon name="clock" size={18} />} />
+        <StatCard label={t.kpi.new} value={String(newCount)} accent={newCount ? "danger" : "petrol"} icon={<Icon name="sparkles" size={18} />} />
+        <StatCard label={t.kpi.pending} value={String(pendingCount)} accent="warning" icon={<Icon name="clock" size={18} />} />
         <StatCard label={t.kpi.tracked} value={String(sources.filter((s) => s.active && !isManualSource(s)).length)} accent="success" icon={<Icon name="radar" size={18} />} />
-        <StatCard label={t.kpi.updated} value={String(doneThisMonth)} accent="coral" icon={<Icon name="check-circle-2" size={18} />} />
+        <StatCard label={t.kpi.updated} value={String(doneThisMonth)} accent="info" icon={<Icon name="check-circle-2" size={18} />} />
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} iconLeft={<Icon name="search" size={16} />} /></div>
@@ -174,25 +179,29 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
             </label>
           )}
           {filtered.length === 0 && (
-            <Card padding="none"><EmptyState icon="scale" title={t.feedEmptyTitle} subtitle={t.feedEmptySub} /></Card>
+            <Card padding="none"><EmptyState icon="scale" title={t.feedEmptyTitle} subtitle={t.feedEmptySub} action={changes.length === 0 && backend === "ok" ? <Button variant="primary" iconLeft={<Icon name="calendar-search" size={15} />} disabled={scanning} onClick={() => runScan({ from: `${new Date().getFullYear()}-01-01` })}>{t.firstSteps.scanYear}</Button> : null} /></Card>
           )}
           {filtered.map((c) => {
             const isSel = c.id === selectedId;
             return (
-              <Card key={c.id} interactive onClick={() => setSelectedId(c.id)}
-                style={isSel ? { borderColor: "var(--brand)", boxShadow: "0 0 0 2px var(--ring-color)" } : {}} padding="md">
+              <Card key={c.id} interactive selected={isSel} onClick={() => setSelectedId(c.id)} padding="md" className="ui-stripe"
+                style={{ "--stripe": c.status === "urgent" ? "var(--danger-600)" : c.status === "done" ? "var(--success-600)" : c.status === "progress" ? "var(--warning-500)" : "var(--info-600)" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div onClick={(e) => e.stopPropagation()} style={{ paddingTop: 2 }}><Checkbox checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={c.title[lang]} /></div>
                   <div style={{ width: 36, height: 36, borderRadius: "var(--radius-sm)", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 36px" }}>
                     <Icon name={c.kind === "judgment" ? "gavel" : "scale"} size={17} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14 }}>{c.title[lang]}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{c.act} · {c.date}</div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-                    <StatusPill status={HRBP_STATUS_MAP[c.status]} lang={lang} label={t.st[c.status]} />
-                    <Badge tone={areaTone(ws, c.area)}>{t.area[c.area] || t.area.other}</Badge>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14, lineHeight: 1.35, minWidth: 0 }}>{c.title[lang]}</div>
+                      <StatusPill status={HRBP_STATUS_MAP[c.status]} lang={lang} label={t.st[c.status]} style={{ flex: "0 0 auto" }} />
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>{c.act}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                      <Badge tone={areaTone(ws, c.area)} style={{ whiteSpace: "normal", textAlign: "left" }}>{t.area[c.area] || t.area.other}</Badge>
+                      {c.actType && <Badge tone="neutral">{c.actType}</Badge>}
+                      <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>{c.date}</span>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -276,6 +285,38 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
         </Card>
       </div>
     </div>
+  );
+}
+
+// One-time onboarding card per department, dismissed into localStorage.
+// Shown only while the feed is empty — the three actions are real ones.
+function FirstSteps({ t, ws, changes, backend, runScan }) {
+  const key = `hrbp-onboarded-${ws.id}`;
+  const [hidden, setHidden] = React.useState(() => { try { return localStorage.getItem(key) === "1"; } catch (e) { return false; } });
+  if (hidden || changes.length > 0) return null;
+  const dismiss = () => { setHidden(true); try { localStorage.setItem(key, "1"); } catch (e) {} };
+  const f = t.firstSteps;
+  const icons = ["radar", "calendar-search", "tags"];
+  return (
+    <Card padding="lg" className="hrbp-pop" style={{ background: "linear-gradient(135deg, var(--brand-soft), var(--surface-card) 70%)" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-xl)", color: "var(--text-heading)" }}>{f.title}</h2>
+        <Button variant="ghost" size="sm" onClick={dismiss} iconLeft={<Icon name="x" size={14} />}>{f.dismiss}</Button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 14 }}>
+        {f.steps.map((step, i) => (
+          <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <span style={{ width: 34, height: 34, borderRadius: 10, background: "var(--surface-card)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 34px", boxShadow: "var(--shadow-xs)", fontWeight: 700, fontFamily: "var(--font-display)" }}>{i + 1}</span>
+            <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--text-body)" }}>{step}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
+        <Button variant="secondary" size="sm" iconLeft={<Icon name="radar" size={14} />} onClick={() => { window.location.hash = `#/${ws.id}/sources`; }}>{f.sources}</Button>
+        <Button variant="primary" size="sm" disabled={backend !== "ok"} iconLeft={<Icon name="calendar-search" size={14} />} onClick={() => runScan({ from: `${new Date().getFullYear()}-01-01` })}>{f.scanYear}</Button>
+        <Button variant="ghost" size="sm" iconLeft={<Icon name="help-circle" size={14} />} onClick={() => { window.location.hash = `#/${ws.id}/help`; }}>{f.guide}</Button>
+      </div>
+    </Card>
   );
 }
 

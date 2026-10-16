@@ -54,3 +54,28 @@
 :root[data-theme="dark"][data-accent="teal"], :root[data-theme="dark"]:not([data-accent]){
   --brand:#2aa6ae; --brand-hover:#5bc0c6;
 }
+
+/* Sunset — warm orange */
+:root[data-accent="sunset"]{
+  --brand:#c2571a; --brand-hover:#9e4512; --brand-soft:#fbe9dd; --on-brand-soft:#7d3710;
+  --brand-tint:#fbe9dd; --focus-ring:color-mix(in srgb,#c2571a 45%,transparent); --ring-color:color-mix(in srgb,#c2571a 22%,transparent);
+}
+:root[data-theme="dark"][data-accent="sunset"]{
+  --brand:#ef9a63; --brand-hover:#f4b084; --brand-soft:#40271a; --on-brand-soft:#f6c4a3; --brand-tint:#40271a;
+}
+/* Rose — magenta-pink */
+:root[data-accent="rose"]{
+  --brand:#b02a5b; --brand-hover:#8e2149; --brand-soft:#f9e3eb; --on-brand-soft:#7a1c3e;
+  --brand-tint:#f9e3eb; --focus-ring:color-mix(in srgb,#b02a5b 45%,transparent); --ring-color:color-mix(in srgb,#b02a5b 22%,transparent);
+}
+:root[data-theme="dark"][data-accent="rose"]{
+  --brand:#ea7fa5; --brand-hover:#f09dba; --brand-soft:#3e1f2b; --on-brand-soft:#f5b9cd; --brand-tint:#3e1f2b;
+}
+/* Indigo — deep blue-violet */
+:root[data-accent="indigo"]{
+  --brand:#3f4bb8; --brand-hover:#323b95; --brand-soft:#e6e8f9; --on-brand-soft:#2b3380;
+  --brand-tint:#e6e8f9; --focus-ring:color-mix(in srgb,#3f4bb8 45%,transparent); --ring-color:color-mix(in srgb,#3f4bb8 22%,transparent);
+}
+:root[data-theme="dark"][data-accent="indigo"]{
+  --brand:#8f98ee; --brand-hover:#a8aff3; --brand-soft:#23264a; --on-brand-soft:#c3c8f7; --brand-tint:#23264a;
+}

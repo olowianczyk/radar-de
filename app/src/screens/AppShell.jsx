@@ -3,7 +3,7 @@
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
 import { LoadingState } from "../components/Loading.jsx";
-import { WORKSPACES, ACCENTS, initialSources, isManualSource, tFor } from "../workspaces.js";
+import { WORKSPACES, ACCENTS, ACCENT_SWATCH, initialSources, isManualSource, tFor } from "../workspaces.js";
 import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc, addKbComment, saveTriage, saveSourceConfig } from "../isapIntegration.js";
 
 function useSources(ws) {
@@ -32,10 +32,58 @@ function LangSwitch({ lang, setLang }) {
   );
 }
 
-function Wordmark({ t }) {
+function Wordmark({ t, ws }) {
   return (
-    <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700, letterSpacing: ".03em", textTransform: "uppercase", color: "var(--text-heading)", lineHeight: 1.25 }}>
-      {t.product}
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <span aria-hidden="true" style={{ width: 36, height: 36, borderRadius: 11, flex: "0 0 36px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--on-brand)", background: "linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 60%, var(--accent)))", boxShadow: "0 6px 16px color-mix(in srgb, var(--brand) 30%, transparent)" }}>
+        <Icon name="radar" size={18} />
+      </span>
+      <div style={{ lineHeight: 1.15, minWidth: 0 }}>
+        <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 700, color: "var(--text-heading)", letterSpacing: "-.01em" }}>{t.product}</div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.app}</div>
+      </div>
+    </div>
+  );
+}
+
+// Quick appearance popover in the top bar: theme + accent, same preferences as
+// Settings, so colour variants are one click away.
+function AppearancePopover({ t, lang, appearance, ws }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return undefined;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDoc); document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+  const { theme, setTheme, accent, setAccent, effectiveAccent } = appearance;
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <IconButton label={t.appearance} active={open} onClick={() => setOpen((v) => !v)}><Icon name="palette" size={18} /></IconButton>
+      {open && (
+        <div className="ui-popover hrbp-pop" role="dialog" aria-label={t.appearance}>
+          <div className="ui-eyebrow" style={{ marginBottom: 8 }}>{t.settings.theme}</div>
+          <div role="radiogroup" style={{ display: "flex", background: "var(--surface-sunken)", borderRadius: "var(--radius-pill)", padding: 3, gap: 2, marginBottom: 14 }}>
+            {["light", "dark", "system"].map((m) => (
+              <button key={m} type="button" role="radio" aria-checked={theme === m} onClick={() => setTheme(m)} style={{ flex: 1, border: "none", cursor: "pointer", padding: "7px 8px", borderRadius: "var(--radius-pill)", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600, background: theme === m ? "var(--brand)" : "transparent", color: theme === m ? "var(--on-brand)" : "var(--text-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 32 }}>
+                <Icon name={m === "light" ? "sun" : m === "dark" ? "moon" : "monitor"} size={13} />{t.settings.themes[m]}
+              </button>
+            ))}
+          </div>
+          <div className="ui-eyebrow" style={{ marginBottom: 8 }}>{t.settings.accent} · <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>{accent === "auto" ? `${t.settings.accentAuto} (${t.accents[effectiveAccent]})` : t.accents[accent]}</span></div>
+          <div role="radiogroup" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            <button type="button" role="radio" aria-checked={accent === "auto"} title={t.settings.accentAuto} onClick={() => setAccent("auto")} className={`ui-chip${accent === "auto" ? " ui-chip--on" : ""}`}>
+              <span style={{ display: "inline-flex" }}>{WORKSPACES.map((w) => <span key={w.id} style={{ width: 9, height: 9, borderRadius: "50%", background: ACCENT_SWATCH[w.accent], marginLeft: -2, border: "1px solid var(--surface-card)" }} />)}</span>
+              {t.settings.accentAuto}
+            </button>
+            {ACCENTS.map((a) => (
+              <button key={a} type="button" role="radio" aria-checked={accent === a} aria-label={t.accents[a]} title={t.accents[a]} onClick={() => setAccent(a)} className={`ui-swatch${accent === a ? " ui-swatch--on" : ""}`} style={{ background: ACCENT_SWATCH[a] }} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -54,19 +102,16 @@ function WorkspaceSwitch({ ws, setWorkspace, lang, t, compact }) {
     );
   }
   return (
-    <div role="group" aria-label={t.switchWorkspace} style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 12 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text-muted)", padding: "0 4px 4px" }}>{t.workspace}</div>
+    <div role="group" aria-label={t.switchWorkspace} style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 14 }}>
+      <div className="ui-eyebrow" style={{ padding: "0 2px 2px" }}>{t.workspace}</div>
       {WORKSPACES.map((w) => {
         const isActive = w.id === ws.id;
         return (
-          <button key={w.id} type="button" onClick={() => setWorkspace(w.id)} aria-pressed={isActive} style={{
-            display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", padding: "7px 8px", border: "1px solid",
-            borderColor: isActive ? "var(--brand)" : "transparent", borderRadius: "var(--radius-sm)", cursor: "pointer",
-            background: isActive ? "var(--brand-soft)" : "transparent", color: isActive ? "var(--on-brand-soft)" : "var(--text-body)",
-            fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: isActive ? 700 : 500,
-          }}>
+          <button key={w.id} type="button" onClick={() => setWorkspace(w.id)} aria-pressed={isActive} className={`ui-ws${isActive ? " ui-ws--active" : ""}`}>
+            <span className="ui-ws__dot" style={{ background: ACCENT_SWATCH[w.accent] }} />
             <Icon name={w.icon} size={15} />
             <span style={{ flex: 1 }}>{w.label[lang] || w.label.pl}</span>
+            {isActive && <Icon name="check" size={14} />}
           </button>
         );
       })}
@@ -93,13 +138,9 @@ function BottomTabBar({ items, activeId, onSelect }) {
       {items.map((it) => {
         const isActive = it.id === activeId;
         return (
-          <button key={it.id} onClick={() => onSelect(it.id)} style={{
-            flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-            padding: "9px 4px 8px", border: "none", background: "transparent", cursor: "pointer",
-            color: isActive ? "var(--brand)" : "var(--text-muted)", position: "relative",
-          }}>
-            <span style={{ display: "inline-flex" }}>{it.icon}</span>
-            <span style={{ fontFamily: "var(--font-sans)", fontSize: 10, fontWeight: isActive ? 700 : 500, textAlign: "center", lineHeight: 1.1 }}>{it.label}</span>
+          <button key={it.id} onClick={() => onSelect(it.id)} aria-current={isActive ? "page" : undefined} className={`ui-bottomtab${isActive ? " ui-bottomtab--active" : ""}`}>
+            <span className="ui-bottomtab__icon">{it.icon}</span>
+            <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 500, textAlign: "center", lineHeight: 1.1 }}>{it.label}</span>
             {!!it.badge && (
               <span style={{ position: "absolute", top: 4, right: "28%", minWidth: 15, height: 15, borderRadius: "50%", background: "var(--accent)", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{it.badge}</span>
             )}
@@ -261,13 +302,15 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
   const addComment = React.useCallback((docId, text) => addKbComment(ws.id, docId, text)
     .then((doc) => setKbDocs((prev) => prev.map((d) => (d.id === doc.id ? doc : d))))
     .catch((e) => { reportError(t.notice.saveComment, e); throw e; }), [ws.id, t, reportError]);
-  const runScan = React.useCallback(() => {
+  const runScan = React.useCallback((override) => {
     if (scanning) return;
     setScanning(true);
     setNotice(null);
     // "From" alone is a valid period (backend defaults "to" = today); swap if reversed.
     const [f, to] = scanFrom && scanTo && scanFrom > scanTo ? [scanTo, scanFrom] : [scanFrom, scanTo];
-    const range = f ? { from: f, to: to || undefined } : undefined;
+    const explicit = override && typeof override === "object" && typeof override.from === "string" ? override : null;
+    if (explicit) { setScanFrom(explicit.from); setScanTo(explicit.to || ""); }
+    const range = explicit ? { from: explicit.from, to: explicit.to || undefined } : f ? { from: f, to: to || undefined } : undefined;
     const scanned = sources.filter((s) => s.active && !isManualSource(s));
     forceScan(ws.id, scanned, range).then((data) => {
       const results = data.results || [];
@@ -332,7 +375,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
       {!isMobile && (
         <SidebarNav
           items={items} activeId={active} onSelect={setActive}
-          header={<div><Wordmark t={t} /><WorkspaceSwitch ws={ws} setWorkspace={setWorkspace} lang={lang} t={t} /></div>}
+          header={<div><Wordmark t={t} ws={ws} /><WorkspaceSwitch ws={ws} setWorkspace={setWorkspace} lang={lang} t={t} /></div>}
           footer={
             <button onClick={() => setActive("settings")} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", border: "none", background: "transparent", cursor: "pointer", padding: 0, textAlign: "left" }}>
               <Avatar name={t.persona} size="sm" tone={1} />
@@ -372,6 +415,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
             </IconButton>
           )}
           <LangSwitch lang={lang} setLang={setLang} />
+          <AppearancePopover t={t} lang={lang} appearance={appearance} ws={ws} />
           <IconButton label={t.settings.darkMode} active={dark} onClick={() => setDark((d) => !d)}><Icon name={dark ? "sun" : "moon"} size={18} /></IconButton>
           {!isMobile && (
             <div ref={notifRef} style={{ position: "relative" }}>
@@ -439,12 +483,12 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
           </div>
         )}
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
-          <div style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
+          <div key={active} className="hrbp-screen" style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
             {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, appearance, backend, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment }) : children}
           </div>
         </main>
       </div>
-      {isMobile && <BottomTabBar items={items} activeId={active} onSelect={setActive} />}
+      {isMobile && <BottomTabBar items={[...items, { id: "settings", label: t.nav.settings, icon: <Icon name="settings" size={18} /> }]} activeId={active} onSelect={setActive} />}
     </div>
   );
 }
