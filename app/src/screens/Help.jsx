@@ -5,6 +5,7 @@
 import React from "react";
 import { Card, Badge, Icon, Button, StatusPill } from "../components/index.js";
 import { tFor, isManualSource } from "../workspaces.js";
+import { CoverageCard } from "../components/CoverageCard.jsx";
 
 const HELP = {
   pl: {
@@ -245,6 +246,8 @@ export function Help({ lang, ws }) {
         </div>
         <Button variant="secondary" iconLeft={<Icon name="printer" size={16} />} onClick={() => window.print()}>{h.print}</Button>
       </div>
+
+      <CoverageCard t={t} ws={ws} />
 
       <Card padding="lg">
         <H2 icon="list-checks">{h.howTitle}</H2>

@@ -5,6 +5,7 @@ import { EmptyState } from "../components/Loading.jsx";
 import { HRBP_STATUS_MAP } from "../data.js";
 import { tFor, areaTone } from "../workspaces.js";
 import { latestIsapCheck } from "../isapIntegration.js";
+import { CoverageCard } from "../components/CoverageCard.jsx";
 
 function parseDMY(s) {
   const [d, m, y] = (s || "").split(".").map(Number);
@@ -109,7 +110,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
           return (f[new Intl.PluralRules(lang).select(n)] || f.many || f.other).replace("{n}", String(n));
         })()}</p>
       </div>
-      <a href={`#/${ws.id}/help`} style={{ fontSize: 12.5, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 6, alignSelf: "flex-start", marginTop: -8 }}><Icon name="help-circle" size={14} />{t.howListWorks}</a>
+      <CoverageCard t={t} ws={ws} sources={sources} variant="compact" />
       <ScanBanner t={t} backend={backend} sources={sources} scanning={scanning} runScan={runScan} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} lastScanFound={lastScanFound} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
         <StatCard label={t.kpi.new} value={String(newCount)} accent="danger" icon={<Icon name="sparkles" size={18} />} />

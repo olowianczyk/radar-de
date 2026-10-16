@@ -10,6 +10,7 @@ import React from "react";
 import { Card, Badge, Switch, Icon, Button, IconButton, Input, Select } from "../components/index.js";
 import { tFor, isManualSource } from "../workspaces.js";
 import { fetchKeywords, sourceQueryUrl, sourceQueries, nextScanRange } from "../isapIntegration.js";
+import { CoverageCard } from "../components/CoverageCard.jsx";
 
 function fmtIso(iso, lang) {
   const [y, m, d] = (iso || "").split("-");
@@ -235,6 +236,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
         <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 14 }}>{t.sourcesSub}</p>
         <Button variant="secondary" iconLeft={<Icon name="plus" size={16} />} disabled={backend !== "ok"} onClick={() => setAdding((v) => !v)}>{t.addSourceTitle}</Button>
       </div>
+      <CoverageCard t={t} ws={ws} sources={sources} />
       <HowItWorks t={t} />
       {adding && <AddSourceForm t={t} ws={ws} onAdd={addSource} onCancel={() => setAdding(false)} />}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
