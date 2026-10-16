@@ -3,7 +3,7 @@
 // link by design, so nothing here pretends otherwise.
 import React from "react";
 import { Card, Avatar, Select, Switch, Badge, Icon } from "../components/index.js";
-import { tFor, ACCENTS, WORKSPACES, ACCENT_SWATCH as SWATCH } from "../workspaces.js";
+import { tFor, ACCENTS, WORKSPACES, THEMES, THEME_ICON, ACCENT_SWATCH as SWATCH } from "../workspaces.js";
 
 function Row({ label, children }) {
   return (
@@ -45,11 +45,11 @@ export function Settings({ lang, ws, setLang, appearance }) {
           </Row>
           <Row label={t.theme}>
             <div role="radiogroup" aria-label={t.theme} style={{ display: "flex", background: "var(--surface-sunken)", borderRadius: "var(--radius-pill)", padding: 3, gap: 2 }}>
-              {["light", "dark", "system"].map((m) => (
+              {THEMES.map((m) => (
                 <button key={m} type="button" role="radio" aria-checked={theme === m} onClick={() => { setTheme(m); flash(); }} style={{
                   border: "none", cursor: "pointer", padding: "6px 12px", borderRadius: "var(--radius-pill)", fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600,
                   background: theme === m ? "var(--brand)" : "transparent", color: theme === m ? "var(--on-brand)" : "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: 6,
-                }}><Icon name={m === "light" ? "sun" : m === "dark" ? "moon" : "monitor"} size={13} />{t.themes[m]}</button>
+                }}><Icon name={THEME_ICON[m]} size={13} />{t.themes[m]}</button>
               ))}
             </div>
           </Row>

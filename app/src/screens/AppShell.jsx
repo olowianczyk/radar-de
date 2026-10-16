@@ -4,7 +4,7 @@ import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
 import { LoadingState } from "../components/Loading.jsx";
 import { RadarMark } from "../components/RadarMark.jsx";
-import { WORKSPACES, ACCENTS, ACCENT_SWATCH, initialSources, isManualSource, tFor } from "../workspaces.js";
+import { WORKSPACES, ACCENTS, ACCENT_SWATCH, THEMES, THEME_ICON, initialSources, isManualSource, tFor } from "../workspaces.js";
 import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc, addKbComment, saveTriage, saveSourceConfig } from "../isapIntegration.js";
 
 function useSources(ws) {
@@ -25,7 +25,7 @@ function LangSwitch({ lang, setLang }) {
         <button key={l} onClick={() => setLang(l)} style={{
           border: "none", cursor: "pointer", padding: "5px 11px", borderRadius: "var(--radius-pill)",
           fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em",
-          background: lang === l ? "var(--brand)" : "transparent", color: lang === l ? "#fff" : "var(--text-muted)",
+          background: lang === l ? "var(--brand)" : "transparent", color: lang === l ? "var(--on-brand)" : "var(--text-muted)",
           transition: "background var(--dur-base), color var(--dur-base)",
         }}>{l}</button>
       ))}
@@ -69,9 +69,9 @@ function AppearancePopover({ t, lang, appearance, ws }) {
         <div className="ui-popover hrbp-pop" role="dialog" aria-label={t.appearance}>
           <div className="ui-eyebrow" style={{ marginBottom: 8 }}>{t.settings.theme}</div>
           <div role="radiogroup" style={{ display: "flex", background: "var(--surface-sunken)", borderRadius: "var(--radius-pill)", padding: 3, gap: 2, marginBottom: 14 }}>
-            {["light", "dark", "system"].map((m) => (
-              <button key={m} type="button" role="radio" aria-checked={theme === m} onClick={() => setTheme(m)} style={{ flex: 1, border: "none", cursor: "pointer", padding: "7px 8px", borderRadius: "var(--radius-pill)", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600, background: theme === m ? "var(--brand)" : "transparent", color: theme === m ? "var(--on-brand)" : "var(--text-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 32 }}>
-                <Icon name={m === "light" ? "sun" : m === "dark" ? "moon" : "monitor"} size={13} />{t.settings.themes[m]}
+            {THEMES.map((m) => (
+              <button key={m} type="button" role="radio" aria-checked={theme === m} onClick={() => setTheme(m)} style={{ flex: 1, border: "none", cursor: "pointer", padding: "7px 6px", borderRadius: "var(--radius-pill)", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600, background: theme === m ? "var(--brand)" : "transparent", color: theme === m ? "var(--on-brand)" : "var(--text-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 32 }}>
+                <Icon name={THEME_ICON[m]} size={13} />{t.settings.themes[m]}
               </button>
             ))}
           </div>
@@ -145,7 +145,7 @@ function BottomTabBar({ items, activeId, onSelect }) {
             <span className="ui-bottomtab__icon">{it.icon}</span>
             <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 500, textAlign: "center", lineHeight: 1.1 }}>{it.label}</span>
             {!!it.badge && (
-              <span style={{ position: "absolute", top: 4, right: "28%", minWidth: 15, height: 15, borderRadius: "50%", background: "var(--accent)", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{it.badge}</span>
+              <span style={{ position: "absolute", top: 4, right: "28%", minWidth: 15, height: 15, borderRadius: "50%", background: "var(--accent)", color: "var(--on-accent, #fff)", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{it.badge}</span>
             )}
           </button>
         );
@@ -154,13 +154,28 @@ function BottomTabBar({ items, activeId, onSelect }) {
   );
 }
 
-// Appearance is a per-browser preference: theme light | dark | system and an
-// accent palette (tokens/accents.css). accent "auto" follows the workspace's
-// own colour so each department is recognisable at a glance.
-const THEMES = ["light", "dark", "system"];
+// Appearance is a per-browser preference: theme radar | light | dark | system
+// and an accent palette (tokens/accents.css, tokens/theme-radar.css).
+//
+// Theme "radar" (the DEFAULT) is the dark radar-screen look of the logo. It is
+// a dark theme underneath: <html> gets data-theme="dark" (so all dark tokens
+// apply) plus data-skin="radar" (the green-black surfaces on top).
+//
+// accent "auto" follows the workspace's own colour so each department is
+// recognisable at a glance — except in the radar theme, where "auto" means the
+// radar's own phosphor green (the look is one brand palette by design). Any
+// explicitly picked accent still applies in every theme.
+//
+// Storage key: "rl-theme", NOT the old "hrbp-theme". The old key was written on
+// every visit (the effect below saves the current value), so nearly every
+// returning browser holds "system" there and would never see the new default.
+// A fresh key gives everyone the radar theme once; whoever prefers light/dark
+// picks it again and that choice is then remembered under the new key.
+// ponytail: old light/dark choices are not migrated (cannot tell a deliberate
+// "system" from the auto-saved default); add a one-off copy if users complain.
 function useAppearance(ws) {
   const read = (k, allowed, fallback) => { try { const v = localStorage.getItem(k); return allowed.includes(v) ? v : fallback; } catch (e) { return fallback; } };
-  const [theme, setTheme] = React.useState(() => read("hrbp-theme", THEMES, "system"));
+  const [theme, setTheme] = React.useState(() => read("rl-theme", THEMES, "radar"));
   const [accent, setAccent] = React.useState(() => read("hrbp-accent", ["auto", ...ACCENTS], "auto"));
   const [systemDark, setSystemDark] = React.useState(() => typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
   React.useEffect(() => {
@@ -170,15 +185,22 @@ function useAppearance(ws) {
     mq.addEventListener ? mq.addEventListener("change", onChange) : mq.addListener(onChange);
     return () => { mq.removeEventListener ? mq.removeEventListener("change", onChange) : mq.removeListener(onChange); };
   }, []);
-  const dark = theme === "dark" || (theme === "system" && systemDark);
-  const effectiveAccent = accent === "auto" ? ws.accent || "teal" : accent;
+  const radar = theme === "radar";
+  const dark = radar || theme === "dark" || (theme === "system" && systemDark);
+  const effectiveAccent = accent === "auto" ? (radar ? "radar" : ws.accent || "teal") : accent;
   React.useEffect(() => {
-    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-    document.documentElement.setAttribute("data-accent", effectiveAccent);
-    try { localStorage.setItem("hrbp-theme", theme); localStorage.setItem("hrbp-accent", accent); } catch (e) {}
-  }, [dark, theme, accent, effectiveAccent]);
-  // The top-bar toggle flips between explicit light and dark (leaving "system").
-  const setDark = React.useCallback((v) => setTheme((prev) => { const cur = prev === "dark" || (prev === "system" && systemDark); const next = typeof v === "function" ? v(cur) : v; return next ? "dark" : "light"; }), [systemDark]);
+    const html = document.documentElement;
+    html.setAttribute("data-theme", dark ? "dark" : "light");
+    // data-skin only exists for the radar theme; removing it restores the
+    // plain light/dark surfaces.
+    if (radar) html.setAttribute("data-skin", "radar"); else html.removeAttribute("data-skin");
+    html.setAttribute("data-accent", effectiveAccent);
+    try { localStorage.setItem("rl-theme", theme); localStorage.setItem("hrbp-accent", accent); } catch (e) {}
+  }, [dark, radar, theme, accent, effectiveAccent]);
+  // The top-bar sun/moon toggle flips between light and the DEFAULT dark look,
+  // i.e. radar (leaving "system"). The neutral "dark" stays selectable in the
+  // appearance menu and in Settings.
+  const setDark = React.useCallback((v) => setTheme((prev) => { const cur = prev === "radar" || prev === "dark" || (prev === "system" && systemDark); const next = typeof v === "function" ? v(cur) : v; return next ? "radar" : "light"; }), [systemDark]);
   return { dark, setDark, theme, setTheme, accent, setAccent, effectiveAccent };
 }
 
@@ -425,7 +447,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
               <IconButton label={t.notifications} active={notifOpen} onClick={() => setNotifOpen((v) => !v)} style={{ position: "relative" }}>
                 <Icon name="bell" size={18} />
                 {unreadTotal > 0 && (
-                  <span style={{ position: "absolute", top: 2, right: 2, minWidth: 15, height: 15, borderRadius: "50%", background: "var(--accent)", color: "#fff", fontSize: 9.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unreadTotal}</span>
+                  <span style={{ position: "absolute", top: 2, right: 2, minWidth: 15, height: 15, borderRadius: "50%", background: "var(--accent)", color: "var(--on-accent, #fff)", fontSize: 9.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unreadTotal}</span>
                 )}
               </IconButton>
               {notifOpen && (

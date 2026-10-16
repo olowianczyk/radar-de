@@ -227,7 +227,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
               <div style={{ display: "flex", gap: 24, padding: "14px 0", borderTop: "1px solid var(--border-subtle)", borderBottom: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
                 <Meta label={t.published} value={sel.date} />
                 <Meta label={t.effective} value={sel.effective} />
-                <Meta label={t.source} value={/^https?:/.test(sel.source) ? <a href={sel.source} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>ISAP ↗</a> : sel.source} small />
+                <Meta label={t.source} value={/^https?:/.test(sel.source) ? <a href={sel.source} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>{sel.kind === "judgment" ? "SAOS" : "ISAP"} ↗</a> : sel.source} small />
               </div>
               {sel.kind === "judgment" ? (
               <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 8 }}>

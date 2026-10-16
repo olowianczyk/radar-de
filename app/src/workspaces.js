@@ -29,10 +29,20 @@ import { HRBP_I18N } from "./data.js";
 
 const ISAP = "https://isap.sejm.gov.pl";
 const TONES = ["brand", "blue", "amber", "green", "neutral"];
-// Accent palettes defined in public/tokens/accents.css ("teal" is the base palette).
-export const ACCENTS = ["teal", "ocean", "plum", "indigo", "forest", "terracotta", "sunset", "rose", "graphite"];
+// Accent palettes defined in public/tokens/accents.css ("teal" is the base palette)
+// plus "radar" (phosphor green, public/tokens/theme-radar.css) — listed first
+// because it is the brand colour and the default of the default "radar" theme.
+export const ACCENTS = ["radar", "teal", "ocean", "plum", "indigo", "forest", "terracotta", "sunset", "rose", "graphite"];
+// Themes offered in the pickers (Settings + the top-bar appearance popover), in
+// display order, with their lucide icon. "radar" is the default look: the dark
+// radar screen of the logo (public/tokens/theme-radar.css). "dark" is the older
+// neutral dark theme, kept for people who prefer it.
+export const THEMES = ["radar", "light", "dark", "system"];
+export const THEME_ICON = { radar: "radar", light: "sun", dark: "moon", system: "monitor" };
 // Light-theme primary of each accent — swatches in pickers and workspace dots.
-export const ACCENT_SWATCH = { teal: "#00727e", ocean: "#1f5fa8", plum: "#6b3fa0", indigo: "#3f4bb8", forest: "#2f6b3f", terracotta: "#b4472c", sunset: "#c2571a", rose: "#b02a5b", graphite: "#3d4a52" };
+// Exception: "radar" shows its phosphor green (#3DF5B0), the colour people
+// recognise from the logo, rather than its darker light-theme shade.
+export const ACCENT_SWATCH = { radar: "#3DF5B0", teal: "#00727e", ocean: "#1f5fa8", plum: "#6b3fa0", indigo: "#3f4bb8", forest: "#2f6b3f", terracotta: "#b4472c", sunset: "#c2571a", rose: "#b02a5b", graphite: "#3d4a52" };
 
 const tr = (pl, en, de) => ({ pl, en, de });
 // Automatic source. `o` carries { title?, keyword?, publisher?, type?, active? }.
@@ -41,6 +51,17 @@ const src = (id, name, area, o = {}, scope) => ({ id, name, type: o.type || "Ust
 // referencedRegulation = an act the judgment cites (precise); phrase = full-text (broad).
 const saos = (id, name, area, o, scope) => ({ id, name, type: "Orzecznictwo", register: "SAOS", url: "https://www.saos.org.pl/search", area, courtType: o.courtType, judgmentTypes: o.judgmentTypes || [], referencedRegulation: o.referencedRegulation || null, phrase: o.phrase || null, keyword: null, title: null, publisher: "SAOS", active: o.active, scope: scope || null });
 const NOTE_SAOS = tr("SAOS agreguje portale orzeczeń z opóźnieniem — skan cofa się o 60 dni i deduplikuje po id; panel zakresu pokazuje datę najnowszego orzeczenia w SAOS dla tego sądu.", "SAOS aggregates court portals with a delay — the scan looks back 60 days and dedupes by id; the scope panel shows the newest judgment SAOS holds for this court.", "SAOS aggregiert Gerichtsportale verzögert — der Scan geht 60 Tage zurück und dedupliziert nach ID; der Umfangsbereich zeigt das neueste Urteil in SAOS für dieses Gericht.");
+// Why SN / NSA / TK / KIO case law is MANUAL although SAOS has those courts:
+// measured live on 2026-10-16, SAOS stopped receiving them (newest judgment —
+// SN 2016-06, TK 2015-12, KIO 2018-09; NSA/WSA: no judgments at all). Only
+// common courts are current there, so only COMMON sources scan SAOS; the rest
+// point at the courts' own portals. `{d}` = when SAOS's copy ends.
+// ponytail: re-measure once a year (GET /api/scan?register=SAOS&courtType=...)
+// and switch a court back to saos(...) if SAOS starts updating it again.
+const noteSaosFrozen = (pl, en, de) => tr(
+  `Automatyczny skan niemożliwy: SAOS nie otrzymuje już tych orzeczeń (${pl}). Przeglądaj portal sądu.`,
+  `No automatic scan: SAOS no longer receives these judgments (${en}). Review the court's own portal.`,
+  `Kein automatischer Scan: SAOS erhält diese Entscheidungen nicht mehr (${de}). Das Gerichtsportal prüfen.`);
 // Manual (non-scannable) source.
 const man = (id, name, area, url, cadence, reason, scope) => ({ id, name, type: "Manual", kind: "manual", url, area, cadence, reason, keyword: null, title: null, scope: scope || null });
 
@@ -68,9 +89,10 @@ export const WORKSPACES = [
       other: tr("Inne", "Other", "Sonstiges"),
     },
     sources: [
-      saos(201, "Sąd Najwyższy — orzeczenia powołujące Kodeks pracy", "caselaw", { courtType: "SUPREME", judgmentTypes: ["SENTENCE", "RESOLUTION"], referencedRegulation: "Kodeks pracy" }, NOTE_SAOS),
-      saos(202, "Sądy powszechne (apelacyjne/okręgowe) — Kodeks pracy", "caselaw", { courtType: "COMMON", judgmentTypes: ["SENTENCE"], referencedRegulation: "Kodeks pracy", active: false },
-        tr("Duży wolumen (setki orzeczeń miesięcznie) — włącz, jeśli zespół ma kto to przeglądać. Rozważ zawężenie frazą.", "High volume (hundreds a month) — switch on only if someone will review it. Consider narrowing with a phrase.", "Hohes Volumen (Hunderte pro Monat) — nur einschalten, wenn jemand es sichtet. Ggf. mit Phrase eingrenzen.")),
+      // ponytail: id 201 (the old SAOS "SN — Kodeks pracy" source) is retired,
+      // not reused — its scan history in Blob stays attached to nothing.
+      saos(202, "Sądy powszechne — wyroki powołujące Kodeks pracy", "caselaw", { courtType: "COMMON", judgmentTypes: ["SENTENCE"], referencedRegulation: "Kodeks pracy" },
+        tr("Ok. 5 wyroków miesięcznie (pomiar 10.2026) — sądy pracy rejonowe, okręgowe i apelacyjne. SN: źródło ręczne poniżej.", "About 5 judgments a month (measured 10.2026) — district, regional and appeal labour courts. SN: manual source below.", "Etwa 5 Urteile pro Monat (Messung 10.2026) — Arbeitsgerichte aller Instanzen. SN: manuelle Quelle unten.")),
       src(1, "Kodeks pracy", "contracts", { keyword: "kodeks pracy", title: "Kodeks pracy" },
         tr("Słowo kluczowe łapie nowelizacje zbiorcze („…oraz niektórych innych ustaw”), tytuł — teksty jednolite i nowelizacje nazwane. Priorytet: jawność wynagrodzeń (dyr. 2023/970), praca zdalna, mobbing.", "Keyword catches omnibus amendments, title catches consolidated texts and named amendments. Priority: pay transparency (Dir. 2023/970), remote work, mobbing.", "Schlagwort erfasst Sammelnovellen, Titel erfasst konsolidierte Fassungen und benannte Novellen. Priorität: Entgelttransparenz (RL 2023/970), Remote-Arbeit, Mobbing.")),
       src(2, "Ustawa o pracowniczych planach kapitałowych (PPK)", "pay", { keyword: "pracownicze plany kapitałowe", title: "o pracowniczych planach kapitałowych" }),
@@ -105,6 +127,7 @@ export const WORKSPACES = [
         tr("Monitor Polski: komunikaty Prezesa GUS o przeciętnym wynagrodzeniu — podstawa limitów ZUS i wielu progów.", "Monitor Polski: Statistics Poland notices on average pay — the basis for ZUS limits and many thresholds.", "Monitor Polski: GUS-Bekanntmachungen zum Durchschnittsentgelt — Grundlage für ZUS-Grenzen und viele Schwellen.")),
       man(101, "MRPiPS — stanowiska i interpretacje", "other", "https://www.gov.pl/web/rodzina", "monthly", "guidance"),
       man(105, "TSUE — orzeczenia w sprawach pracowniczych (czas pracy, urlopy, dyskryminacja)", "caselaw", "https://curia.europa.eu/", "monthly", "caselaw"),
+      man(106, "Sąd Najwyższy — Izba Pracy i Ubezpieczeń Społecznych (uchwały, wyroki)", "caselaw", "https://www.sn.pl/orzecznictwo/SitePages/Wyszukiwarka.aspx", "weekly", "caselaw", noteSaosFrozen("SN — do 06.2016", "SN — up to 06.2016", "SN — bis 06.2016")),
       man(102, "EUR-Lex — dyrektywy 2023/970 (jawność wynagrodzeń) i 2024/2831 (praca platformowa)", "pay", "https://eur-lex.europa.eu/", "monthly", "eu"),
       man(103, "Rządowe Centrum Legislacji — projekty z zakresu prawa pracy", "other", "https://legislacja.gov.pl/", "weekly", "draft"),
       man(104, "Sejm — druki i proces legislacyjny", "other", "https://www.sejm.gov.pl/", "weekly", "draft"),
@@ -134,12 +157,9 @@ export const WORKSPACES = [
       other: tr("Inne", "Other", "Sonstiges"),
     },
     sources: [
-      saos(201, "NSA / WSA — orzeczenia powołujące ustawę AML", "caselaw", { courtType: "ADMINISTRATIVE", referencedRegulation: "o przeciwdziałaniu praniu pieniędzy" }, NOTE_SAOS),
-      saos(202, "NSA / WSA — orzeczenia powołujące ustawę o ochronie danych osobowych", "caselaw", { courtType: "ADMINISTRATIVE", referencedRegulation: "o ochronie danych osobowych" }, NOTE_SAOS),
+      // ponytail: ids 201, 202, 204 (old SAOS NSA/WSA sources) are retired, not reused.
       saos(203, "SOKiK — odwołania od decyzji Prezesa UOKiK", "caselaw", { courtType: "COMMON", phrase: "Prezesa Urzędu Ochrony Konkurencji i Konsumentów" },
         tr("Fraza pełnotekstowa — łapie też sprawy, w których UOKiK jest tylko wspomniany. SAOS indeksuje sądy powszechne z opóźnieniem.", "Full-text phrase — also catches cases merely mentioning UOKiK. SAOS indexes common courts with a delay.", "Volltextphrase — erfasst auch Fälle, die UOKiK nur erwähnen. SAOS indexiert ordentliche Gerichte verzögert.")),
-      saos(204, "NSA — uchwały w sprawach podatkowych (Ordynacja, VAT, CIT)", "caselaw", { courtType: "ADMINISTRATIVE", judgmentTypes: ["RESOLUTION"], referencedRegulation: "podatk" },
-        tr("Tylko uchwały NSA; fragment „podatk” łapie Ordynację podatkową i ustawy o podatkach.", "NSA resolutions only; the fragment “podatk” matches the Tax Ordinance and tax acts.", "Nur NSA-Beschlüsse; das Fragment „podatk“ trifft Abgabenordnung und Steuergesetze.")),
       src(1, "Ustawa o przeciwdziałaniu praniu pieniędzy oraz finansowaniu terroryzmu", "aml", { title: "o przeciwdziałaniu praniu pieniędzy", keyword: "pranie pieniędzy" },
         tr("Pakiet AML UE (AMLR od 07.2027, AMLA) jest prawem UE — poza Dz.U.", "The EU AML package (AMLR from 07.2027, AMLA) is EU law — outside Dz.U.", "Das EU-AML-Paket (AMLR ab 07.2027, AMLA) ist EU-Recht — außerhalb des Gesetzblatts.")),
       src(2, "Sankcje krajowe — ustawa o przeciwdziałaniu wspieraniu agresji na Ukrainę", "sanctions", { title: "przeciwdziałania wspieraniu agresji na Ukrainę" },
@@ -203,6 +223,7 @@ export const WORKSPACES = [
       man(112, "Komisja Europejska — wytyczne (konkurencja, AI Act, ESG), pakiety Omnibus", "other", "https://commission.europa.eu/", "monthly", "guidance"),
       man(113, "Rządowe Centrum Legislacji — projekty i OSR", "other", "https://legislacja.gov.pl/", "weekly", "draft"),
       man(114, "Sejm — druki i proces legislacyjny", "other", "https://www.sejm.gov.pl/", "weekly", "draft"),
+      man(115, "NSA / WSA (CBOSA) — AML, ochrona danych, uchwały podatkowe", "caselaw", "https://orzeczenia.nsa.gov.pl/", "weekly", "caselaw", noteSaosFrozen("NSA/WSA — brak w SAOS", "NSA/WSA — not in SAOS", "NSA/WSA — nicht in SAOS")),
     ],
   },
   {
@@ -227,18 +248,10 @@ export const WORKSPACES = [
       other: tr("Inne", "Other", "Sonstiges"),
     },
     sources: [
-      saos(201, "Sąd Najwyższy — uchwały (k.c., k.p.c., k.s.h. i inne)", "caselaw", { courtType: "SUPREME", judgmentTypes: ["RESOLUTION"], referencedRegulation: "Kodeks" },
-        tr("Uchwały SN powołujące dowolny kodeks (fragment „Kodeks”). Zagadnienia prawne dopiero przedstawione do rozstrzygnięcia nie są w SAOS — sn.pl (źródło ręczne).", "SN resolutions citing any code (fragment “Kodeks”). Legal questions merely referred are not in SAOS — sn.pl (manual source).", "SN-Beschlüsse mit Bezug auf ein Gesetzbuch (Fragment „Kodeks“). Erst vorgelegte Rechtsfragen fehlen in SAOS — sn.pl (manuelle Quelle).")),
-      saos(202, "Sąd Najwyższy — wyroki powołujące Kodeks cywilny", "caselaw", { courtType: "SUPREME", judgmentTypes: ["SENTENCE"], referencedRegulation: "Kodeks cywilny" }, NOTE_SAOS),
-      saos(203, "Sąd Najwyższy — wyroki powołujące Kodeks spółek handlowych", "caselaw", { courtType: "SUPREME", judgmentTypes: ["SENTENCE"], referencedRegulation: "Kodeks spółek handlowych" }, NOTE_SAOS),
-      saos(204, "NSA — uchwały", "caselaw", { courtType: "ADMINISTRATIVE", judgmentTypes: ["RESOLUTION"], referencedRegulation: "ustaw" },
-        tr("Wszystkie uchwały NSA (fragment „ustaw” pasuje do każdej powołanej ustawy).", "All NSA resolutions (the fragment “ustaw” matches any cited statute).", "Alle NSA-Beschlüsse (Fragment „ustaw“ trifft jedes zitierte Gesetz).")),
-      saos(205, "Trybunał Konstytucyjny — wyroki", "caselaw", { courtType: "CONSTITUTIONAL_TRIBUNAL", judgmentTypes: ["SENTENCE"], referencedRegulation: "Konstytucja" },
-        tr("Każdy wyrok TK powołuje Konstytucję, więc fragment „Konstytucja” = wszystkie wyroki.", "Every TK judgment cites the Constitution, so “Konstytucja” = all judgments.", "Jedes TK-Urteil zitiert die Verfassung, daher „Konstytucja“ = alle Urteile.")),
-      saos(206, "Krajowa Izba Odwoławcza — orzeczenia (PZP)", "caselaw", { courtType: "NATIONAL_APPEAL_CHAMBER", referencedRegulation: "zamówień publicznych", active: false },
-        tr("Bardzo duży wolumen — włącz tylko z frazą zawężającą albo gdy zamówienia publiczne są kluczowe.", "Very high volume — switch on only with a narrowing phrase or when procurement is core business.", "Sehr hohes Volumen — nur mit eingrenzender Phrase oder wenn Vergabe Kerngeschäft ist.")),
-      saos(207, "Sądy apelacyjne — wyroki powołujące Kodeks cywilny", "caselaw", { courtType: "COMMON", judgmentTypes: ["SENTENCE"], referencedRegulation: "Kodeks cywilny", active: false },
-        tr("Duży wolumen; domyślnie wyłączone.", "High volume; off by default.", "Hohes Volumen; standardmäßig aus.")),
+      // ponytail: ids 201–206 (old SAOS SN/NSA/TK/KIO sources) are retired, not reused.
+      saos(207, "Sądy powszechne — wyroki powołujące Kodeks cywilny", "caselaw", { courtType: "COMMON", judgmentTypes: ["SENTENCE"], referencedRegulation: "Kodeks cywilny", active: false },
+        tr("Większy wolumen (ok. 35 wyroków miesięcznie, pomiar 10.2026); domyślnie wyłączone.", "Higher volume (about 35 judgments a month, measured 10.2026); off by default.", "Höheres Volumen (etwa 35 Urteile pro Monat, Messung 10.2026); standardmäßig aus.")),
+      saos(208, "Sądy powszechne — wyroki powołujące Kodeks spółek handlowych", "caselaw", { courtType: "COMMON", judgmentTypes: ["SENTENCE"], referencedRegulation: "Kodeks spółek handlowych" }, NOTE_SAOS),
       src(1, "Konstytucja Rzeczypospolitej Polskiej", "codes", { title: "Konstytucja Rzeczypospolitej Polskiej" }),
       src(2, "Kodeks cywilny", "codes", { title: "Kodeks cywilny", keyword: "kodeks cywilny" },
         tr("Tu trafi też wdrożenie dyrektywy 2024/2853 o odpowiedzialności za produkt (art. 449¹ i n.), jeśli pójdzie przez k.c.", "Transposition of Directive 2024/2853 on product liability (Art. 449¹ et seq.) lands here too if done via the Civil Code.", "Auch die Umsetzung der RL 2024/2853 zur Produkthaftung (Art. 449¹ ff.) landet hier, wenn über das Zivilgesetzbuch.")),
@@ -308,6 +321,10 @@ export const WORKSPACES = [
         tr("Także komunikaty Ministra Cyfryzacji o terminach wdrożenia (Dz.U.).", "Also the Minister of Digital Affairs' notices on rollout dates (Dz.U.).", "Auch die Bekanntmachungen des Digitalministers zu Einführungsterminen (Dz.U.).")),
       src(59, "Usługi zaufania i identyfikacja elektroniczna", "digital", { title: "o usługach zaufania" }),
       man(101, "Sąd Najwyższy — zagadnienia prawne przedstawione do rozstrzygnięcia (jeszcze bez uchwały)", "caselaw", "https://www.sn.pl/", "weekly", "caselaw"),
+      man(113, "Sąd Najwyższy — uchwały i wyroki (k.c., k.p.c., k.s.h.)", "caselaw", "https://www.sn.pl/orzecznictwo/SitePages/Wyszukiwarka.aspx", "weekly", "caselaw", noteSaosFrozen("SN — do 06.2016", "SN — up to 06.2016", "SN — bis 06.2016")),
+      man(102, "NSA / CBOSA — uchwały i linia orzecznicza", "caselaw", "https://orzeczenia.nsa.gov.pl/", "weekly", "caselaw", noteSaosFrozen("NSA/WSA — brak w SAOS", "NSA/WSA — not in SAOS", "NSA/WSA — nicht in SAOS")),
+      man(103, "Trybunał Konstytucyjny — wyroki uchylające przepisy", "caselaw", "https://ipo.trybunal.gov.pl/", "monthly", "caselaw", noteSaosFrozen("TK — do 12.2015", "TK — up to 12.2015", "TK — bis 12.2015")),
+      man(114, "KIO — orzeczenia (zamówienia publiczne)", "procurement", "https://orzeczenia.uzp.gov.pl/", "monthly", "caselaw", noteSaosFrozen("KIO — do 09.2018", "KIO — up to 09.2018", "KIO — bis 09.2018")),
       man(104, "TSUE — wyroki i opinie rzeczników generalnych", "caselaw", "https://curia.europa.eu/", "weekly", "caselaw"),
       man(105, "UZP — opinie prawne i wytyczne", "procurement", "https://www.uzp.gov.pl/", "monthly", "guidance"),
       man(106, "EUR-Lex — Bruksela I bis, Rzym I/II, doręczenia 2020/1784, dowody 2020/1783, upadłość 2015/848", "disputes", "https://eur-lex.europa.eu/", "monthly", "eu"),

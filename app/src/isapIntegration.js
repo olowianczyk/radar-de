@@ -189,7 +189,10 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
         changeDate: e.changeDate || null,
         displayAddress: e.displayAddress || null,
         detectedOn: isoToDmy(e.detectedOn) || date,
-        source: e.url || source.url,
+        // Judgments detected before the link fix stored SAOS's JSON endpoint
+        // (saos.org.pl/api/judgments/{id}); rewrite it to the human page
+        // (saos.org.pl/judgments/{id}) so old feed entries open correctly too.
+        source: (e.url || source.url || "").replace("saos.org.pl/api/judgments/", "saos.org.pl/judgments/"),
         title: { pl: e.note, de: e.note, en: e.note },
         summary: isJudgment ? { pl: e.excerpt || "", de: e.excerpt || "", en: e.excerpt || "" } : summary,
         affected: [],

@@ -1,0 +1,104 @@
+/* ==========================================================================
+   "Radar" theme — the app's DEFAULT look (deep teal-black + phosphor green)
+   ==========================================================================
+
+   Same palette as the logo and the intro (root index.html): the dark radar
+   screen #061517, phosphor green #3DF5B0 and amber #FFB547. The product owner
+   asked for this look to become the main theme of the app.
+
+   HOW IT IS SWITCHED ON (see useAppearance in src/screens/AppShell.jsx)
+   Theme "radar" puts TWO attributes on <html>:
+     data-theme="dark"   → every existing dark rule applies (tokens/dark.css,
+                           the dark accents in tokens/accents.css, the dark
+                           wordmark colours in radar.css). This file only
+                           layers the radar differences on top of them.
+     data-skin="radar"   → the neutral surfaces below (canvas, cards, borders,
+                           text) become the radar's green-tinted blacks.
+   With accent "auto" the app also sets data-accent="radar" (phosphor green
+   for --brand). Picking another accent in the appearance menu keeps the radar
+   surfaces but swaps the brand colour, exactly like in the other themes.
+
+   The "radar" ACCENT also works in the light theme (forest-like #0B7A62, the
+   light wordmark colour of the logo), so it behaves like the other 9 accents.
+
+   Loaded from styles.css AFTER dark.css and accents.css: the selectors here
+   have equal or higher specificity, and on a tie the later file wins.
+   ========================================================================== */
+
+/* ---- Radar surfaces (only with data-skin="radar") -------------------------- */
+:root[data-skin="radar"]{
+  /* Surfaces, darkest to lightest: page → sunken wells → cards. Each step is a
+     little lighter and greener, so cards read as raised panels on the screen. */
+  --canvas:#061517;           /* = intro background */
+  --surface:#0a1f21;          /* sidebar, top bar, popovers */
+  --surface-card:#0b2325;     /* cards */
+  --surface-sunken:#0e2b2c;   /* inputs, segmented controls, hover rows */
+
+  /* Borders: phosphor green at low strength instead of grey. */
+  --border:#143834;
+  --border-subtle:#143834;
+  --border-default:#1d4a45;
+  --border-strong:#1d4a45;
+
+  /* Text: mint-white headings, soft green body, the intro's muted green. All
+     ≥ 4.5:1 on --surface-card (muted #84bfb0 ≈ 7.9:1). */
+  --text-strong:#e8fff7;
+  --text-heading:#e8fff7;
+  --text-body:#bfe0d6;
+  --text-muted:#84bfb0;
+  --ink-300:#3f6f64;          /* placeholder / disabled grey-green */
+
+  /* Second accent = the logo's amber (the "fresh detection" blip), replacing
+     coral. Used for unread badges and .ui-btn--accent; text placed ON it must
+     be dark, hence --on-accent (white on amber would be ~1.8:1). */
+  --accent:#ffb547;
+  --accent-hover:#ffc670;
+  --accent-soft:#3a2f14;
+  --on-accent:#2a1a00;
+
+  /* Soft status backgrounds, nudged towards the green-black canvas so they do
+     not look like grey patches. The status foreground colours stay as in dark. */
+  --green-100:#0f3a2c;
+  --success-100:#0f3a2c;
+  --amber-100:#3a2f14;
+  --warning-100:#3a2f14;
+  --red-100:#3d1d1c;
+  --danger-100:#3d1d1c;
+  --blue-100:#0f2a3a;
+  --info-100:#0f2a3a;
+
+  /* Shadows: deeper black plus a faint phosphor glow on the large ones, like
+     the glow around the radar disc. */
+  --shadow-xs:0 1px 2px rgba(0,0,0,.5);
+  --shadow-sm:0 2px 10px rgba(0,0,0,.45);
+  --shadow-md:0 6px 18px rgba(0,0,0,.5), 0 0 0 1px rgba(61,245,176,.04);
+  --shadow-lg:0 20px 44px rgba(0,0,0,.6), 0 0 40px rgba(61,245,176,.06);
+
+  /* Headings in the logo's Space Grotesk (loaded by radar.css) instead of the
+     serif Fraunces, so screen titles match the logo and the intro. Body text
+     stays Figtree. */
+  --font-display:"Space Grotesk","Figtree",system-ui,sans-serif;
+
+  /* Native controls (<select> dropdown, date pickers, scrollbars) render in
+     their dark variant; without it the language <select> shows a white box. */
+  color-scheme:dark;
+}
+
+/* ---- "radar" accent, light theme ------------------------------------------- */
+:root[data-accent="radar"]{
+  --brand:#0b7a62; --brand-hover:#08604d; --brand-soft:#dcf3ec; --on-brand-soft:#08503f;
+  --brand-tint:#dcf3ec; --teal-100:#dcf3ec;
+  --focus-ring:color-mix(in srgb,#0b7a62 45%,transparent); --ring-color:color-mix(in srgb,#0b7a62 22%,transparent);
+}
+
+/* ---- "radar" accent, dark theme (the default combination) ------------------ */
+/* Phosphor green is very bright, so text and icons ON it (primary buttons,
+   active nav item, selected segmented control) switch to near-black via
+   --on-brand — white on #3DF5B0 would be ~1.4:1, near-black is ~13:1. */
+:root[data-theme="dark"][data-accent="radar"]{
+  --brand:#3df5b0; --brand-hover:#7af8c8;
+  --brand-soft:#0f3a33; --brand-tint:#0f3a33; --teal-100:#0f3a33;
+  --on-brand-soft:#9ff7d4;
+  --on-brand:#04201a; --text-on-brand:#04201a;
+  --focus-ring:color-mix(in srgb,#3df5b0 45%,transparent); --ring-color:color-mix(in srgb,#3df5b0 25%,transparent);
+}

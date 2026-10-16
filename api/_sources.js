@@ -3,17 +3,6 @@
 module.exports = {
   hr: [
     {
-      id: 201,
-      publisher: "SAOS",
-      register: "SAOS",
-      "courtType": "SUPREME",
-      "judgmentTypes": [
-        "SENTENCE",
-        "RESOLUTION"
-      ],
-      "referencedRegulation": "Kodeks pracy"
-    },
-    {
       id: 202,
       publisher: "SAOS",
       register: "SAOS",
@@ -21,8 +10,7 @@ module.exports = {
       "judgmentTypes": [
         "SENTENCE"
       ],
-      "referencedRegulation": "Kodeks pracy",
-      active: false
+      "referencedRegulation": "Kodeks pracy"
     },
     {
       id: 1,
@@ -122,35 +110,11 @@ module.exports = {
   ],
   compliance: [
     {
-      id: 201,
-      publisher: "SAOS",
-      register: "SAOS",
-      "courtType": "ADMINISTRATIVE",
-      "referencedRegulation": "o przeciwdziałaniu praniu pieniędzy"
-    },
-    {
-      id: 202,
-      publisher: "SAOS",
-      register: "SAOS",
-      "courtType": "ADMINISTRATIVE",
-      "referencedRegulation": "o ochronie danych osobowych"
-    },
-    {
       id: 203,
       publisher: "SAOS",
       register: "SAOS",
       "courtType": "COMMON",
       phrase: "Prezesa Urzędu Ochrony Konkurencji i Konsumentów"
-    },
-    {
-      id: 204,
-      publisher: "SAOS",
-      register: "SAOS",
-      "courtType": "ADMINISTRATIVE",
-      "judgmentTypes": [
-        "RESOLUTION"
-      ],
-      "referencedRegulation": "podatk"
     },
     {
       id: 1,
@@ -309,64 +273,6 @@ module.exports = {
   ],
   legal: [
     {
-      id: 201,
-      publisher: "SAOS",
-      register: "SAOS",
-      "courtType": "SUPREME",
-      "judgmentTypes": [
-        "RESOLUTION"
-      ],
-      "referencedRegulation": "Kodeks"
-    },
-    {
-      id: 202,
-      publisher: "SAOS",
-      register: "SAOS",
-      "courtType": "SUPREME",
-      "judgmentTypes": [
-        "SENTENCE"
-      ],
-      "referencedRegulation": "Kodeks cywilny"
-    },
-    {
-      id: 203,
-      publisher: "SAOS",
-      register: "SAOS",
-      "courtType": "SUPREME",
-      "judgmentTypes": [
-        "SENTENCE"
-      ],
-      "referencedRegulation": "Kodeks spółek handlowych"
-    },
-    {
-      id: 204,
-      publisher: "SAOS",
-      register: "SAOS",
-      "courtType": "ADMINISTRATIVE",
-      "judgmentTypes": [
-        "RESOLUTION"
-      ],
-      "referencedRegulation": "ustaw"
-    },
-    {
-      id: 205,
-      publisher: "SAOS",
-      register: "SAOS",
-      "courtType": "CONSTITUTIONAL_TRIBUNAL",
-      "judgmentTypes": [
-        "SENTENCE"
-      ],
-      "referencedRegulation": "Konstytucja"
-    },
-    {
-      id: 206,
-      publisher: "SAOS",
-      register: "SAOS",
-      "courtType": "NATIONAL_APPEAL_CHAMBER",
-      "referencedRegulation": "zamówień publicznych",
-      active: false
-    },
-    {
       id: 207,
       publisher: "SAOS",
       register: "SAOS",
@@ -376,6 +282,16 @@ module.exports = {
       ],
       "referencedRegulation": "Kodeks cywilny",
       active: false
+    },
+    {
+      id: 208,
+      publisher: "SAOS",
+      register: "SAOS",
+      "courtType": "COMMON",
+      "judgmentTypes": [
+        "SENTENCE"
+      ],
+      "referencedRegulation": "Kodeks spółek handlowych"
     },
     {
       id: 1,

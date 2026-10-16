@@ -9,8 +9,23 @@ const { put, get } = require("@vercel/blob");
 const SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
 const KEYWORDS_URL = "https://api.sejm.gov.pl/eli/keywords";
 // SAOS — System Analizy Orzeczeń Sądowych (ICM UW): public JSON API, no key.
+// Docs: https://www.saos.org.pl/help/index.php/dokumentacja-api
 // Aggregates court portals with a publication delay, so every SAOS scan looks
 // back SAOS_LOOKBACK_DAYS behind the last check and relies on dedupe by id.
+//
+// COVERAGE (measured live on 2026-10-16 — newest judgmentDate per courtType):
+//   COMMON                   current (judgments up to last week, ~1.5k/month)
+//   SUPREME                  frozen at 2016-06
+//   CONSTITUTIONAL_TRIBUNAL  frozen at 2015-12
+//   NATIONAL_APPEAL_CHAMBER  frozen at 2018-09
+//   ADMINISTRATIVE           0 judgments at all
+// So only common-court sources are worth scanning; the default SN/NSA/TK/KIO
+// sources are manual entries pointing at the courts' own portals (see
+// app/src/workspaces.js). The freshness probe below keeps showing this in the
+// UI if anyone adds such a source by hand.
+// Data quality: a few records carry impossible future dates (3013-12-04,
+// 2101-04-14 — typos at the source), so every query that sorts by date must
+// cap judgmentDateTo at today, or those records sort to the top.
 const SAOS_SEARCH_URL = "https://www.saos.org.pl/api/search/judgments";
 const SAOS_JUDGMENT_URL = "https://www.saos.org.pl/judgments/";
 const SAOS_LOOKBACK_DAYS = 60;
@@ -199,7 +214,9 @@ async function searchJudgments(opts) {
   if (!data || !Array.isArray(data.items)) throw new Error("SAOS API: unexpected response shape (no items[])");
   return data.items.map((j) => ({
     id: j.id,
-    href: j.href || `${SAOS_JUDGMENT_URL}${j.id}`,
+    // Human-readable judgment page. NOT j.href — in search results that is the
+    // JSON endpoint (/api/judgments/{id}), which opened raw JSON in the feed.
+    href: `${SAOS_JUDGMENT_URL}${j.id}`,
     courtType: j.courtType || opts.courtType || null,
     courtName: (j.division && j.division.court && j.division.court.name) || (j.court && j.court.name) || null,
     caseNumbers: Array.isArray(j.courtCases) ? j.courtCases.map((c) => c && c.caseNumber).filter(Boolean) : [],
@@ -220,7 +237,9 @@ async function saosLatestFor(courtType) {
   if (hit && Date.now() - hit.ts < SAOS_FRESHNESS_TTL_MS) return hit.p;
   const p = (async () => {
     try {
-      const items = await searchJudgments({ courtType, pageSize: 1 });
+      // dateTo = today skips the typo'd future dates (see COVERAGE above),
+      // which would otherwise report e.g. COMMON as "newest: 3013-12-04".
+      const items = await searchJudgments({ courtType, dateTo: isoToday(), pageSize: 1 });
       return items[0] && items[0].judgmentDate ? items[0].judgmentDate : null;
     } catch (e) {
       return null;

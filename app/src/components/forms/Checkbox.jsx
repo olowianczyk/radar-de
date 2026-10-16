@@ -22,7 +22,7 @@ export function Checkbox({ checked = false, onChange, label, disabled = false, i
         {...rest}
       >
         {checked ? (
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--on-brand, #fff)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
         ) : null}

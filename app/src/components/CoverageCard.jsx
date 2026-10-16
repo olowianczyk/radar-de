@@ -15,7 +15,7 @@ const MARK = {
 // not configuration — see README "Na jakiej zasadzie działa skanowanie".
 const MATRIX = [
   ["du", "auto"], ["mp", "auto"], ["saos", "auto"], ["actStatusSnapshot", "auto"],
-  ["eu", "manual"], ["cjeu", "manual"], ["regulators", "manual"], ["sanctions", "manual"], ["drafts", "manual"],
+  ["eu", "manual"], ["caselaw", "manual"], ["cjeu", "manual"], ["regulators", "manual"], ["sanctions", "manual"], ["drafts", "manual"],
   ["content", "no"], ["statusLater", "no"], ["relevance", "no"],
 ];
 
