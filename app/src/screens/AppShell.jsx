@@ -3,6 +3,7 @@
 import React from "react";
 import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
 import { LoadingState } from "../components/Loading.jsx";
+import { RadarMark } from "../components/RadarMark.jsx";
 import { WORKSPACES, ACCENTS, ACCENT_SWATCH, initialSources, isManualSource, tFor } from "../workspaces.js";
 import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc, addKbComment, saveTriage, saveSourceConfig } from "../isapIntegration.js";
 
@@ -32,14 +33,16 @@ function LangSwitch({ lang, setLang }) {
   );
 }
 
-function Wordmark({ t, ws }) {
+// Sidebar brand block: animated radar sygnet + product name + workspace
+// subtitle. The name "Radar Legislacyjny" (t.product) is set in Space Grotesk,
+// the logo's own typeface (loaded by radar.css); the subtitle keeps the app's
+// UI font. The mark is decorative here because the name is written next to it.
+function Wordmark({ t }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <span aria-hidden="true" style={{ width: 36, height: 36, borderRadius: 11, flex: "0 0 36px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--on-brand)", background: "linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 60%, var(--accent)))", boxShadow: "0 6px 16px color-mix(in srgb, var(--brand) 30%, transparent)" }}>
-        <Icon name="radar" size={18} />
-      </span>
+      <RadarMark size={36} />
       <div style={{ lineHeight: 1.15, minWidth: 0 }}>
-        <div style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 700, color: "var(--text-heading)", letterSpacing: "-.01em" }}>{t.product}</div>
+        <div style={{ fontFamily: "'Space Grotesk', var(--font-display)", fontSize: 15, fontWeight: 700, color: "var(--text-heading)", letterSpacing: "-.01em" }}>{t.product}</div>
         <div style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.app}</div>
       </div>
     </div>
@@ -375,7 +378,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
       {!isMobile && (
         <SidebarNav
           items={items} activeId={active} onSelect={setActive}
-          header={<div><Wordmark t={t} ws={ws} /><WorkspaceSwitch ws={ws} setWorkspace={setWorkspace} lang={lang} t={t} /></div>}
+          header={<div><Wordmark t={t} /><WorkspaceSwitch ws={ws} setWorkspace={setWorkspace} lang={lang} t={t} /></div>}
           footer={
             <button onClick={() => setActive("settings")} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", border: "none", background: "transparent", cursor: "pointer", padding: 0, textAlign: "left" }}>
               <Avatar name={t.persona} size="sm" tone={1} />

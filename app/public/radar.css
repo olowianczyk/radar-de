@@ -1,0 +1,215 @@
+/* Logo typefaces (from the design): Space Grotesk for "§", "Radar", "Legislacyjny";
+   JetBrains Mono for the tagline. Loaded here so every page that links radar.css
+   gets them; must stay the first rule in the file (CSS requires @import first). */
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Space+Grotesk:wght@500;700&display=swap");
+
+/* ==========================================================================
+   Radar Legislacyjny — logo (animated radar mark + wordmark)
+   ==========================================================================
+
+   Single source of truth for the brand logo. Used by:
+     - the React app (app/src/components/RadarMark.jsx) — small mark in the
+       sidebar header, linked from app/index.html as "/radar.css";
+     - the vanilla intro (root index.html, first scene) — full horizontal logo,
+       linked there as "app/radar.css" (Vercel copies app/public/* into dist/app/).
+
+   Ported 1:1 from the Claude Design canvas "Radar Legislacyjny – logo"
+   (artboards "Logo poziome (animowane)" and "Sygnet / ikona"). Every pixel value
+   below is the design's own, drawn on a 300 × 300 px disc.
+
+   HOW SCALING WORKS
+   The disc (.rl-disc) is always laid out at its design size of 300 px and then
+   shrunk/grown with `transform: scale(var(--rl-scale))`. The outer wrapper
+   (.rl-mark) reserves the *scaled* footprint (300px × scale) so surrounding
+   layout sees the real size. Scaling the whole disc — instead of rewriting every
+   length — keeps the rings, grid, glow and box-shadow bezel in exact proportion
+   at any size (36 px in the sidebar, 300 px in the intro).
+     <span class="rl-mark" style="--rl-scale: .12">  →  36 × 36 px mark
+
+   HOW THE ANIMATION WORKS
+   - .rl-sweep is a conic-gradient "beam" that rotates once every --rl-period
+     (4 s, the design default). It starts pointing straight up (0°) and turns
+     clockwise.
+   - Each blip (.rl-blip) is a detected change at polar position (angle a,
+     radius r). Its position is precomputed as left/top percentages:
+         x = 50 + 50·r·sin(a)    y = 50 − 50·r·cos(a)
+     and its animation-delay is a/360 · period, so the blip flashes exactly
+     when the beam passes over it, then fades to a faint afterglow until the
+     next pass — like a real radar screen.
+   - The amber blip (.rl-blip--fresh) is "a new change just detected"; it also
+     emits an expanding ring (.rl-ping) on each pass.
+   - The design's random new detections every 7 s (JS state machine in the
+     canvas) are intentionally NOT ported: the marks here are 36 px or shown for
+     ~2.5 s in the intro, where a random spawn would never be noticed.
+     ponytail: fixed blips; port the canvas's detect() loop if the logo is ever
+     shown large and long (e.g. a dashboard hero).
+   - prefers-reduced-motion: the beam KEEPS rotating on purpose (product owner's
+     decision: "radar ma się kręcić") — it is a slow, smooth, non-flashing turn.
+     Only the flashing extras (blip flash, amber ping, pulsing dot) stop.
+   ========================================================================== */
+
+/* Brand colours of the logo. Fixed on purpose — the radar screen is always the
+   dark "phosphor" disc regardless of the app's theme or department accent.
+   Only the wordmark text switches between the light and dark variants. */
+:root {
+  --rl-phosphor: #3DF5B0;      /* beam, blips, § — the radar's green */
+  --rl-amber: #FFB547;         /* the "fresh detection" blip + tagline dot */
+  --rl-screen: #05191a;        /* disc background */
+  --rl-period: 4s;             /* one full beam revolution */
+  /* Wordmark colours, light variant (design theme "jasny"). */
+  --rl-word-accent: #0B7A62;   /* "Radar" */
+  --rl-word-ink: #0B2224;      /* "Legislacyjny" */
+  --rl-word-sub: #4A6660;      /* tagline */
+}
+/* Dark variant (design theme "ciemny"), following the app's own dark switch
+   (AppShell sets data-theme="dark" on <html>). */
+:root[data-theme="dark"] {
+  --rl-word-accent: #3DF5B0;
+  --rl-word-ink: #E8FFF7;
+  --rl-word-sub: #7FBFAE;
+}
+
+/* ---- Mark: wrapper that reserves the scaled footprint -------------------- */
+.rl-mark {
+  --rl-scale: 1;                               /* override inline per usage */
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  width: calc(300px * var(--rl-scale));
+  height: calc(300px * var(--rl-scale));
+}
+
+/* ---- Disc: the radar screen at its 300 px design size --------------------- */
+.rl-disc {
+  position: absolute;
+  left: 0; top: 0;
+  width: 300px; height: 300px;
+  transform: scale(var(--rl-scale));
+  transform-origin: 0 0;                       /* scale from the wrapper's corner */
+  border-radius: 50%;
+  overflow: hidden;                            /* clip beam + blips to the circle */
+  background-color: var(--rl-screen);
+  /* inner glow + faint 20 px phosphor grid */
+  background-image:
+    radial-gradient(circle, rgba(13,80,72,.85) 0%, rgba(5,25,26,0) 72%),
+    repeating-linear-gradient(0deg, rgba(61,245,176,.08) 0 1px, transparent 1px 20px),
+    repeating-linear-gradient(90deg, rgba(61,245,176,.08) 0 1px, transparent 1px 20px);
+  /* bezel: thin bright ring, dark band, mid ring, then an outer glow */
+  box-shadow: 0 0 0 2px #1f8a76, 0 0 0 9px #0a2c2a, 0 0 0 11px #156356, 0 0 46px rgba(61,245,176,.28);
+}
+
+/* Tick marks around the rim: a conic stripe every 10°, masked to a thin band
+   between 90 % and 97 % of the radius. */
+.rl-ticks {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: repeating-conic-gradient(rgba(61,245,176,.6) 0deg 1.2deg, transparent 1.2deg 10deg);
+  -webkit-mask-image: radial-gradient(circle closest-side, transparent 90%, #000 91%, #000 97%, transparent 98%);
+          mask-image: radial-gradient(circle closest-side, transparent 90%, #000 91%, #000 97%, transparent 98%);
+}
+
+/* Range rings at 75 %, 50 % (emphasised) and 25 % of the radius. */
+.rl-ring { position: absolute; border-radius: 50%; border: 1px solid rgba(61,245,176,.32); }
+.rl-ring--1 { inset: 12.5%; }
+.rl-ring--2 { inset: 25%; border-width: 2px; border-color: rgba(61,245,176,.5); }
+.rl-ring--3 { inset: 37.5%; }
+
+/* Crosshair: vertical and horizontal axis lines. */
+.rl-axis { position: absolute; background: rgba(61,245,176,.35); }
+.rl-axis--v { left: 50%; top: 4%; bottom: 4%; width: 1px; }
+.rl-axis--h { top: 50%; left: 4%; right: 4%; height: 1px; }
+
+/* The rotating beam: a 75° fading tail behind a bright leading edge at 360°. */
+.rl-sweep {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(61,245,176,0) 0deg, rgba(61,245,176,0) 285deg, rgba(61,245,176,.42) 357deg, rgba(190,255,230,.85) 360deg);
+  animation: rl-spin var(--rl-period) linear infinite;
+}
+/* The beam's leading line, from the centre up to the rim. */
+.rl-sweep::after {
+  content: "";
+  position: absolute; left: calc(50% - 1px); top: 0;
+  width: 2px; height: 50%;
+  background: linear-gradient(to top, rgba(190,255,230,.3), #d4fff0);
+  box-shadow: 0 0 8px var(--rl-phosphor);
+}
+
+/* A detected change. Position (left/top) and animation-delay are set inline —
+   see the formulas in the header comment. */
+.rl-blip {
+  position: absolute;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--rl-phosphor);
+  box-shadow: 0 0 10px var(--rl-phosphor);
+  transform: translate(-50%, -50%);            /* centre the dot on its point */
+  animation: rl-blip var(--rl-period) linear infinite;
+}
+.rl-blip--fresh { background: var(--rl-amber); box-shadow: 0 0 10px var(--rl-amber); }
+/* Expanding ring around the fresh blip, emitted on each beam pass. */
+.rl-ping {
+  position: absolute;
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--rl-amber);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: rl-ping var(--rl-period) ease-out infinite;
+}
+
+/* The "§" hub in the middle — the legal-paragraph sign the radar centres on. */
+.rl-hub {
+  position: absolute; left: 50%; top: 50%;
+  width: 30px; height: 30px; margin: -15px 0 0 -15px;
+  border-radius: 50%;
+  background: var(--rl-screen);
+  border: 1px solid rgba(61,245,176,.6);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px; line-height: 1;
+  color: var(--rl-phosphor);
+}
+
+/* ---- Wordmark: "Radar / Legislacyjny / • MONITORING ZMIAN W PRAWIE" -------- */
+.rl-logo { display: flex; align-items: center; gap: 56px; }   /* mark + text, design gap */
+.rl-word { display: flex; flex-direction: column; gap: 10px; }
+.rl-word-1 {                                   /* "Radar" */
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+  font-size: 104px; line-height: .9; letter-spacing: -0.02em;
+  color: var(--rl-word-accent);
+}
+.rl-word-2 {                                   /* "Legislacyjny" */
+  font-family: 'Space Grotesk', sans-serif; font-weight: 500;
+  font-size: 56px; line-height: 1; letter-spacing: -0.01em;
+  color: var(--rl-word-ink);
+}
+.rl-tagline {                                  /* "• MONITORING ZMIAN W PRAWIE" */
+  display: flex; align-items: center; gap: 12px; margin-top: 20px;
+  font-family: 'JetBrains Mono', monospace; font-weight: 500;
+  font-size: 15px; letter-spacing: .18em;
+  color: var(--rl-word-sub);
+}
+.rl-tagline::before {                          /* pulsing amber status dot */
+  content: "";
+  width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px;
+  background: var(--rl-amber);
+  animation: rl-pulse 1.6s ease-in-out infinite;
+}
+
+/* ---- Keyframes (timings from the design) ---------------------------------- */
+@keyframes rl-spin { to { transform: rotate(360deg); } }
+/* Flash bigger when the beam hits, settle, then fade to a 12 % afterglow. */
+@keyframes rl-blip {
+  0%       { opacity: 1;   transform: translate(-50%,-50%) scale(1.5); }
+  10%      { opacity: 1;   transform: translate(-50%,-50%) scale(1); }
+  85%,100% { opacity: .12; transform: translate(-50%,-50%) scale(1); }
+}
+@keyframes rl-ping {
+  0%       { opacity: .95; transform: translate(-50%,-50%) scale(.4); }
+  45%,100% { opacity: 0;   transform: translate(-50%,-50%) scale(3.2); }
+}
+@keyframes rl-pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+
+/* Accessibility: users who ask for less motion lose the flashing/pulsing
+   effects. .rl-sweep is deliberately NOT listed — the radar must always spin
+   (explicit product requirement); a 4 s linear rotation without flashes is
+   mild motion. Blips then stay fully lit instead of flashing. */
+@media (prefers-reduced-motion: reduce) {
+  .rl-blip, .rl-ping, .rl-tagline::before { animation: none !important; }
+}

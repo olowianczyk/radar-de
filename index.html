@@ -3,8 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Monitor zmian w prawie · HR / Compliance / Dział prawny</title>
+<title>Radar Legislacyjny · Monitoring zmian w prawie</title>
+<!-- Brand assets live in the app's public folder (app/public/), which Vercel
+     copies to dist/app/ — so from this root page they are under "app/".
+     radar.css = animated logo + its fonts (Space Grotesk, JetBrains Mono). -->
+<link rel="icon" type="image/svg+xml" href="app/favicon.svg">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="app/radar.css">
 <style>
   html, body { height: 100%; }
   #intro {
@@ -44,8 +49,14 @@
   .word { display: inline-block; opacity: 0; transform: translateY(14px); transition: opacity .55s ease, transform .55s ease; }
   .scene.active .word { opacity: 1; transform: translateY(0); }
 
-  #scene-mark .mark-title { font-family: 'Fraunces', serif; font-size: 44px; font-weight: 600; color: var(--text-strong); text-align: center; max-width: 720px; opacity: 0; transform: scale(.94); transition: opacity .7s ease, transform .7s ease; }
-  #scene-mark.active .mark-title { opacity: 1; transform: scale(1); }
+  /* Scene 1 = the full horizontal "Radar Legislacyjny" logo (styles in
+     app/radar.css). Fades/scales in like the old text title did. The logo is
+     designed ~1040 px wide, so it is zoomed down on narrower screens
+     (zoom scales layout too, so nothing overflows). */
+  #scene-mark .rl-logo { opacity: 0; transform: scale(.94); transition: opacity .7s ease, transform .7s ease; }
+  #scene-mark.active .rl-logo { opacity: 1; transform: scale(1); }
+  @media (max-width: 1140px) { #scene-mark .rl-logo { zoom: .7; } }
+  @media (max-width: 780px)  { #scene-mark .rl-logo { zoom: .45; } }
   #scene-mark .mark-label { font-family: 'Figtree', sans-serif; font-size: 16px; font-weight: 600; color: var(--text-muted); letter-spacing: .14em; text-transform: uppercase; margin-top: 22px; opacity: 0; transition: opacity .7s ease .15s; }
   #scene-mark.active .mark-label { opacity: 1; }
 
@@ -101,14 +112,44 @@
   </div>
 
   <div class="scene" id="scene-mark">
-    <div class="mark-title">HR BUSINESS PARTNER PLATFORM</div>
+    <!-- Horizontal logo, markup mirrors app/src/components/RadarMark.jsx.
+         Blip left/top/delay are precomputed from polar (angle a, radius r):
+         left = 50+50·r·sin(a) %, top = 50−50·r·cos(a) %, delay = a/360 · 4 s,
+         so each blip flashes when the rotating beam passes over it.
+         Angles/radii: 40°/.62, 128°/.38, 205°/.74, 300°/.5, fresh 160°/.55.
+         Change them in BOTH places if the design changes. -->
+    <div class="rl-logo" role="img" aria-label="Radar Legislacyjny — monitoring zmian w prawie">
+      <span class="rl-mark" aria-hidden="true">
+        <span class="rl-disc">
+          <span class="rl-ticks"></span>
+          <span class="rl-ring rl-ring--1"></span>
+          <span class="rl-ring rl-ring--2"></span>
+          <span class="rl-ring rl-ring--3"></span>
+          <span class="rl-axis rl-axis--v"></span>
+          <span class="rl-axis rl-axis--h"></span>
+          <span class="rl-sweep"></span>
+          <span class="rl-blip" style="left:69.93%;top:26.25%;animation-delay:.444s"></span>
+          <span class="rl-blip" style="left:64.97%;top:61.7%;animation-delay:1.422s"></span>
+          <span class="rl-blip" style="left:34.36%;top:83.53%;animation-delay:2.278s"></span>
+          <span class="rl-blip" style="left:28.35%;top:37.5%;animation-delay:3.333s"></span>
+          <span class="rl-ping" style="left:59.41%;top:75.84%;animation-delay:1.778s"></span>
+          <span class="rl-blip rl-blip--fresh" style="left:59.41%;top:75.84%;animation-delay:1.778s"></span>
+          <span class="rl-hub">§</span>
+        </span>
+      </span>
+      <span class="rl-word" aria-hidden="true">
+        <span class="rl-word-1">Radar</span>
+        <span class="rl-word-2">Legislacyjny</span>
+        <span class="rl-tagline">MONITORING ZMIAN W PRAWIE</span>
+      </span>
+    </div>
     <div class="mark-label">HR · Compliance · Dział prawny</div>
   </div>
 
   <div class="scene" id="scene-tagline">
     <div class="badge">
       <div class="badge-dot"></div>
-      <div class="badge-label">HR BUSINESS PARTNER PLATFORM</div>
+      <div class="badge-label">RADAR LEGISLACYJNY</div>
     </div>
     <div class="tagline" id="tagline-words"></div>
     <div class="subtext">Codzienny, automatyczny monitoring aktów prawnych — dla Twojego działu HR.</div>
@@ -159,7 +200,9 @@ const FEED = [
 ];
 
 const SCENES = ['scene-mark', 'scene-tagline', 'scene-feed', 'scene-quote'];
-const DURATIONS = [1600, 2200, 2600, 1800]; // mark, tagline, feed, quote
+// mark, tagline, feed, quote (ms). The logo scene is 2400 ms (was 1600 for the
+// old text title) so the beam visibly sweeps ~half a turn and the name can be read.
+const DURATIONS = [2400, 2200, 2600, 1800];
 const APP_URL = 'app/index.html';
 
 function lastScanLabel() {
