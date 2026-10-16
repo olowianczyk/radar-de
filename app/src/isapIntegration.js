@@ -70,6 +70,11 @@ export async function addKbComment(ws, docId, text) {
   return data.doc;
 }
 
+// Deletes one KB document (and its comments) for the whole department.
+export async function deleteKbDoc(ws, docId) {
+  await post("/api/kb", { workspace: ws, action: "delete", docId });
+}
+
 // Shared review statuses — returns the whole map after the write.
 export async function saveTriage(ws, ids, status) {
   const data = await post("/api/triage", { workspace: ws, ids, status });

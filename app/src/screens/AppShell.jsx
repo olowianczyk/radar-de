@@ -5,7 +5,7 @@ import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index
 import { LoadingState } from "../components/Loading.jsx";
 import { RadarMark } from "../components/RadarMark.jsx";
 import { WORKSPACES, ACCENTS, ACCENT_SWATCH, THEMES, THEME_ICON, initialSources, isManualSource, tFor } from "../workspaces.js";
-import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc, addKbComment, saveTriage, saveSourceConfig } from "../isapIntegration.js";
+import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc, addKbComment, deleteKbDoc, saveTriage, saveSourceConfig } from "../isapIntegration.js";
 
 function useSources(ws) {
   return React.useState(() => initialSources(ws));
@@ -363,6 +363,10 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
   const addComment = React.useCallback((docId, text) => addKbComment(ws.id, docId, text)
     .then((doc) => setKbDocs((prev) => prev.map((d) => (d.id === doc.id ? doc : d))))
     .catch((e) => { reportError(t.notice.saveComment, e); throw e; }), [ws.id, t, reportError]);
+  // Removes the document from the list only after the server confirmed the delete.
+  const removeKb = React.useCallback((docId) => deleteKbDoc(ws.id, docId)
+    .then(() => setKbDocs((prev) => prev.filter((d) => d.id !== docId)))
+    .catch((e) => { reportError(t.notice.deleteKb, e); throw e; }), [ws.id, t, reportError]);
   const runScan = React.useCallback((override) => {
     if (scanning) return;
     setScanning(true);
@@ -546,7 +550,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
         )}
         <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
           <div key={active} className="hrbp-screen" style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, appearance, backend, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment }) : children}
+            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, appearance, backend, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment, removeKb }) : children}
           </div>
         </main>
       </div>

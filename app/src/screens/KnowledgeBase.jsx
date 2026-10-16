@@ -1,7 +1,9 @@
 // Knowledge base — short documents a department keeps next to its legal-change
 // feed (policies, procedures, notes on pending changes). Documents and their
 // comments are persisted server-side (see /api/kb.js) and shared by the whole
-// department; favourites are a per-browser convenience. Nothing here is a
+// department; favourites are a per-browser convenience. A document can be
+// deleted (trash icon in its detail panel, after a confirm) — that removes it
+// and its comments for everyone. Nothing here is a
 // placeholder: there is no attachment storage and no versioning, so neither is
 // shown.
 import React from "react";
@@ -15,7 +17,7 @@ function formatDate(iso, lang) {
   return d.toLocaleString(lang === "pl" ? "pl-PL" : lang === "de" ? "de-DE" : "en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, kbDocs, addKb, addComment, backend }) {
+export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, kbDocs, addKb, addComment, removeKb, backend }) {
   const t = tFor(lang, ws);
   const favKey = ws.id === "hr" ? "hrbp-kb-favorites" : `hrbp-kb-favorites-${ws.id}`;
   const docsAll = kbDocs || [];
@@ -56,6 +58,15 @@ export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, kbDocs, add
     if (!text || posting) return;
     setPosting(true);
     addComment(docId, text).then(() => setDraft("")).catch(() => {}).finally(() => setPosting(false));
+  };
+  // Delete the open document for the whole department. The native confirm()
+  // is enough as the safety step (the delete cannot be undone); a failure is
+  // reported by AppShell's notice bar, so it is only swallowed here.
+  const [deleting, setDeleting] = React.useState(false);
+  const deleteDoc = (doc) => {
+    if (deleting || !window.confirm(t.kbDeleteConfirm.replace("{t}", doc.title))) return;
+    setDeleting(true);
+    removeKb(doc.id).then(() => setSelectedId(null)).catch(() => {}).finally(() => setDeleting(false));
   };
   const docs = docsAll.filter((k) => {
     if (tab === "favorites" && !favorites.has(k.id)) return false;
@@ -141,6 +152,11 @@ export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, kbDocs, add
                 <IconButton label={favorites.has(sel.id) ? t.removeFavorite : t.addFavorite} onClick={() => toggleFavorite(sel.id)}>
                   <Icon name="star" size={18} style={favorites.has(sel.id) ? { fill: "var(--amber-600)", color: "var(--amber-600)" } : {}} />
                 </IconButton>
+                {writable && typeof removeKb === "function" && (
+                  <IconButton label={t.kbDelete} disabled={deleting} onClick={() => deleteDoc(sel)}>
+                    <Icon name="trash-2" size={18} />
+                  </IconButton>
+                )}
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingBottom: 14, borderBottom: "1px solid var(--border-subtle)" }}>
                 <Badge tone={areaTone(ws, sel.area)}>{t.area[sel.area] || t.area.other}</Badge>

@@ -1,6 +1,7 @@
 // GET  /api/kb?ws=…                                       — list documents (with comments).
 // POST /api/kb { workspace, title, area, body }           — add a document.
 // POST /api/kb { workspace, action: "comment", docId, text } — add a comment to one.
+// POST /api/kb { workspace, action: "delete", docId }      — delete one (with its comments).
 // Persisted in the workspace's kb doc (see api/_lib.js). No auth model exists
 // (open link, no login — by design), so bounds are applied to every field.
 const { loadDoc, saveDoc, normalizeWorkspace, parseBody, sendError } = require("./_lib.js");
@@ -36,6 +37,18 @@ module.exports = async (req, res) => {
       doc.comments = [...(doc.comments || []).slice(-(MAX_COMMENTS - 1)), comment];
       await saveDoc(ws, "kb", kb);
       res.status(200).json({ doc });
+      return;
+    }
+    // Delete one document together with its comments. Same open-link model as
+    // every other write (no auth by design); the UI asks for confirmation first.
+    // ponytail: hard delete, no trash/undo — add a `deletedAt` soft delete if
+    // accidental deletions ever become a problem.
+    if (body.action === "delete") {
+      const docId = Number(body.docId);
+      if (!kb.docs.some((d) => d.id === docId)) { res.status(404).json({ error: "not_found", message: "document not found" }); return; }
+      kb.docs = kb.docs.filter((d) => d.id !== docId);
+      await saveDoc(ws, "kb", kb);
+      res.status(200).json({ deleted: docId });
       return;
     }
     const title = typeof body.title === "string" ? body.title.trim().slice(0, 200) : "";
