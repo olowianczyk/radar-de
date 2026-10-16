@@ -9,12 +9,13 @@ import { WORKSPACES } from "../app/src/workspaces.js";
 const out = {};
 for (const ws of WORKSPACES) {
   out[ws.id] = ws.sources
-    .filter((s) => s.kind !== "manual" && (s.keyword || s.title))
+    .filter((s) => s.kind !== "manual" && (s.keyword || s.title || (s.register === "SAOS" && (s.referencedRegulation || s.phrase))))
     .map((s) => {
       const o = { id: s.id };
       if (s.keyword) o.keyword = s.keyword;
       if (s.title) o.title = s.title;
       if (s.publisher && s.publisher !== "DU") o.publisher = s.publisher;
+      if (s.register === "SAOS") { o.register = "SAOS"; o.courtType = s.courtType; if (s.judgmentTypes && s.judgmentTypes.length) o.judgmentTypes = s.judgmentTypes; if (s.referencedRegulation) o.referencedRegulation = s.referencedRegulation; if (s.phrase) o.phrase = s.phrase; }
       if (s.active === false) o.active = false;
       return o;
     });

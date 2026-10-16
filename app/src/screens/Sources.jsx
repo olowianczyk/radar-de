@@ -8,7 +8,7 @@
 // source it says why it isn't scanned and how often to review it.
 import React from "react";
 import { Card, Badge, Switch, Icon, Button, IconButton, Input, Select } from "../components/index.js";
-import { tFor, isManualSource } from "../workspaces.js";
+import { tFor, isManualSource, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES } from "../workspaces.js";
 import { fetchKeywords, sourceQueryUrl, sourceQueries, nextScanRange } from "../isapIntegration.js";
 import { CoverageCard } from "../components/CoverageCard.jsx";
 
@@ -76,7 +76,17 @@ function ScopeRow({ label, children }) {
 }
 
 function registerLabel(source, t) {
+  if (source.register === "SAOS") return t.saos.register;
   return source.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue;
+}
+
+function modeLabel(mode, t) {
+  return mode === "keyword" ? t.scopeMatchKeyword : mode === "title" ? t.scopeMatchTitle : mode === "referencedRegulation" ? t.saos.matchReferenced : t.saos.matchPhrase;
+}
+
+function daysAgo(iso) {
+  if (!iso) return null;
+  return Math.max(0, Math.round((Date.now() - new Date(`${iso}T00:00:00Z`).getTime()) / 86400000));
 }
 
 function ScopePanel({ source, lang, t, thesaurus }) {
@@ -90,11 +100,17 @@ function ScopePanel({ source, lang, t, thesaurus }) {
       </div>
       <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
         <ScopeRow label={t.scopeRegister}>{registerLabel(source, t)}</ScopeRow>
+        {source.register === "SAOS" && (
+          <ScopeRow label={t.saos.court}>
+            {t.saos.courts[source.courtType] || source.courtType}
+            <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.saos.judgmentTypes}: {(source.judgmentTypes || []).length ? source.judgmentTypes.map((j) => t.saos.types[j] || j).join(", ") : t.saos.allTypes}</div>
+          </ScopeRow>
+        )}
         <ScopeRow label={t.scopeMatch}>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {queries.map((q) => (
               <div key={q.mode}>
-                <span style={{ fontWeight: 500, color: "var(--text-muted)" }}>{q.mode === "keyword" ? t.scopeMatchKeyword : t.scopeMatchTitle}</span>{" "}
+                <span style={{ fontWeight: 500, color: "var(--text-muted)" }}>{modeLabel(q.mode, t)}</span>{" "}
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5 }}>„{q.term}”</span>
               </div>
             ))}
@@ -103,7 +119,16 @@ function ScopePanel({ source, lang, t, thesaurus }) {
         </ScopeRow>
         <ScopeRow label={t.scopeNext}>
           {range.first ? t.scopeSinceYearStart.replace("{y}", range.from.slice(0, 4)) : t.scopeSinceLast.replace("{d}", fmtIso(range.from, lang))}
+          {source.register === "SAOS" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.saos.lookback.replace("{n}", "60")}</div>}
         </ScopeRow>
+        {source.register === "SAOS" && (
+          <ScopeRow label={t.saos.freshness}>
+            {source.freshness && source.freshness.latestJudgmentDate
+              ? <>{fmtIso(source.freshness.latestJudgmentDate, lang)} <span style={{ fontWeight: 500, color: daysAgo(source.freshness.latestJudgmentDate) > 30 ? "var(--warning-700)" : "var(--text-muted)" }}>({t.saos.freshnessAgo.replace("{n}", String(daysAgo(source.freshness.latestJudgmentDate)))})</span></>
+              : <span style={{ fontWeight: 500, color: "var(--text-muted)" }}>{source.freshness ? t.saos.freshnessUnknown : "—"}</span>}
+            <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.saos.freshnessWarn}</div>
+          </ScopeRow>
+        )}
         <ScopeRow label={t.scopeLimit}>{t.scopeLimitValue}</ScopeRow>
       </div>
       {note && (
@@ -114,12 +139,12 @@ function ScopePanel({ source, lang, t, thesaurus }) {
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
         {queries.map((q) => (
           <a key={q.mode} href={sourceQueryUrl(source, range.from, range.to, q.mode)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <Icon name="external-link" size={12} />{t.scopeOpenQuery}{queries.length > 1 ? ` (${q.mode === "keyword" ? t.scopeMatchKeyword : t.scopeMatchTitle})` : ""}
+            <Icon name="external-link" size={12} />{source.register === "SAOS" ? t.scopeOpenQuery.replace("API Sejmu", "SAOS").replace("Sejm API", "SAOS").replace("Sejm-API", "SAOS") : t.scopeOpenQuery}{queries.length > 1 ? ` (${modeLabel(q.mode, t)})` : ""}
           </a>
         ))}
         {source.url && (
           <a href={source.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <Icon name="external-link" size={12} />ISAP
+            <Icon name="external-link" size={12} />{source.register === "SAOS" ? "SAOS" : "ISAP"}
           </a>
         )}
       </div>
@@ -153,29 +178,38 @@ function AddSourceForm({ t, ws, onAdd, onCancel }) {
   const [mode, setMode] = React.useState("title");
   const [term, setTerm] = React.useState("");
   const [publisher, setPublisher] = React.useState("DU");
+  const [courtType, setCourtType] = React.useState("SUPREME");
+  const [judgmentType, setJudgmentType] = React.useState("");
   const [area, setArea] = React.useState("other");
   const valid = name.trim() && term.trim();
+  const isSaos = publisher === "SAOS";
   return (
     <Card padding="lg">
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-heading)" }}>{t.addSourceTitle}</div>
         <Input label={t.srcName} value={name} onChange={(e) => setName(e.target.value)} />
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ width: 200 }}>
-            <Select label={t.srcMode} value={mode} onChange={(e) => setMode(e.target.value)} options={[{ value: "title", label: t.scopeMatchTitle }, { value: "keyword", label: t.scopeMatchKeyword }]} />
+          <div style={{ width: 220 }}>
+            <Select label={t.scopeRegister} value={publisher} onChange={(e) => { const v = e.target.value; setPublisher(v); setMode(v === "SAOS" ? "referencedRegulation" : "title"); }} options={[{ value: "DU", label: t.scopeRegisterValue }, { value: "MP", label: t.scopeRegisterMP }, { value: "SAOS", label: t.saos.register }]} />
           </div>
-          <div style={{ flex: 1, minWidth: 220 }}><Input label={mode === "keyword" ? t.srcTerm : t.srcTermTitle} value={term} onChange={(e) => setTerm(e.target.value)} /></div>
-          <div style={{ width: 200 }}>
-            <Select label={t.scopeRegister} value={publisher} onChange={(e) => setPublisher(e.target.value)} options={[{ value: "DU", label: t.scopeRegisterValue }, { value: "MP", label: t.scopeRegisterMP }]} />
+          {isSaos && (
+            <>
+              <div style={{ width: 220 }}><Select label={t.saos.court} value={courtType} onChange={(e) => setCourtType(e.target.value)} options={SAOS_COURT_TYPES.map((c) => ({ value: c, label: t.saos.courts[c] }))} /></div>
+              <div style={{ width: 180 }}><Select label={t.saos.judgmentTypes} value={judgmentType} onChange={(e) => setJudgmentType(e.target.value)} options={[{ value: "", label: t.saos.allTypes }, ...SAOS_JUDGMENT_TYPES.map((j) => ({ value: j, label: t.saos.types[j] }))]} /></div>
+            </>
+          )}
+          <div style={{ width: 220 }}>
+            <Select label={t.srcMode} value={mode} onChange={(e) => setMode(e.target.value)} options={isSaos ? [{ value: "referencedRegulation", label: t.saos.matchReferenced }, { value: "phrase", label: t.saos.matchPhrase }] : [{ value: "title", label: t.scopeMatchTitle }, { value: "keyword", label: t.scopeMatchKeyword }]} />
           </div>
+          <div style={{ flex: 1, minWidth: 220 }}><Input label={isSaos ? modeLabel(mode, t) : mode === "keyword" ? t.srcTerm : t.srcTermTitle} value={term} onChange={(e) => setTerm(e.target.value)} /></div>
           <div style={{ width: 220 }}>
             <Select label={t.srcArea} value={area} onChange={(e) => setArea(e.target.value)} options={Object.keys(ws.areas).map((k) => ({ value: k, label: t.area[k] }))} />
           </div>
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{t.scopeHow[1]}</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{isSaos ? t.saos.howBullet : t.scopeHow[1]}</div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <Button variant="ghost" onClick={onCancel}>{t.srcCancel}</Button>
-          <Button variant="primary" disabled={!valid} onClick={() => onAdd({ name: name.trim(), mode, term: term.trim(), publisher, area })}>{t.srcAdd}</Button>
+          <Button variant="primary" disabled={!valid} onClick={() => onAdd({ name: name.trim(), mode, term: term.trim(), publisher, courtType, judgmentType, area })}>{t.srcAdd}</Button>
         </div>
       </div>
     </Card>
@@ -218,11 +252,15 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
   const auto = sources.filter((s) => !isManualSource(s));
   const manual = sources.filter(isManualSource);
 
-  const addSource = ({ name, mode, term, publisher, area }) => {
-    const id = Math.max(0, ...auto.map((s) => s.id)) + 1;
+  const addSource = ({ name, mode, term, publisher, courtType, judgmentType, area }) => {
+    const id = Math.max(1000, ...auto.map((s) => s.id)) + 1;
+    const saos = publisher === "SAOS";
     setSources((prev) => [...prev, {
-      id, name, type: "Ustawa", url: "https://isap.sejm.gov.pl", area, publisher,
-      keyword: mode === "keyword" ? term : null, title: mode === "title" ? term : null,
+      id, name, type: saos ? "Orzecznictwo" : "Ustawa", url: saos ? "https://www.saos.org.pl/search" : "https://isap.sejm.gov.pl", area,
+      publisher: saos ? "SAOS" : publisher, register: saos ? "SAOS" : "ELI",
+      courtType: saos ? courtType : null, judgmentTypes: saos && judgmentType ? [judgmentType] : [],
+      referencedRegulation: saos && mode === "referencedRegulation" ? term : null, phrase: saos && mode === "phrase" ? term : null,
+      keyword: !saos && mode === "keyword" ? term : null, title: !saos && mode === "title" ? term : null,
       lastChecked: null, found: 0, active: true, scope: null,
     }]);
     setAdding(false);
@@ -269,15 +307,16 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                       <span style={{ width: 7, height: 7, borderRadius: "50%", background: kwBad && queries.length === 1 ? "var(--danger-600)" : kwBad ? "var(--amber-600)" : "var(--success-500)", flex: "0 0 7px" }} />
                       {queries.map((q, k) => (
-                        <span key={q.mode}>{k > 0 ? " / " : ""}{q.mode === "keyword" ? t.scopeMatchKeyword : t.scopeMatchTitle}: <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-heading)" }}>„{q.term}”</span></span>
+                        <span key={q.mode}>{k > 0 ? " / " : ""}{modeLabel(q.mode, t)}: <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-heading)" }}>„{q.term}”</span></span>
                       ))}
                     </span>
                     {s.publisher === "MP" && <Badge tone="amber">M.P.</Badge>}
+                    {s.register === "SAOS" && <Badge tone="blue">{t.saos.registerShort} · {t.saos.courts[s.courtType] || s.courtType}</Badge>}
                     <span>· {t.lastChecked}: {s.lastChecked || "—"}</span>
                   </div>
                   {s.error && <div style={{ fontSize: 11.5, color: "var(--danger-600)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{s.error}</div>}
                 </div>
-                <Badge tone="neutral">{s.type}</Badge>
+                {s.register !== "SAOS" && <Badge tone="neutral">{s.type}</Badge>}
                 <Badge tone="neutral">{t.area[s.area] || t.area.other}</Badge>
                 <div style={{ minWidth: 90, textAlign: "center" }}>
                   <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 20, color: hist.length ? "var(--brand)" : "var(--ink-300)" }}>{hist.length}</div>

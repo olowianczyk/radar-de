@@ -9,7 +9,7 @@
 // Either path merges its results into the persisted scan doc so the next page
 // load — or the next cron run — sees what was found. The response says whether
 // that persist happened (`persisted`); it never claims success it didn't have.
-const { WORKSPACES, normalizeWorkspace, DEFAULT_SOURCES, scanSources, storageAvailable, loadDoc, saveDoc, sendError, parseBody } = require("./_lib.js");
+const { WORKSPACES, normalizeWorkspace, DEFAULT_SOURCES, scanSources, isScannable, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES, storageAvailable, loadDoc, saveDoc, sendError, parseBody } = require("./_lib.js");
 
 function dedupeKey(e) {
   return e.eli || `${e.note}|${e.url}`;
@@ -24,7 +24,7 @@ function effectiveSources(ws, config) {
     .filter((s) => {
       const o = overrides[String(s.id)];
       const active = o && typeof o.active === "boolean" ? o.active : s.active !== false;
-      return active && (s.keyword || s.title);
+      return active && isScannable(s);
     });
 }
 
@@ -78,7 +78,7 @@ async function scanWorkspace(ws, sources, range) {
   // instead of dropping their lastChecked.
   const untouched = prev.sources.filter((p) => !results.some((r) => r.id === p.id));
   const next = {
-    sources: [...untouched, ...results.map((r) => ({ id: r.id, lastChecked: r.lastChecked, found: r.found }))],
+    sources: [...untouched, ...results.map((r) => ({ id: r.id, lastChecked: r.lastChecked, found: r.found, ...(r.freshness ? { freshness: r.freshness } : {}) }))],
     history: mergeHistory(prev.history, results),
     lastRun,
   };
@@ -111,6 +111,11 @@ module.exports = async (req, res) => {
           keyword: typeof (s && s.keyword) === "string" ? s.keyword.slice(0, 200) : null,
           title: typeof (s && s.title) === "string" ? s.title.slice(0, 200) : null,
           publisher: s && s.publisher === "MP" ? "MP" : "DU",
+          register: s && s.register === "SAOS" ? "SAOS" : "ELI",
+          courtType: s && SAOS_COURT_TYPES.includes(s.courtType) ? s.courtType : null,
+          judgmentTypes: s && Array.isArray(s.judgmentTypes) ? s.judgmentTypes.filter((j) => SAOS_JUDGMENT_TYPES.includes(j)).slice(0, 5) : [],
+          referencedRegulation: typeof (s && s.referencedRegulation) === "string" ? s.referencedRegulation.slice(0, 200) : null,
+          phrase: typeof (s && s.phrase) === "string" ? s.phrase.slice(0, 200) : null,
           lastChecked: typeof (s && s.lastChecked) === "string" ? s.lastChecked.slice(0, 20) : null,
         }))
         .filter((s) => Number.isFinite(s.id));

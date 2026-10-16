@@ -3,7 +3,7 @@ import React from "react";
 import { Card, StatCard, StatusPill, Badge, Button, Input, Tabs, Icon, Select, Checkbox } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
 import { HRBP_STATUS_MAP } from "../data.js";
-import { tFor, areaTone } from "../workspaces.js";
+import { tFor, areaTone, isManualSource } from "../workspaces.js";
 import { latestIsapCheck } from "../isapIntegration.js";
 import { CoverageCard } from "../components/CoverageCard.jsx";
 
@@ -55,6 +55,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
   const [tab, setTab] = React.useState("all");
   const [query, setQuery] = React.useState("");
   const [area, setArea] = React.useState("");
+  const [kind, setKind] = React.useState("all");
   const [selected, setSelected] = React.useState(() => new Set());
   const toggleSelect = (id) => setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const changes = changesProp || [];
@@ -62,6 +63,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
   const filtered = changes.filter((c) => {
     if (tab !== "all" && c.status !== tab) return false;
     if (area && c.area !== area) return false;
+    if (kind !== "all" && (c.kind || "act") !== kind) return false;
     if (periodStart != null) {
       const cd = parseDMY(c.date);
       if (cd < periodStart || cd > periodEnd) return false;
@@ -115,12 +117,15 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
         <StatCard label={t.kpi.new} value={String(newCount)} accent="danger" icon={<Icon name="sparkles" size={18} />} />
         <StatCard label={t.kpi.pending} value={String(pendingCount)} accent="petrol" icon={<Icon name="clock" size={18} />} />
-        <StatCard label={t.kpi.tracked} value={String(sources.filter((s) => s.active && (s.keyword || s.title)).length)} accent="success" icon={<Icon name="radar" size={18} />} />
+        <StatCard label={t.kpi.tracked} value={String(sources.filter((s) => s.active && !isManualSource(s)).length)} accent="success" icon={<Icon name="radar" size={18} />} />
         <StatCard label={t.kpi.updated} value={String(doneThisMonth)} accent="coral" icon={<Icon name="check-circle-2" size={18} />} />
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} iconLeft={<Icon name="search" size={16} />} /></div>
         <div style={{ width: 200 }}><Select value={area} onChange={(e) => setArea(e.target.value)} placeholder={t.allAreas} options={[{ value: "", label: t.allAreas }, ...Object.keys(t.area).map((k) => ({ value: k, label: t.area[k] }))]} /></div>
+        {changes.some((c) => c.kind === "judgment") && (
+          <div style={{ width: 190 }}><Select value={kind} onChange={(e) => setKind(e.target.value)} options={[{ value: "all", label: t.saos.kindAll }, { value: "act", label: t.saos.kindAct }, { value: "judgment", label: t.saos.kindJudgment }]} /></div>
+        )}
         <div style={{ width: 200 }}>
           <Select value={period} onChange={(e) => setPeriod(e.target.value)} options={[
             { value: "all", label: t.periodAll },
@@ -135,7 +140,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
         {period === "custom" && (
           <div style={{ width: 180 }}><Input type="date" label={t.periodFrom} value={customDate} onChange={(e) => setCustomDate(e.target.value)} /></div>
         )}
-        {(query || area || period !== "all") && <Button variant="ghost" iconLeft={<Icon name="x" size={14} />} onClick={() => { setQuery(""); setArea(""); setPeriod("all"); setCustomDate(""); }}>{t.clearFilters}</Button>}
+        {(query || area || kind !== "all" || period !== "all") && <Button variant="ghost" iconLeft={<Icon name="x" size={14} />} onClick={() => { setQuery(""); setArea(""); setKind("all"); setPeriod("all"); setCustomDate(""); }}>{t.clearFilters}</Button>}
         <Button variant="secondary" iconLeft={<Icon name="file-spreadsheet" size={16} />} onClick={() => exportCsvFor(filtered)} disabled={filtered.length === 0}>{t.exportCsv}</Button>
         <Button variant="secondary" iconLeft={<Icon name="file-down" size={16} />} onClick={exportPdf} disabled={filtered.length === 0}>{t.exportPdf}</Button>
       </div>
@@ -179,7 +184,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div onClick={(e) => e.stopPropagation()} style={{ paddingTop: 2 }}><Checkbox checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={c.title[lang]} /></div>
                   <div style={{ width: 36, height: 36, borderRadius: "var(--radius-sm)", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 36px" }}>
-                    <Icon name="scale" size={17} />
+                    <Icon name={c.kind === "judgment" ? "gavel" : "scale"} size={17} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14 }}>{c.title[lang]}</div>
@@ -215,6 +220,22 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                 <Meta label={t.effective} value={sel.effective} />
                 <Meta label={t.source} value={/^https?:/.test(sel.source) ? <a href={sel.source} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>ISAP ↗</a> : sel.source} small />
               </div>
+              {sel.kind === "judgment" ? (
+              <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icon name="gavel" size={12} />{t.saos.judgment}
+                </div>
+                <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+                  <Meta label={t.saos.court} value={sel.judgment.courtName || t.saos.courts[sel.judgment.courtType] || sel.judgment.courtType || t.noData} small />
+                  <Meta label={t.saos.caseNumber} value={sel.judgment.caseNumbers.join(", ") || t.noData} small />
+                  <Meta label={t.saos.judgmentTypes} value={t.saos.types[sel.judgment.judgmentType] || sel.judgment.judgmentType || t.noData} small />
+                  <Meta label={t.saos.judgmentDate} value={sel.date} small />
+                </div>
+                {sel.judgment.excerpt && <div style={{ fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.55 }}><span style={{ fontWeight: 600, color: "var(--text-heading)" }}>{t.saos.excerpt}: </span>{sel.judgment.excerpt}…</div>}
+                {sel.judgment.keywords.length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{sel.judgment.keywords.map((k) => <Badge key={k} tone="neutral">{k}</Badge>)}</div>}
+                <a href={sel.source} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="external-link" size={12} />{t.saos.openSaos}</a>
+              </div>
+              ) : (
               <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 8 }}>
                 <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
                   <Icon name="landmark" size={12} />{t.actStatus} <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>— {t.actStatusAsOf.replace("{d}", sel.detectedOn || sel.date)}</span>
@@ -227,14 +248,15 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                 </div>
                 <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.5 }}>{t.actStatusNote}</div>
               </div>
+              )}
               <p style={{ margin: 0, color: "var(--text-body)", fontSize: 14, lineHeight: 1.6 }}>{sel.summary[lang]}</p>
               {sel.matchedBy && (
                 <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 6 }}>
                   <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Icon name="crosshair" size={12} />{t.foundVia}</div>
                   <div style={{ fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.55 }}>
-                    {t.source}: <strong>{sel.matchedBy.sourceName}</strong> · {sel.matchedBy.mode === "keyword" ? t.scopeMatchKeyword : t.scopeMatchTitle} <span style={{ fontFamily: "var(--font-mono)" }}>„{sel.matchedBy.term}”</span> · {sel.matchedBy.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue} · {t.foundViaDate} {sel.date}{sel.actType ? <> · {t.actType}: {sel.actType}</> : null}
+                    {t.source}: <strong>{sel.matchedBy.sourceName}</strong> · {sel.matchedBy.mode === "keyword" ? t.scopeMatchKeyword : sel.matchedBy.mode === "title" ? t.scopeMatchTitle : sel.matchedBy.mode === "referencedRegulation" ? t.saos.matchReferenced : t.saos.matchPhrase} <span style={{ fontFamily: "var(--font-mono)" }}>„{sel.matchedBy.term}”</span> · {sel.matchedBy.publisher === "SAOS" ? t.saos.register : sel.matchedBy.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue} · {sel.kind === "judgment" ? t.saos.judgmentDate.toLowerCase() : t.foundViaDate} {sel.date}{sel.actType ? <> · {t.actType}: {sel.actType}</> : null}
                   </div>
-                  <a href={sel.matchedBy.queryUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="external-link" size={12} />{t.scopeOpenQuery}</a>
+                  <a href={sel.matchedBy.queryUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="external-link" size={12} />{sel.kind === "judgment" ? t.scopeOpenQuery.replace("API Sejmu", "SAOS").replace("Sejm API", "SAOS").replace("Sejm-API", "SAOS") : t.scopeOpenQuery}</a>
                 </div>
               )}
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>

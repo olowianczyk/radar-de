@@ -3,7 +3,7 @@
 // on/off and which sources were added by hand. The daily cron reads the same
 // doc (see scan-all.js effectiveSources), so a toggle here really changes what
 // gets scanned tomorrow — it is not a cosmetic client-side flag.
-const { loadDoc, saveDoc, normalizeWorkspace, parseBody, sendError } = require("./_lib.js");
+const { loadDoc, saveDoc, normalizeWorkspace, parseBody, sendError, isScannable, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES } = require("./_lib.js");
 
 const MAX_CUSTOM = 100;
 
@@ -23,10 +23,15 @@ module.exports = async (req, res) => {
         keyword: typeof (s && s.keyword) === "string" && s.keyword.trim() ? s.keyword.trim().slice(0, 200) : null,
         title: typeof (s && s.title) === "string" && s.title.trim() ? s.title.trim().slice(0, 200) : null,
         publisher: s && s.publisher === "MP" ? "MP" : "DU",
+        register: s && s.register === "SAOS" ? "SAOS" : "ELI",
+        courtType: s && SAOS_COURT_TYPES.includes(s.courtType) ? s.courtType : null,
+        judgmentTypes: s && Array.isArray(s.judgmentTypes) ? s.judgmentTypes.filter((j) => SAOS_JUDGMENT_TYPES.includes(j)).slice(0, 5) : [],
+        referencedRegulation: typeof (s && s.referencedRegulation) === "string" && s.referencedRegulation.trim() ? s.referencedRegulation.trim().slice(0, 200) : null,
+        phrase: typeof (s && s.phrase) === "string" && s.phrase.trim() ? s.phrase.trim().slice(0, 200) : null,
         area: typeof (s && s.area) === "string" && /^[a-z][a-z_]{0,29}$/.test(s.area) ? s.area : "other",
         type: typeof (s && s.type) === "string" ? s.type.slice(0, 40) : "Ustawa",
       }))
-      .filter((s) => Number.isFinite(s.id) && s.name && (s.keyword || s.title));
+      .filter((s) => Number.isFinite(s.id) && s.name && isScannable(s));
     const config = { overrides, custom };
     // Validate against the live doc shape before overwriting (loadDoc throws
     // when storage is missing — reported as 503, nothing is pretended).

@@ -98,3 +98,19 @@ Projekt w aplikacji — ten sam model co dziś, czwarty rejestr obok DU/MP/SEJM:
 | Zakres w UI | panel pokazuje dokładny URL zapytania SAOS do odtworzenia + datę najnowszego orzeczenia w bazie dla danego sądu (miara opóźnienia). |
 | Domyślne źródła | Legal: SN uchwały (`judgmentType=RESOLUTION`, `courtType=SUPREME`) w k.c./k.p.c./k.s.h.; NSA uchwały w Ordynacji/VAT/CIT; TK wyroki; KIO w PZP. HR: SN i sądy apelacyjne, `referencedRegulation` = Kodeks pracy, wybrane artykuły. Compliance: NSA w AML/RODO-ustawie, UOKiK → SOKiK (sąd powszechny, XVII AmA). |
 | Nakład | 2–3 dni (silnik + UI + źródła domyślne), po potwierdzeniu parametrów API. |
+
+## 4. Status SAOS (zrobione) i kolejne API do rozważenia
+
+SAOS jest wdrożony jako czwarty rejestr (`register: "SAOS"`): źródła domyślne w
+trzech działach, cofnięcie okna o 60 dni, pomiar opóźnienia per sąd, orzeczenia
+w feedzie z filtrem „Akty / Orzeczenia”. **Nazwy parametrów i kształt odpowiedzi
+API SAOS nie były weryfikowane z tego środowiska** — błąd lub nieoczekiwany
+format pokaże się jako czerwony komunikat przy źródle, nie jako „0 wyników”.
+
+**dane.gov.pl (api.dane.gov.pl)** — otwarty katalog zbiorów danych administracji.
+Nie jest strumieniem zmian w prawie, ale przez jego API można pobierać konkretne
+zasoby (CSV/JSON) i wykrywać ich nowe wersje po `modified`/`revision`. Kandydaci:
+rejestry i listy publikowane jako zbiory (np. lista sankcyjna MSWiA, jeśli jest
+tam udostępniana, wykazy podmiotów KNF, rejestry UOKiK). Nakład: typ źródła
+„zasób dane.gov.pl” z detekcją nowej wersji + diff wierszy — 1–2 dni po
+sprawdzeniu, które z potrzebnych rejestrów faktycznie tam są.

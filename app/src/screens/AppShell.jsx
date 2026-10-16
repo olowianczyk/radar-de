@@ -152,7 +152,7 @@ function deriveConfig(ws, sources) {
   sources.forEach((s) => {
     if (isManualSource(s)) return;
     const isCatalogue = ws.sources.some((x) => x.id === s.id);
-    if (!isCatalogue) custom.push({ id: s.id, name: s.name, keyword: s.keyword, title: s.title, publisher: s.publisher || "DU", area: s.area, type: s.type });
+    if (!isCatalogue) custom.push({ id: s.id, name: s.name, keyword: s.keyword, title: s.title, publisher: s.publisher || "DU", register: s.register || "ELI", courtType: s.courtType || null, judgmentTypes: s.judgmentTypes || [], referencedRegulation: s.referencedRegulation || null, phrase: s.phrase || null, area: s.area, type: s.type });
     if (s.active !== defaultActive(ws, s)) overrides[String(s.id)] = { active: s.active };
   });
   return { overrides, custom };
@@ -169,7 +169,7 @@ function applyConfig(ws, base, config) {
     .filter((c) => !fromCatalogue.some((s) => s.id === c.id))
     .map((c) => {
       const o = overrides[String(c.id)];
-      return { ...c, url: "https://isap.sejm.gov.pl", lastChecked: null, found: 0, scope: null, active: o && typeof o.active === "boolean" ? o.active : true };
+      return { ...c, url: c.register === "SAOS" ? "https://www.saos.org.pl/search" : "https://isap.sejm.gov.pl", publisher: c.register === "SAOS" ? "SAOS" : c.publisher, lastChecked: null, found: 0, scope: null, active: o && typeof o.active === "boolean" ? o.active : true };
     });
   return [...fromCatalogue, ...extra];
 }
@@ -232,7 +232,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
       if (!state.storage) setNotice({ tone: "error", text: t.notice.storage });
       setSourcesRaw((prev) => applyConfig(ws, prev, state.config).map((s) => {
         const p = (state.sources || []).find((x) => x.id === s.id);
-        return p ? { ...s, lastChecked: p.lastChecked, found: p.found } : s;
+        return p ? { ...s, lastChecked: p.lastChecked, found: p.found, freshness: p.freshness || null } : s;
       }));
       setSourceHistory(state.history || {});
       setStatusMap(state.triage || {});
@@ -276,7 +276,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
       setLastScanFound(found);
       setSourcesRaw((prev) => prev.map((s) => {
         const r = results.find((x) => x.id === s.id);
-        return r ? { ...s, lastChecked: r.lastChecked, found: r.found, error: r.error || null } : s;
+        return r ? { ...s, lastChecked: r.lastChecked, found: r.found, error: r.error || null, freshness: r.freshness || s.freshness } : s;
       }));
       setSourceHistory((prev) => {
         const next = { ...prev };

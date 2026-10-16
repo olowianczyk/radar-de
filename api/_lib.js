@@ -8,6 +8,19 @@ const { put, get } = require("@vercel/blob");
 
 const SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
 const KEYWORDS_URL = "https://api.sejm.gov.pl/eli/keywords";
+// SAOS — System Analizy Orzeczeń Sądowych (ICM UW): public JSON API, no key.
+// Aggregates court portals with a publication delay, so every SAOS scan looks
+// back SAOS_LOOKBACK_DAYS behind the last check and relies on dedupe by id.
+const SAOS_SEARCH_URL = "https://www.saos.org.pl/api/search/judgments";
+const SAOS_JUDGMENT_URL = "https://www.saos.org.pl/judgments/";
+const SAOS_LOOKBACK_DAYS = 60;
+const SAOS_COURT_TYPES = ["COMMON", "SUPREME", "ADMINISTRATIVE", "CONSTITUTIONAL_TRIBUNAL", "NATIONAL_APPEAL_CHAMBER"];
+const SAOS_JUDGMENT_TYPES = ["SENTENCE", "DECISION", "RESOLUTION", "REGULATION", "REASONS"];
+const FETCH_TIMEOUT_MS = 20000;
+
+function fetchWithTimeout(url) {
+  return fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers: { accept: "application/json" } });
+}
 
 // One workspace per department. Each has its own Blob state file, so a scan or a
 // KB write in one department can never clobber another's (the old single-file
@@ -128,10 +141,108 @@ function buildSearchParams({ keyword, title, dateFrom, dateTo, publisher = "DU",
 }
 
 async function searchActs(opts) {
-  const res = await fetch(`${SEARCH_URL}?${buildSearchParams(opts).toString()}`);
+  const res = await fetchWithTimeout(`${SEARCH_URL}?${buildSearchParams(opts).toString()}`);
   if (!res.ok) throw new Error(`Sejm API error ${res.status}`);
   const data = await res.json();
   return data.items || [];
+}
+
+// ---- SAOS (case law) ------------------------------------------------------
+// Source fields: register "SAOS", courtType (one of SAOS_COURT_TYPES),
+// judgmentTypes (optional subset), and the match: referencedRegulation (an act
+// the judgment cites — precise) or phrase (full-text "all" — broad).
+function isSaosSource(s) {
+  return s && s.register === "SAOS" && SAOS_COURT_TYPES.includes(s.courtType) && !!(s.referencedRegulation || s.phrase);
+}
+
+function buildSaosParams({ courtType, judgmentTypes, referencedRegulation, phrase, dateFrom, dateTo, pageSize = 100 }) {
+  const params = new URLSearchParams({ pageSize: String(pageSize), pageNumber: "0", sortingField: "JUDGMENT_DATE", sortingDirection: "DESC" });
+  if (courtType) params.set("courtType", courtType);
+  (Array.isArray(judgmentTypes) ? judgmentTypes : []).filter((j) => SAOS_JUDGMENT_TYPES.includes(j)).forEach((j) => params.append("judgmentTypes", j));
+  if (referencedRegulation) params.set("referencedRegulation", referencedRegulation);
+  if (phrase) params.set("all", phrase);
+  if (dateFrom) params.set("judgmentDateFrom", dateFrom);
+  if (dateTo) params.set("judgmentDateTo", dateTo);
+  return params;
+}
+
+function stripHtml(s) {
+  return String(s || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
+}
+
+// Returns normalised judgments. Throws on HTTP errors or an unexpected shape —
+// a source then shows the error instead of silently reporting "0 found".
+async function searchJudgments(opts) {
+  const res = await fetchWithTimeout(`${SAOS_SEARCH_URL}?${buildSaosParams(opts).toString()}`);
+  if (!res.ok) throw new Error(`SAOS API error ${res.status}`);
+  const data = await res.json();
+  if (!data || !Array.isArray(data.items)) throw new Error("SAOS API: unexpected response shape (no items[])");
+  return data.items.map((j) => ({
+    id: j.id,
+    href: j.href || `${SAOS_JUDGMENT_URL}${j.id}`,
+    courtType: j.courtType || opts.courtType || null,
+    courtName: (j.division && j.division.court && j.division.court.name) || (j.court && j.court.name) || null,
+    caseNumbers: Array.isArray(j.courtCases) ? j.courtCases.map((c) => c && c.caseNumber).filter(Boolean) : [],
+    judgmentType: j.judgmentType || null,
+    judgmentDate: j.judgmentDate || null,
+    excerpt: stripHtml(j.textContent).slice(0, 400),
+    keywords: Array.isArray(j.keywords) ? j.keywords.slice(0, 10) : [],
+  }));
+}
+
+// Freshness probe: the newest judgment SAOS holds for a court type, regardless
+// of our window. Shown in the UI as "SAOS lags N days" — without it a quiet
+// source could pass for "nothing new" when the aggregator is simply behind.
+const saosFreshnessCache = new Map();
+const SAOS_FRESHNESS_TTL_MS = 60 * 60 * 1000;
+async function saosLatestFor(courtType) {
+  const hit = saosFreshnessCache.get(courtType);
+  if (hit && Date.now() - hit.ts < SAOS_FRESHNESS_TTL_MS) return hit.p;
+  const p = (async () => {
+    try {
+      const items = await searchJudgments({ courtType, pageSize: 1 });
+      return items[0] && items[0].judgmentDate ? items[0].judgmentDate : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+  saosFreshnessCache.set(courtType, { ts: Date.now(), p });
+  return p;
+}
+
+function shiftIsoDays(iso, days) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+async function scanSaosSource(s, dateFrom, dateTo, nowStr, forcedRange) {
+  // Look back behind the incremental window: judgments reach SAOS late.
+  const from = forcedRange ? dateFrom : shiftIsoDays(dateFrom, -SAOS_LOOKBACK_DAYS);
+  const opts = { courtType: s.courtType, judgmentTypes: s.judgmentTypes, referencedRegulation: s.referencedRegulation || undefined, phrase: s.phrase || undefined, dateFrom: from, dateTo };
+  const query = { mode: s.referencedRegulation ? "referencedRegulation" : "phrase", term: s.referencedRegulation || s.phrase, register: "SAOS", courtType: s.courtType, judgmentTypes: s.judgmentTypes || [], dateFrom: from, dateTo, lookbackDays: forcedRange ? 0 : SAOS_LOOKBACK_DAYS, url: `${SAOS_SEARCH_URL}?${buildSaosParams(opts).toString()}` };
+  const [latest, outcome] = await Promise.all([saosLatestFor(s.courtType), searchJudgments(opts).then((items) => ({ items })).catch((e) => ({ error: e.message }))]);
+  const freshness = { courtType: s.courtType, latestJudgmentDate: latest, checkedOn: isoToday() };
+  if (outcome.error) return { id: s.id, lastChecked: nowStr, found: 0, detected: [], error: outcome.error, queries: [query], query, freshness };
+  const detected = outcome.items.map((j) => ({
+    ts: formatDetectedTs(j.judgmentDate),
+    type: "detected",
+    kind: "judgment",
+    note: [j.courtName || j.courtType, j.caseNumbers.join(", "), j.judgmentType].filter(Boolean).join(" · "),
+    url: j.href,
+    eli: `SAOS/${j.id}`,
+    via: query.mode,
+    publisher: "SAOS",
+    courtType: j.courtType,
+    courtName: j.courtName,
+    caseNumbers: j.caseNumbers,
+    judgmentType: j.judgmentType,
+    judgmentDate: j.judgmentDate,
+    excerpt: j.excerpt,
+    keywords: j.keywords,
+    detectedOn: isoToday(),
+  }));
+  return { id: s.id, lastChecked: nowStr, found: detected.length, detected, queries: [query], query, freshness };
 }
 
 // The official keyword thesaurus. Cached per function instance — it changes
@@ -139,7 +250,7 @@ async function searchActs(opts) {
 let keywordsCache = null;
 async function fetchKeywords() {
   if (keywordsCache) return keywordsCache;
-  const res = await fetch(KEYWORDS_URL);
+  const res = await fetchWithTimeout(KEYWORDS_URL);
   if (!res.ok) throw new Error(`Sejm API error ${res.status}`);
   const data = await res.json();
   keywordsCache = Array.isArray(data) ? data : [];
@@ -210,9 +321,18 @@ async function mapPool(items, limit, fn) {
 // ustaw") whose title never names the act, title catches everything that does.
 function sourceQueries(s) {
   const qs = [];
+  if (s.register === "SAOS") {
+    if (isSaosSource(s)) qs.push({ mode: s.referencedRegulation ? "referencedRegulation" : "phrase", term: s.referencedRegulation || s.phrase });
+    return qs;
+  }
   if (s.keyword) qs.push({ mode: "keyword", term: s.keyword });
   if (s.title) qs.push({ mode: "title", term: s.title });
   return qs;
+}
+
+// Anything the engine can actually scan (Sejm/ELI acts or SAOS judgments).
+function isScannable(s) {
+  return sourceQueries(s).length > 0;
 }
 
 // Runs one real scan per source against the live Sejm/ELI API. `sources` items
@@ -233,9 +353,10 @@ async function scanSources(sources, range) {
   return mapPool(sources, 6, async (s) => {
     const qs = sourceQueries(s);
     if (!qs.length) return { id: s.id, lastChecked: nowStr, found: 0, detected: [] };
-    const publisher = normalizePublisher(s.publisher);
     const dateFrom = rangeFrom || toIsoDate(s.lastChecked) || isoYearStart();
     const dateTo = rangeFrom ? rangeTo : todayIso;
+    if (s.register === "SAOS") return scanSaosSource(s, dateFrom, dateTo, nowStr, !!rangeFrom);
+    const publisher = normalizePublisher(s.publisher);
     const queries = qs.map((q) => {
       const opts = { [q.mode]: q.term, publisher, dateFrom, dateTo };
       return { ...q, publisher, dateFrom, dateTo, url: `${SEARCH_URL}?${buildSearchParams(opts).toString()}` };
@@ -284,4 +405,4 @@ function parseBody(req) {
   return typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
 }
 
-module.exports = { WORKSPACES, normalizeWorkspace, normalizePublisher, sourceQueries, searchActs, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, storageAvailable, loadDoc, saveDoc, sendError, parseBody };
+module.exports = { WORKSPACES, normalizeWorkspace, normalizePublisher, sourceQueries, isScannable, isSaosSource, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES, searchActs, searchJudgments, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, storageAvailable, loadDoc, saveDoc, sendError, parseBody };

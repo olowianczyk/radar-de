@@ -9,6 +9,8 @@
 // any browser being open (see vercel.json), for every workspace.
 //
 const SEJM_SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
+const SAOS_SEARCH_URL = "https://www.saos.org.pl/api/search/judgments";
+export const SAOS_LOOKBACK_DAYS = 60;
 
 function parseDMYHM(s) {
   const [datePart, timePart] = (s || "").split(" ");
@@ -92,6 +94,16 @@ export async function fetchKeywords() {
 // buildSearchParams) — surfaced in the UI so "what did we actually search"
 // is never a guess. `dateFrom`/`dateTo` as YYYY-MM-DD.
 export function sourceQueryUrl(source, dateFrom, dateTo, mode) {
+  if (source.register === "SAOS") {
+    const p = new URLSearchParams({ pageSize: "100", pageNumber: "0", sortingField: "JUDGMENT_DATE", sortingDirection: "DESC" });
+    if (source.courtType) p.set("courtType", source.courtType);
+    (source.judgmentTypes || []).forEach((j) => p.append("judgmentTypes", j));
+    if (source.referencedRegulation) p.set("referencedRegulation", source.referencedRegulation);
+    else if (source.phrase) p.set("all", source.phrase);
+    if (dateFrom) p.set("judgmentDateFrom", dateFrom);
+    if (dateTo) p.set("judgmentDateTo", dateTo);
+    return `${SAOS_SEARCH_URL}?${p.toString()}`;
+  }
   const params = new URLSearchParams({ publisher: source.publisher === "MP" ? "MP" : "DU", limit: "100" });
   const m = mode || (source.keyword ? "keyword" : "title");
   params.set(m, m === "keyword" ? source.keyword : source.title);
@@ -103,6 +115,11 @@ export function sourceQueryUrl(source, dateFrom, dateTo, mode) {
 // The one-or-two queries a source stands for (mirrors api/_lib.js sourceQueries).
 export function sourceQueries(source) {
   const qs = [];
+  if (source.register === "SAOS") {
+    if (source.referencedRegulation) qs.push({ mode: "referencedRegulation", term: source.referencedRegulation });
+    else if (source.phrase) qs.push({ mode: "phrase", term: source.phrase });
+    return qs;
+  }
   if (source.keyword) qs.push({ mode: "keyword", term: source.keyword });
   if (source.title) qs.push({ mode: "title", term: source.title });
   return qs;
@@ -124,8 +141,13 @@ export function isoToday() {
 export function nextScanRange(source) {
   const datePart = (source.lastChecked || "").split(" ")[0];
   const [d, m, y] = datePart.split(".").map(Number);
-  if (d) return { from: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`, to: isoToday(), first: false };
-  return { from: `${new Date().getFullYear()}-01-01`, to: isoToday(), first: true };
+  let from = d ? `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : `${new Date().getFullYear()}-01-01`;
+  const first = !d;
+  // SAOS sources look back behind the incremental window (publication lag).
+  if (source.register === "SAOS") {
+    const dt = new Date(`${from}T00:00:00Z`); dt.setUTCDate(dt.getUTCDate() - SAOS_LOOKBACK_DAYS); from = dt.toISOString().slice(0, 10);
+  }
+  return { from, to: isoToday(), first };
 }
 
 // Builds the "legal changes" feed from real scan history instead of hand-written
@@ -149,9 +171,12 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
       const date = (e.ts || "").split(" ")[0];
       const [dd, mm, yy] = date.split(".");
       const iso = dd && mm && yy ? `${yy}-${mm}-${dd}` : undefined;
+      const isJudgment = e.kind === "judgment";
       changes.push({
         id,
         eli: e.eli,
+        kind: isJudgment ? "judgment" : "act",
+        judgment: isJudgment ? { courtType: e.courtType, courtName: e.courtName, caseNumbers: e.caseNumbers || [], judgmentType: e.judgmentType, judgmentDate: e.judgmentDate, excerpt: e.excerpt || "", keywords: e.keywords || [] } : null,
         act: source.name,
         area: source.area,
         actType: e.actType,
@@ -166,16 +191,17 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
         detectedOn: isoToDmy(e.detectedOn) || date,
         source: e.url || source.url,
         title: { pl: e.note, de: e.note, en: e.note },
-        summary,
+        summary: isJudgment ? { pl: e.excerpt || "", de: e.excerpt || "", en: e.excerpt || "" } : summary,
         affected: [],
         matchedBy: (() => {
           // `via` is recorded by the backend since the multi-query engine;
           // older history entries fall back to the source's first query.
-          const mode = e.via || (source.keyword ? "keyword" : "title");
+          const mode = e.via || (source.register === "SAOS" ? (source.referencedRegulation ? "referencedRegulation" : "phrase") : source.keyword ? "keyword" : "title");
+          const term = mode === "keyword" ? source.keyword : mode === "title" ? source.title : mode === "referencedRegulation" ? source.referencedRegulation : source.phrase;
           return {
             sourceName: source.name,
             mode,
-            term: mode === "keyword" ? source.keyword : source.title,
+            term,
             publisher: e.publisher || source.publisher || "DU",
             queryUrl: sourceQueryUrl(source, iso, iso, mode),
           };
@@ -194,7 +220,7 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
 export async function forceScan(ws, activeSources, range) {
   return post("/api/scan-all", {
     workspace: ws,
-    sources: activeSources.map((s) => ({ id: s.id, keyword: s.keyword, title: s.title, publisher: s.publisher, lastChecked: s.lastChecked })),
+    sources: activeSources.map((s) => ({ id: s.id, keyword: s.keyword, title: s.title, publisher: s.publisher, register: s.register, courtType: s.courtType, judgmentTypes: s.judgmentTypes, referencedRegulation: s.referencedRegulation, phrase: s.phrase, lastChecked: s.lastChecked })),
     ...(range ? { dateFrom: range.from, dateTo: range.to } : {}),
   });
 }

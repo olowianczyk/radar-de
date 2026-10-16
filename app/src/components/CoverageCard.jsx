@@ -14,8 +14,8 @@ const MARK = {
 // Coverage matrix rows: [i18n key, level]. Levels are facts about the engine,
 // not configuration — see README "Na jakiej zasadzie działa skanowanie".
 const MATRIX = [
-  ["du", "auto"], ["mp", "auto"], ["actStatusSnapshot", "auto"],
-  ["eu", "manual"], ["caselaw", "manual"], ["regulators", "manual"], ["sanctions", "manual"], ["drafts", "manual"],
+  ["du", "auto"], ["mp", "auto"], ["saos", "auto"], ["actStatusSnapshot", "auto"],
+  ["eu", "manual"], ["cjeu", "manual"], ["regulators", "manual"], ["sanctions", "manual"], ["drafts", "manual"],
   ["content", "no"], ["statusLater", "no"], ["relevance", "no"],
 ];
 
@@ -25,8 +25,9 @@ export function coverageStats(ws, sources) {
   return {
     auto: auto.length,
     active: auto.filter((s) => s.active).length,
-    du: auto.filter((s) => (s.publisher || "DU") === "DU").length,
+    du: auto.filter((s) => s.register !== "SAOS" && (s.publisher || "DU") === "DU").length,
     mp: auto.filter((s) => s.publisher === "MP").length,
+    saos: auto.filter((s) => s.register === "SAOS").length,
     manual: list.filter(isManualSource).length,
     daily: list.filter((s) => isManualSource(s) && s.cadence === "daily").length,
   };
