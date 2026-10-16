@@ -94,6 +94,7 @@ export const HRBP_I18N = {
       judgment: "Orzeczenie", caseNumber: "Sygnatura", judgmentDate: "Data orzeczenia", excerpt: "Fragment", openSaos: "Otwórz w SAOS", kindAct: "Akty prawne", kindJudgment: "Orzeczenia", kindAll: "Akty i orzeczenia", kindLabel: "Rodzaj",
       howBullet: "Orzecznictwo (SN, NSA/WSA, TK, KIO, sądy powszechne) pochodzi z SAOS — publicznej bazy ICM UW agregującej portale orzeczeń. Dopasowanie po akcie powołanym w orzeczeniu lub po frazie; okno dat po dacie orzeczenia, cofnięte o 60 dni, bo orzeczenia trafiają do SAOS z opóźnieniem. TSUE nie jest w SAOS — źródło ręczne.",
     },
+    srcHowChoose: "Jak dobierać tytuły i słowa kluczowe?", srcHowAdd: "Jak dodać i sprawdzić źródło?",
     notifications: "Powiadomienia", notificationsEmpty: "Brak nowych powiadomień", notifKbNeedsUpdate: "Dokument wymaga aktualizacji", markAllRead: "Oznacz wszystkie jako przeczytane",
   },
   de: {
@@ -189,6 +190,7 @@ export const HRBP_I18N = {
       judgment: "Entscheidung", caseNumber: "Aktenzeichen", judgmentDate: "Entscheidungsdatum", excerpt: "Auszug", openSaos: "In SAOS öffnen", kindAct: "Rechtsakte", kindJudgment: "Entscheidungen", kindAll: "Akte und Entscheidungen", kindLabel: "Art",
       howBullet: "Rechtsprechung (SN, NSA/WSA, TK, KIO, ordentliche Gerichte) stammt aus SAOS — der öffentlichen ICM-UW-Datenbank, die Gerichtsportale aggregiert. Treffer über einen zitierten Akt oder eine Phrase; Fenster nach Entscheidungsdatum, um 60 Tage zurückgesetzt, weil Urteile SAOS verspätet erreichen. Der EuGH ist nicht in SAOS — manuelle Quelle.",
     },
+    srcHowChoose: "Wie Titel und Schlagwörter wählen?", srcHowAdd: "Wie eine Quelle hinzufügen und prüfen?",
     notifications: "Benachrichtigungen", notificationsEmpty: "Keine neuen Benachrichtigungen", notifKbNeedsUpdate: "Dokument benötigt Aktualisierung", markAllRead: "Alle als gelesen markieren",
   },
   en: {
@@ -284,6 +286,7 @@ export const HRBP_I18N = {
       judgment: "Judgment", caseNumber: "Case number", judgmentDate: "Judgment date", excerpt: "Excerpt", openSaos: "Open in SAOS", kindAct: "Legal acts", kindJudgment: "Judgments", kindAll: "Acts and judgments", kindLabel: "Kind",
       howBullet: "Case law (SN, NSA/WSA, TK, KIO, common courts) comes from SAOS — the public ICM UW database aggregating court portals. Matched by an act the judgment cites or by a phrase; the window is by judgment date and moved back 60 days because judgments reach SAOS late. The CJEU is not in SAOS — manual source.",
     },
+    srcHowChoose: "How to choose titles and keywords?", srcHowAdd: "How to add and verify a source?",
     notifications: "Notifications", notificationsEmpty: "No new notifications", notifKbNeedsUpdate: "Document needs update", markAllRead: "Mark all as read",
   },
 };

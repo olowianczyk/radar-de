@@ -29,13 +29,14 @@ function useKeywordThesaurus() {
     return () => { alive = false; };
   }, []);
   const set = React.useMemo(() => (Array.isArray(kw) ? new Set(kw.map((k) => k.toLowerCase())) : kw), [kw]);
+  const list = Array.isArray(kw) ? kw : null;
   const suggest = React.useCallback((term) => {
     if (!Array.isArray(kw) || !term) return [];
     const stem = term.toLowerCase().split(/\s+/)[0].slice(0, 6);
     if (stem.length < 3) return [];
     return kw.filter((k) => k.toLowerCase().includes(stem)).slice(0, 4);
   }, [kw]);
-  return { set, suggest };
+  return { set, list, suggest };
 }
 
 function keywordOk(source, set) {
@@ -173,7 +174,7 @@ function HowItWorks({ t }) {
   );
 }
 
-function AddSourceForm({ t, ws, onAdd, onCancel }) {
+function AddSourceForm({ t, ws, onAdd, onCancel, thesaurus }) {
   const [name, setName] = React.useState("");
   const [mode, setMode] = React.useState("title");
   const [term, setTerm] = React.useState("");
@@ -181,8 +182,16 @@ function AddSourceForm({ t, ws, onAdd, onCancel }) {
   const [courtType, setCourtType] = React.useState("SUPREME");
   const [judgmentType, setJudgmentType] = React.useState("");
   const [area, setArea] = React.useState("other");
-  const valid = name.trim() && term.trim();
   const isSaos = publisher === "SAOS";
+  const kwMode = !isSaos && mode === "keyword";
+  const kwSet = thesaurus && thesaurus.set;
+  const kwList = thesaurus && thesaurus.list;
+  const needle = term.trim().toLowerCase();
+  const suggestions = kwMode && Array.isArray(kwList) && needle.length >= 2 ? kwList.filter((k) => k.toLowerCase().includes(needle)).slice(0, 8) : [];
+  const kwExact = kwMode && kwSet instanceof Set && needle ? kwSet.has(needle) : null;
+  // A keyword outside the thesaurus can never match — don't let it be saved.
+  const valid = name.trim() && term.trim() && !(kwMode && kwSet instanceof Set && !kwExact);
+  const guideLink = (id) => (e) => { e.preventDefault(); try { sessionStorage.setItem("hrbp-help-anchor", id); } catch (err) {} window.location.hash = `#/${ws.id}/help`; };
   return (
     <Card padding="lg">
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -201,12 +210,32 @@ function AddSourceForm({ t, ws, onAdd, onCancel }) {
           <div style={{ width: 220 }}>
             <Select label={t.srcMode} value={mode} onChange={(e) => setMode(e.target.value)} options={isSaos ? [{ value: "referencedRegulation", label: t.saos.matchReferenced }, { value: "phrase", label: t.saos.matchPhrase }] : [{ value: "title", label: t.scopeMatchTitle }, { value: "keyword", label: t.scopeMatchKeyword }]} />
           </div>
-          <div style={{ flex: 1, minWidth: 220 }}><Input label={isSaos ? modeLabel(mode, t) : mode === "keyword" ? t.srcTerm : t.srcTermTitle} value={term} onChange={(e) => setTerm(e.target.value)} /></div>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <Input label={isSaos ? modeLabel(mode, t) : mode === "keyword" ? t.srcTerm : t.srcTermTitle} value={term} onChange={(e) => setTerm(e.target.value)} />
+            {kwMode && needle.length >= 2 && (
+              <div style={{ marginTop: 6, fontSize: 12 }}>
+                {kwSet === undefined && <span style={{ color: "var(--text-muted)" }}>{t.kwChecking}</span>}
+                {kwSet === null && <span style={{ color: "var(--text-muted)" }}>{t.kwUnknown}</span>}
+                {kwSet instanceof Set && (kwExact
+                  ? <span style={{ color: "var(--success-600)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="check-circle-2" size={12} />{t.kwValid}</span>
+                  : <span style={{ color: "var(--danger-600)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{t.kwInvalid}</span>)}
+                {suggestions.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                    {suggestions.map((k) => <button key={k} type="button" onClick={() => setTerm(k)} style={{ border: "1px solid var(--border-default)", background: "var(--surface)", color: "var(--text-heading)", borderRadius: "var(--radius-pill)", padding: "3px 10px", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-sans)" }}>{k}</button>)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <div style={{ width: 220 }}>
             <Select label={t.srcArea} value={area} onChange={(e) => setArea(e.target.value)} options={Object.keys(ws.areas).map((k) => ({ value: k, label: t.area[k] }))} />
           </div>
         </div>
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{isSaos ? t.saos.howBullet : t.scopeHow[1]}</div>
+        <div style={{ fontSize: 12, display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <a href={`#/${ws.id}/help`} onClick={guideLink("selection")} style={{ color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="help-circle" size={12} />{t.srcHowChoose}</a>
+          <a href={`#/${ws.id}/help`} onClick={guideLink("add-source")} style={{ color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="help-circle" size={12} />{t.srcHowAdd}</a>
+        </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <Button variant="ghost" onClick={onCancel}>{t.srcCancel}</Button>
           <Button variant="primary" disabled={!valid} onClick={() => onAdd({ name: name.trim(), mode, term: term.trim(), publisher, courtType, judgmentType, area })}>{t.srcAdd}</Button>
@@ -276,7 +305,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
       </div>
       <CoverageCard t={t} ws={ws} sources={sources} />
       <HowItWorks t={t} />
-      {adding && <AddSourceForm t={t} ws={ws} onAdd={addSource} onCancel={() => setAdding(false)} />}
+      {adding && <AddSourceForm t={t} ws={ws} thesaurus={thesaurus} onAdd={addSource} onCancel={() => setAdding(false)} />}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ width: 160 }}><Input type="date" label={t.periodFrom} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} /></div>
         <div style={{ width: 160 }}><Input type="date" label={t.periodTo} value={scanTo} onChange={(e) => setScanTo(e.target.value)} /></div>

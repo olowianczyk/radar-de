@@ -6,6 +6,35 @@ import React from "react";
 import { Card, Badge, Icon, Button, StatusPill } from "../components/index.js";
 import { tFor, isManualSource } from "../workspaces.js";
 import { CoverageCard } from "../components/CoverageCard.jsx";
+import { fetchKeywords } from "../isapIntegration.js";
+import { Input } from "../components/index.js";
+
+// Live search over the Sejm keyword thesaurus — real data from /api/keywords,
+// an honest error when it cannot be fetched.
+function ThesaurusSearch({ h }) {
+  const [kw, setKw] = React.useState(undefined);
+  const [q, setQ] = React.useState("");
+  React.useEffect(() => { let alive = true; fetchKeywords().then((l) => alive && setKw(l)).catch(() => alive && setKw(null)); return () => { alive = false; }; }, []);
+  const needle = q.trim().toLowerCase();
+  const matches = Array.isArray(kw) && needle.length >= 2 ? kw.filter((k) => k.toLowerCase().includes(needle)).slice(0, 40) : [];
+  return (
+    <div id="thesaurus" style={{ marginTop: 18, padding: 16, border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", background: "var(--surface-sunken)" }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)", display: "flex", alignItems: "center", gap: 8 }}><Icon name="book-a" size={15} style={{ color: "var(--brand)" }} />{h.thesaurusTitle}</div>
+      <p style={{ margin: "6px 0 10px", fontSize: 12.5, color: "var(--text-muted)" }}>{h.thesaurusIntro}</p>
+      <Input placeholder={h.thesaurusPlaceholder} value={q} onChange={(e) => setQ(e.target.value)} iconLeft={<Icon name="search" size={15} />} />
+      <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--text-muted)" }}>
+        {kw === undefined && h.thesaurusLoading}
+        {kw === null && <span style={{ color: "var(--danger-600)" }}>{h.thesaurusError}</span>}
+        {Array.isArray(kw) && <>{h.thesaurusCount.replace("{n}", String(kw.length))}{needle.length >= 2 ? ` · ${h.thesaurusMatches.replace("{n}", String(kw.filter((k) => k.toLowerCase().includes(needle)).length))}` : ""}</>}
+      </div>
+      {Array.isArray(kw) && needle.length >= 2 && (
+        matches.length ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>{matches.map((k) => <Badge key={k} tone="neutral">{k}</Badge>)}</div>
+        ) : <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--warning-700)" }}>{h.thesaurusNone}</div>
+      )}
+    </div>
+  );
+}
 
 const HELP = {
   pl: {
@@ -66,6 +95,36 @@ const HELP = {
     manualIntro: "Tych źródeł API Sejmu nie obejmuje. Są wymienione, żeby luka była widoczna; zalecana częstotliwość przeglądu pochodzi z dokumentu wymagań.",
     colSource: "Źródło", colMatch: "Dopasowanie", colRegister: "Rejestr", colDefault: "Domyślnie", colCadence: "Częstotliwość", colWhy: "Dlaczego ręcznie",
     on: "włączone", off: "wyłączone",
+    selectionTitle: "Jak dobrane są akty i słowa kluczowe",
+    selectionIntro: "Lista źródeł nie jest automatyczna — to decyzja redakcyjna oparta na dokumencie wymagań dla działu prawnego i compliance (sekcje: fundament, spory, prawo korporacyjne, podatki, prawo pracy, konkurencja, dane, IP, produkt, zamówienia, nieruchomości, AML/sankcje/ESG). Każdy akt z tej listy, który jest publikowany w Dz.U. lub M.P., ma swoje źródło. Dla każdego źródła wybraliśmy sposób dopasowania według poniższych zasad:",
+    selectionRules: [
+      ["Fragment tytułu — domyślny wybór", "Bierzemy kawałek oficjalnego tytułu aktu w takiej odmianie, w jakiej występuje w nowelizacjach i tekstach jednolitych, np. „o ochronie konkurencji i konsumentów”, „Kodeks spółek handlowych”, „o Krajowym Rejestrze Sądowym”. Łapie: ustawę, jej nowelizacje nazwane po tytule, obwieszczenia z tekstem jednolitym, rozporządzenia, które powołują ten tytuł."],
+      ["Słowo kluczowe Sejmu — tylko ze słownika", "Biblioteka Sejmowa nadaje każdemu aktowi hasła z zamkniętego słownika (ok. kilku tysięcy pozycji). Używamy go tam, gdzie hasło jest trafne i istnieje w słowniku — bo hasło spoza słownika nie znajdzie nigdy niczego. Przy każdym źródle widać zielony/czerwony znacznik, a niżej możesz przeszukać słownik."],
+      ["Oba naraz — dla kluczowych kodeksów", "Kodeks pracy, k.c., k.p.c., k.s.h., ustawa AML, UOKiK mają i tytuł, i słowo kluczowe. Powód: nowelizacje zbiorcze („…oraz niektórych innych ustaw”) nie nazywają aktu w tytule — łapie je tylko słowo kluczowe. Wyniki są scalane, duplikaty znikają."],
+      ["Monitor Polski — dla obwieszczeń i komunikatów", "Stawki i progi (odsetki ustawowe, przeciętne wynagrodzenie, progi zamówień) nie są w Dz.U., tylko w M.P. — takie źródła mają rejestr M.P."],
+      ["Orzecznictwo — po powołanym akcie", "Źródła SAOS dopasowują orzeczenia po akcie, który sąd powołał (np. „Kodeks pracy”), z filtrem sądu i rodzaju orzeczenia. Fraza pełnotekstowa jest szersza i używana tylko tam, gdzie nie ma lepszego kryterium (np. odwołania od decyzji UOKiK)."],
+      ["Celowo szerokie i celowo wyłączone", "Niektóre fragmenty są szerokie z premedytacją i mają to napisane w uwagach (np. „Kodeks karny” łapie też KKS). Źródła o dużym wolumenie albo z „fazy 3” dokumentu wymagań (rynek kapitałowy, nieruchomości, środowisko, KIO, sądy powszechne) są zdefiniowane, ale wyłączone — włączasz je przełącznikiem."],
+      ["Obszar prawa to nasza etykieta", "Przypisanie źródła do obszaru (np. „Sankcje i kontrola inwestycji”) służy filtrowaniu w feedzie. Nie pochodzi z Sejmu ani z ISAP."],
+    ],
+    thesaurusTitle: "Przeszukaj słownik słów kluczowych Sejmu",
+    thesaurusIntro: "To pełna, aktualna lista haseł z API Sejmu (GET /eli/keywords). Tylko hasło z tej listy zadziała w trybie „słowo kluczowe”.",
+    thesaurusPlaceholder: "np. praca, podatek, dane osobowe…", thesaurusCount: "{n} haseł w słowniku", thesaurusMatches: "{n} pasujących", thesaurusNone: "Brak hasła zawierającego ten fragment — użyj trybu „tytuł zawiera”.", thesaurusLoading: "wczytuję słownik…", thesaurusError: "Nie udało się pobrać słownika z API Sejmu — nie da się teraz sprawdzić haseł.",
+    addTitle: "Czy można dodawać własne źródła? Tak — i są wspólne dla działu",
+    addSteps: [
+      ["Wejdź w „Monitorowane źródła” → „Nowe źródło”", "Formularz jest nad listą. Dodane źródło zapisuje się na serwerze i od następnego skanu (ręcznego lub nocnego) jest traktowane jak każde inne — widzą je wszyscy w dziale."],
+      ["Wybierz rejestr", "Dziennik Ustaw (ustawy, rozporządzenia, teksty jednolite), Monitor Polski (obwieszczenia, komunikaty) albo SAOS (orzecznictwo — wtedy wybierasz też sąd i rodzaj orzeczenia)."],
+      ["Wybierz tryb i wpisz termin", "„Tytuł zawiera” — wklej fragment oficjalnego tytułu w odmianie, jak w ISAP (np. „o prawach konsumenta”, nie „prawa konsumenta”). „Słowo kluczowe Sejmu” — podczas pisania pokazują się pasujące hasła ze słownika; wybierz jedno z nich. W SAOS: „powołany akt zawiera” (np. „Kodeks cywilny”) lub „fraza w treści”."],
+      ["Nadaj nazwę i obszar", "Nazwa jest tym, co zobaczysz w feedzie przy każdej wykrytej zmianie. Obszar służy filtrowaniu."],
+      ["Sprawdź, czy źródło działa", "Rozwiń jego panel „Zakres przeszukiwania”: zobaczysz dokładne zapytanie (link „Otwórz zapytanie…” pokazuje surową odpowiedź API) i znacznik słowa kluczowego. Potem kliknij „Sprawdź teraz” z zakresem dat, np. od 1 stycznia — jeśli akt był w tym okresie nowelizowany, powinien się pojawić. Jeśli nic nie ma, otwórz zapytanie i oceń, czy to brak publikacji, czy zły fragment."],
+      ["Wyłączanie i usuwanie", "Przełącznik przy źródle wyłącza je ze skanów (również nocnych) bez utraty historii. Własne źródła można usunąć w panelu zakresu („Usuń źródło”). Źródeł z listy domyślnej nie da się usunąć, tylko wyłączyć."],
+      ["Zmiana listy domyślnej", "Lista domyślna jest w kodzie (`app/src/workspaces.js`) i w instrukcji — zmiana wymaga wdrożenia. Własne źródła dodane w aplikacji nie wymagają niczego."],
+    ],
+    addTips: [
+      "Za szeroki fragment („ustawa”, „o zmianie”) zaleje feed. Za wąski („Kodeks pracy z 1974 r.”) nie złapie niczego — tytuły nowelizacji nie zawierają roku.",
+      "Odmiana ma znaczenie: w tytułach nowelizacji akt występuje w dopełniaczu/miejscowniku („o zmianie ustawy o rachunkowości”), w tekstach jednolitych tak samo — dlatego fragment „o rachunkowości” działa, a „ustawa o rachunkowość” nie.",
+      "Rozporządzenia wykonawcze często nie powtarzają tytułu ustawy — jeśli ich potrzebujesz, dodaj osobne źródło po słowie kluczowym (np. „BHP”).",
+      "Prawo UE nie jest w Dz.U. — źródło na „RODO” albo „AI Act” nic nie znajdzie; zobaczysz tylko krajowe ustawy wdrażające.",
+    ],
     faqTitle: "Najczęstsze pytania",
     faq: [
       ["Źródło od dawna nic nie znajduje. Czy działa?", "Najpierw otwórz jego panel „Zakres przeszukiwania”. Jeśli słowo kluczowe ma czerwony znacznik, nie istnieje w słowniku Sejmu — zmień je na podpowiedziane albo przełącz źródło na dopasowanie po tytule. Jeśli znacznik jest zielony, prawdopodobnie w tym okresie po prostu nie opublikowano pasującego aktu — kliknij „Otwórz zapytanie w API Sejmu”, aby to potwierdzić."],
@@ -135,6 +194,36 @@ const HELP = {
     manualIntro: "The Sejm API does not cover these sources. They are listed so the gap is visible; the recommended cadence comes from the requirements document.",
     colSource: "Source", colMatch: "Matching", colRegister: "Register", colDefault: "Default", colCadence: "Cadence", colWhy: "Why manual",
     on: "on", off: "off",
+    selectionTitle: "How the acts and keywords were chosen",
+    selectionIntro: "The source list is not automatic — it is an editorial decision based on the legal/compliance requirements document (sections: fundamentals, disputes, corporate, tax, labour, competition, data, IP, product, procurement, real estate, AML/sanctions/ESG). Every act on that list that is published in Dz.U. or M.P. has a source. For each one the matching mode was chosen by these rules:",
+    selectionRules: [
+      ["Title fragment — the default", "A piece of the act’s official title, declined the way it appears in amendments and consolidated texts, e.g. “o ochronie konkurencji i konsumentów”, “Kodeks spółek handlowych”. Catches: the act, amendments named after it, consolidated-text notices, regulations that cite the title."],
+      ["Sejm keyword — only from the thesaurus", "The Sejm Library tags each act with headings from a closed thesaurus (a few thousand entries). We use it where a heading fits and exists — a heading outside the thesaurus never finds anything. Each source shows a green/red marker, and you can search the thesaurus below."],
+      ["Both at once — for key codes", "Labour Code, k.c., k.p.c., k.s.h., the AML and competition acts have both a title and a keyword. Reason: omnibus amendments (“…oraz niektórych innych ustaw”) don’t name the act in the title — only the keyword catches them. Results are merged, duplicates removed."],
+      ["Monitor Polski — for notices", "Rates and thresholds (statutory interest, average pay, procurement thresholds) are not in Dz.U. but in M.P. — those sources use the M.P. register."],
+      ["Case law — by cited act", "SAOS sources match judgments by the act the court cited (e.g. “Kodeks pracy”), filtered by court and judgment type. A full-text phrase is broader and used only where there is no better criterion (e.g. appeals from UOKiK decisions)."],
+      ["Deliberately broad and deliberately off", "Some fragments are broad on purpose and say so in their notes (e.g. “Kodeks karny” also matches the Fiscal Penal Code). High-volume or “phase 3” sources (capital markets, real estate, environment, KIO, common courts) are defined but switched off — you enable them with the toggle."],
+      ["The legal area is our label", "Assigning a source to an area (e.g. “Sanctions & investment screening”) is for filtering the feed. It does not come from the Sejm or ISAP."],
+    ],
+    thesaurusTitle: "Search the Sejm keyword thesaurus",
+    thesaurusIntro: "The full, current list of headings from the Sejm API (GET /eli/keywords). Only a heading from this list works in “keyword” mode.",
+    thesaurusPlaceholder: "e.g. praca, podatek, dane osobowe…", thesaurusCount: "{n} headings in the thesaurus", thesaurusMatches: "{n} matching", thesaurusNone: "No heading contains this fragment — use “title contains” instead.", thesaurusLoading: "loading the thesaurus…", thesaurusError: "Could not fetch the thesaurus from the Sejm API — headings cannot be checked right now.",
+    addTitle: "Can you add your own sources? Yes — and they are shared by the department",
+    addSteps: [
+      ["Go to “Monitored sources” → “New source”", "The form sits above the list. A new source is saved on the server and treated like any other from the next scan (manual or nightly) — everyone in the department sees it."],
+      ["Pick the register", "Journal of Laws (statutes, regulations, consolidated texts), Monitor Polski (notices) or SAOS (case law — then also pick the court and judgment type)."],
+      ["Pick the mode and type the term", "“Title contains” — paste a fragment of the official title declined as in ISAP (e.g. “o prawach konsumenta”). “Sejm keyword” — matching thesaurus headings appear as you type; pick one. In SAOS: “cited act contains” (e.g. “Kodeks cywilny”) or “phrase in text”."],
+      ["Name it and pick an area", "The name is what you will see in the feed next to each detected change. The area is for filtering."],
+      ["Check that it works", "Expand its “Search scope” panel: you see the exact query (“Open query…” shows the raw API response) and the keyword marker. Then click “Check now” with a date range, e.g. from 1 January — if the act was amended in that period it should appear. If nothing shows, open the query and judge whether nothing was published or the fragment is wrong."],
+      ["Switching off and removing", "The toggle excludes a source from scans (nightly too) without losing history. Own sources can be removed in the scope panel (“Remove source”). Default sources can only be switched off."],
+      ["Changing the default list", "The default list lives in code (`app/src/workspaces.js`) and in this guide — changing it needs a deployment. Sources added in the app need nothing."],
+    ],
+    addTips: [
+      "Too broad a fragment (“ustawa”, “o zmianie”) floods the feed. Too narrow (“Kodeks pracy z 1974 r.”) catches nothing — amendment titles don’t contain the year.",
+      "Declension matters: in amendment titles the act appears in the genitive/locative (“o zmianie ustawy o rachunkowości”), likewise in consolidated texts — so “o rachunkowości” works and “ustawa o rachunkowość” does not.",
+      "Implementing regulations often don’t repeat the statute’s title — if you need them, add a separate keyword source (e.g. “BHP”).",
+      "EU law is not in Dz.U. — a source for “RODO” or “AI Act” finds nothing; you will only see national implementing acts.",
+    ],
     faqTitle: "Frequently asked questions",
     faq: [
       ["A source hasn't found anything for a long time. Does it work?", "Open its “Search scope” panel first. If the keyword has a red marker it doesn't exist in the Sejm thesaurus — change it to a suggested one or switch the source to title matching. If the marker is green, most likely no matching act was published in that period — click “Open query in the Sejm API” to confirm."],
@@ -204,6 +293,36 @@ const HELP = {
     manualIntro: "Diese Quellen deckt die Sejm-API nicht ab. Sie sind aufgeführt, damit die Lücke sichtbar ist; der empfohlene Rhythmus stammt aus dem Anforderungsdokument.",
     colSource: "Quelle", colMatch: "Treffer", colRegister: "Register", colDefault: "Standard", colCadence: "Rhythmus", colWhy: "Warum manuell",
     on: "ein", off: "aus",
+    selectionTitle: "Wie Akte und Schlagwörter ausgewählt wurden",
+    selectionIntro: "Die Quellenliste ist nicht automatisch — sie ist eine redaktionelle Entscheidung auf Basis des Anforderungsdokuments für Recht und Compliance (Abschnitte: Grundlagen, Streitigkeiten, Gesellschaftsrecht, Steuern, Arbeitsrecht, Wettbewerb, Daten, IP, Produkt, Vergabe, Immobilien, AML/Sanktionen/ESG). Jeder Akt dieser Liste, der im Dz.U. oder M.P. erscheint, hat eine Quelle. Die Trefferart wurde nach diesen Regeln gewählt:",
+    selectionRules: [
+      ["Titelfragment — der Standard", "Ein Stück des amtlichen Titels, dekliniert wie in Novellen und konsolidierten Fassungen, z. B. „o ochronie konkurencji i konsumentów“, „Kodeks spółek handlowych“. Erfasst: den Akt, nach ihm benannte Novellen, Bekanntmachungen konsolidierter Fassungen, Verordnungen, die den Titel zitieren."],
+      ["Sejm-Schlagwort — nur aus dem Thesaurus", "Die Sejm-Bibliothek verschlagwortet jeden Akt aus einem geschlossenen Thesaurus (einige tausend Einträge). Wir nutzen es, wo ein Schlagwort passt und existiert — ein Schlagwort außerhalb findet nie etwas. Jede Quelle zeigt eine grüne/rote Markierung; unten kann der Thesaurus durchsucht werden."],
+      ["Beides zugleich — für zentrale Gesetzbücher", "Arbeitsgesetzbuch, k.c., k.p.c., k.s.h., AML- und Wettbewerbsgesetz haben Titel und Schlagwort. Grund: Sammelnovellen („…oraz niektórych innych ustaw“) nennen den Akt nicht im Titel — nur das Schlagwort erfasst sie. Ergebnisse werden zusammengeführt."],
+      ["Monitor Polski — für Bekanntmachungen", "Sätze und Schwellen (gesetzliche Zinsen, Durchschnittsentgelt, Vergabeschwellen) stehen nicht im Dz.U., sondern im M.P. — diese Quellen nutzen das Register M.P."],
+      ["Rechtsprechung — nach zitiertem Akt", "SAOS-Quellen treffen Urteile über den vom Gericht zitierten Akt (z. B. „Kodeks pracy“), gefiltert nach Gericht und Entscheidungsart. Eine Volltextphrase ist weiter und wird nur ohne besseres Kriterium genutzt (z. B. Rechtsmittel gegen UOKiK-Entscheidungen)."],
+      ["Bewusst weit und bewusst aus", "Manche Fragmente sind absichtlich weit und sagen das in den Hinweisen (z. B. „Kodeks karny“ trifft auch das Finanzstrafgesetzbuch). Quellen mit hohem Volumen oder aus „Phase 3“ (Kapitalmarkt, Immobilien, Umwelt, KIO, ordentliche Gerichte) sind definiert, aber aus — per Schalter aktivierbar."],
+      ["Das Rechtsgebiet ist unser Etikett", "Die Zuordnung einer Quelle zu einem Bereich dient dem Filtern im Feed. Sie stammt nicht vom Sejm oder ISAP."],
+    ],
+    thesaurusTitle: "Sejm-Schlagwort-Thesaurus durchsuchen",
+    thesaurusIntro: "Die vollständige, aktuelle Liste der Schlagwörter aus der Sejm-API (GET /eli/keywords). Nur ein Schlagwort aus dieser Liste funktioniert im Modus „Schlagwort“.",
+    thesaurusPlaceholder: "z. B. praca, podatek, dane osobowe…", thesaurusCount: "{n} Schlagwörter im Thesaurus", thesaurusMatches: "{n} passend", thesaurusNone: "Kein Schlagwort enthält dieses Fragment — stattdessen „Titel enthält“ verwenden.", thesaurusLoading: "Thesaurus wird geladen…", thesaurusError: "Thesaurus konnte nicht von der Sejm-API geladen werden — Schlagwörter sind gerade nicht prüfbar.",
+    addTitle: "Kann man eigene Quellen hinzufügen? Ja — abteilungsweit gemeinsam",
+    addSteps: [
+      ["„Überwachte Quellen“ → „Neue Quelle“", "Das Formular steht über der Liste. Eine neue Quelle wird auf dem Server gespeichert und ab dem nächsten Scan (manuell oder nächtlich) wie jede andere behandelt — alle in der Abteilung sehen sie."],
+      ["Register wählen", "Gesetzblatt (Gesetze, Verordnungen, konsolidierte Fassungen), Monitor Polski (Bekanntmachungen) oder SAOS (Rechtsprechung — dann auch Gericht und Entscheidungsart wählen)."],
+      ["Trefferart wählen und Begriff eingeben", "„Titel enthält“ — Fragment des amtlichen Titels dekliniert wie in ISAP (z. B. „o prawach konsumenta“). „Sejm-Schlagwort“ — beim Tippen erscheinen passende Thesaurus-Einträge; einen wählen. In SAOS: „zitierter Akt enthält“ (z. B. „Kodeks cywilny“) oder „Phrase im Text“."],
+      ["Name und Bereich vergeben", "Der Name erscheint im Feed bei jeder erkannten Änderung. Der Bereich dient dem Filtern."],
+      ["Prüfen, ob die Quelle funktioniert", "„Suchumfang“ aufklappen: genaue Abfrage („Abfrage öffnen…“ zeigt die Rohantwort) und Schlagwort-Markierung. Dann „Jetzt prüfen“ mit Zeitraum, z. B. ab 1. Januar — wurde der Akt in dieser Zeit novelliert, sollte er erscheinen. Erscheint nichts, Abfrage öffnen und beurteilen: keine Verkündung oder falsches Fragment."],
+      ["Ausschalten und Entfernen", "Der Schalter nimmt eine Quelle aus den Scans (auch nachts), ohne den Verlauf zu verlieren. Eigene Quellen lassen sich im Umfangsbereich entfernen („Quelle entfernen“). Standardquellen können nur ausgeschaltet werden."],
+      ["Standardliste ändern", "Die Standardliste liegt im Code (`app/src/workspaces.js`) und in dieser Anleitung — Änderungen brauchen ein Deployment. In der App hinzugefügte Quellen brauchen nichts."],
+    ],
+    addTips: [
+      "Ein zu weites Fragment („ustawa“, „o zmianie“) flutet den Feed. Ein zu enges („Kodeks pracy z 1974 r.“) findet nichts — Novellentitel enthalten kein Jahr.",
+      "Deklination zählt: in Novellentiteln steht der Akt im Genitiv/Lokativ („o zmianie ustawy o rachunkowości“), ebenso in konsolidierten Fassungen — daher funktioniert „o rachunkowości“, „ustawa o rachunkowość“ nicht.",
+      "Durchführungsverordnungen wiederholen den Gesetzestitel oft nicht — bei Bedarf eine eigene Schlagwortquelle anlegen (z. B. „BHP“).",
+      "EU-Recht steht nicht im Dz.U. — eine Quelle „RODO“ oder „AI Act“ findet nichts; nur nationale Umsetzungsgesetze erscheinen.",
+    ],
     faqTitle: "Häufige Fragen",
     faq: [
       ["Eine Quelle findet seit langem nichts. Funktioniert sie?", "Zuerst den Bereich „Suchumfang“ öffnen. Rote Markierung am Schlagwort: nicht im Sejm-Thesaurus — auf einen Vorschlag ändern oder auf Titeltreffer umstellen. Grüne Markierung: vermutlich wurde im Zeitraum kein passender Akt verkündet — „Abfrage in der Sejm-API öffnen“ zur Bestätigung."],
@@ -230,6 +349,11 @@ const td = { fontSize: 12.5, color: "var(--text-body)", padding: "8px 10px", bor
 
 export function Help({ lang, ws }) {
   const t = tFor(lang, ws);
+  React.useEffect(() => {
+    let anchor = null;
+    try { anchor = sessionStorage.getItem("hrbp-help-anchor"); sessionStorage.removeItem("hrbp-help-anchor"); } catch (e) {}
+    if (anchor) setTimeout(() => { const el = document.getElementById(anchor); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 150);
+  }, []);
   const h = HELP[lang] || HELP.pl;
   const auto = ws.sources.filter((s) => !isManualSource(s));
   const manual = ws.sources.filter(isManualSource);
@@ -356,6 +480,35 @@ export function Help({ lang, ws }) {
             </div>
           </>
         )}
+      </Card>
+
+      <Card padding="lg">
+        <div id="selection" />
+        <H2 icon="list-filter">{h.selectionTitle}</H2>
+        <p style={{ margin: "8px 0 14px", fontSize: 13.5, lineHeight: 1.6, color: "var(--text-body)" }}>{h.selectionIntro}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {h.selectionRules.map(([k, v]) => (
+            <div key={k} style={{ display: "flex", gap: 12 }}>
+              <Icon name="check" size={16} style={{ color: "var(--brand)", marginTop: 3 }} />
+              <div><div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-heading)" }}>{k}</div><div style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--text-body)", marginTop: 2 }}>{v}</div></div>
+            </div>
+          ))}
+        </div>
+        <ThesaurusSearch h={h} />
+      </Card>
+
+      <Card padding="lg">
+        <div id="add-source" />
+        <H2 icon="plus-circle">{h.addTitle}</H2>
+        <ol style={{ margin: "14px 0 0", paddingLeft: 22, display: "flex", flexDirection: "column", gap: 10 }}>
+          {h.addSteps.map(([k, v]) => (
+            <li key={k} style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--text-body)" }}><strong style={{ color: "var(--text-heading)" }}>{k}.</strong> {v}</li>
+          ))}
+        </ol>
+        <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--warning-100)", color: "var(--warning-700)", borderRadius: "var(--radius-md)", fontSize: 13, lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><Icon name="lightbulb" size={14} />{lang === "pl" ? "Wskazówki" : lang === "de" ? "Hinweise" : "Tips"}</div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>{h.addTips.map((x, i) => <li key={i}>{x}</li>)}</ul>
+        </div>
       </Card>
 
       <Card padding="lg">
