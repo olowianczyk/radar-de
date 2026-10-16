@@ -17,6 +17,21 @@ function formatDate(iso, lang) {
   return d.toLocaleString(lang === "pl" ? "pl-PL" : lang === "de" ? "de-DE" : "en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+// Turns http(s) addresses in plain text (document bodies, comments) into links
+// that open in a new tab — e.g. the "SAOS: https://…" line of a judgment saved
+// from the Orzecznictwo screen. Builds React elements, never HTML strings, so
+// text typed by users cannot inject markup.
+// The regex has ONE capturing group, so String.split keeps the matched URLs in
+// the result at odd indexes (text, url, text, url, …). The last character class
+// stops a URL before trailing punctuation, so "see https://x.pl." links to
+// https://x.pl and leaves the full stop as text.
+const URL_RE = /(https?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]'”’])/;
+function linkify(text) {
+  return String(text || "").split(URL_RE).map((part, i) => (i % 2
+    ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" style={{ color: "var(--brand)", wordBreak: "break-all" }}>{part}</a>
+    : part));
+}
+
 export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, kbDocs, addKb, addComment, removeKb, backend }) {
   const t = tFor(lang, ws);
   const favKey = ws.id === "hr" ? "hrbp-kb-favorites" : `hrbp-kb-favorites-${ws.id}`;
@@ -161,7 +176,7 @@ export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, kbDocs, add
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingBottom: 14, borderBottom: "1px solid var(--border-subtle)" }}>
                 <Badge tone={areaTone(ws, sel.area)}>{t.area[sel.area] || t.area.other}</Badge>
               </div>
-              <p style={{ margin: 0, color: "var(--text-body)", fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{sel.body}</p>
+              <p style={{ margin: 0, color: "var(--text-body)", fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{linkify(sel.body)}</p>
               <div style={{ paddingTop: 16, borderTop: "1px solid var(--border-subtle)" }}>
                 <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
                   <Icon name="message-square" size={13} />{t.discussion}{(sel.comments || []).length > 0 ? ` · ${sel.comments.length}` : ""}
@@ -172,7 +187,7 @@ export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, kbDocs, add
                   ) : sel.comments.map((c) => (
                     <div key={c.id} style={{ background: "var(--surface-sunken)", borderRadius: "var(--radius-sm)", padding: "9px 12px" }}>
                       <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 3 }}>{formatDate(c.ts, lang)}</div>
-                      <p style={{ margin: 0, fontSize: 13, color: "var(--text-body)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{c.text}</p>
+                      <p style={{ margin: 0, fontSize: 13, color: "var(--text-body)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{linkify(c.text)}</p>
                     </div>
                   ))}
                 </div>

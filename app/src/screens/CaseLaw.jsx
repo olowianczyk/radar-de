@@ -37,8 +37,8 @@
 // the SAOS link, so the whole team keeps important judgments at hand. A result
 // counts as saved when some KB document already contains its SAOS link, which
 // also survives a reload and works for documents saved by colleagues.
-// ponytail: the saved document is plain text (the KB shows bodies as text, so
-// the link is not clickable there). Linkify KB bodies if people ask for it.
+// The saved document is plain text; the KB screen turns its http(s) addresses
+// into links (see linkify in KnowledgeBase.jsx), so the SAOS link is clickable.
 // ponytail: history is per browser, not shared with the team. Move it to a
 // Blob doc per department if people want to see each other's searches.
 import React from "react";
