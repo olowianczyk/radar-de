@@ -2,7 +2,8 @@
   "buildCommand": "npm --prefix app ci && npm --prefix app run build && mkdir -p dist/app && cp index.html styles.css dist/ && cp -r tokens assets dist/ && cp -r app/dist/* dist/app/",
   "outputDirectory": "dist",
   "functions": {
-    "api/scan-all.js": { "maxDuration": 60 }
+    "api/scan-all.js": { "maxDuration": 60 },
+    "api/scan.js": { "maxDuration": 30 }
   },
   "crons": [
     { "path": "/api/scan-all", "schedule": "0 4 * * *" }

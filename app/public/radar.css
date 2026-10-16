@@ -166,6 +166,43 @@
   color: var(--rl-phosphor);
 }
 
+/* ---- Vivid variant: the mark shown small (sidebar brand plate) ------------ */
+/* Every line above is drawn for the 300 px artboard. Scaled to ~130 px
+   (--rl-scale ≈ .44) a 1 px ring renders ≈ .4 px at 32 % opacity and simply
+   disappears, leaving a dark blob — the product owner asked for the radar to
+   be "better visible". .rl-mark--vivid (RadarMark prop `vivid`) redraws the
+   same screen with strokes ~2.5× thicker and brighter, so after scaling they
+   land at ~1 px and read clearly; bigger blips and hub, a stronger beam and
+   glow. Values are in 300 px design units, like the rules above.
+   Same geometry and timing, so blips still flash exactly under the beam. */
+.rl-mark--vivid .rl-disc {
+  background-image:
+    radial-gradient(circle, rgba(20,110,96,.95) 0%, rgba(5,25,26,0) 75%),
+    repeating-linear-gradient(0deg, rgba(61,245,176,.16) 0 2px, transparent 2px 30px),
+    repeating-linear-gradient(90deg, rgba(61,245,176,.16) 0 2px, transparent 2px 30px);
+  box-shadow: 0 0 0 5px #2fbf9c, 0 0 0 15px #0a2c2a, 0 0 0 20px #1d8a74, 0 0 70px rgba(61,245,176,.5);
+}
+.rl-mark--vivid .rl-ticks {
+  background: repeating-conic-gradient(rgba(61,245,176,.95) 0deg 2.4deg, transparent 2.4deg 10deg);
+}
+.rl-mark--vivid .rl-ring { border-width: 3px; border-color: rgba(61,245,176,.6); }
+.rl-mark--vivid .rl-ring--2 { border-width: 5px; border-color: rgba(61,245,176,.85); }
+.rl-mark--vivid .rl-axis { background: rgba(61,245,176,.6); }
+.rl-mark--vivid .rl-axis--v { width: 3px; left: calc(50% - 1.5px); }
+.rl-mark--vivid .rl-axis--h { height: 3px; top: calc(50% - 1.5px); }
+.rl-mark--vivid .rl-sweep {
+  background: conic-gradient(from 0deg, rgba(61,245,176,0) 0deg, rgba(61,245,176,0) 270deg, rgba(61,245,176,.6) 356deg, rgba(210,255,238,1) 360deg);
+}
+.rl-mark--vivid .rl-sweep::after { left: calc(50% - 3px); width: 6px; box-shadow: 0 0 18px var(--rl-phosphor); }
+.rl-mark--vivid .rl-blip { width: 22px; height: 22px; box-shadow: 0 0 22px var(--rl-phosphor); }
+.rl-mark--vivid .rl-blip--fresh { box-shadow: 0 0 24px var(--rl-amber); }
+.rl-mark--vivid .rl-ping { width: 30px; height: 30px; border-width: 5px; }
+.rl-mark--vivid .rl-hub {
+  width: 64px; height: 64px; margin: -32px 0 0 -32px;
+  border-width: 3px; border-color: rgba(61,245,176,.9);
+  font-size: 40px; box-shadow: 0 0 22px rgba(61,245,176,.45);
+}
+
 /* ---- Wordmark: "Radar / Legislacyjny / • MONITORING ZMIAN W PRAWIE" -------- */
 .rl-logo { display: flex; align-items: center; gap: 56px; }   /* mark + text, design gap */
 .rl-word { display: flex; flex-direction: column; gap: 10px; }

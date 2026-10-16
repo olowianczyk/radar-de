@@ -36,7 +36,8 @@ export const ACCENTS = ["radar", "teal", "ocean", "plum", "indigo", "forest", "t
 // Themes offered in the pickers (Settings + the top-bar appearance popover), in
 // display order, with their lucide icon. "radar" is the default look: the dark
 // radar screen of the logo (public/tokens/theme-radar.css). "dark" is the older
-// neutral dark theme, kept for people who prefer it.
+// neutral dark theme (unbranded), kept for people who prefer it; "light" is the
+// logo's light variant (pale #F3F7F5 page, #0B7A62 brand).
 export const THEMES = ["radar", "light", "dark", "system"];
 export const THEME_ICON = { radar: "radar", light: "sun", dark: "moon", system: "monitor" };
 // Light-theme primary of each accent — swatches in pickers and workspace dots.

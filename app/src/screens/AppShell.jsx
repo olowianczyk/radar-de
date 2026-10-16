@@ -33,17 +33,46 @@ function LangSwitch({ lang, setLang }) {
   );
 }
 
-// Sidebar brand block: animated radar sygnet + product name + workspace
-// subtitle. The name "Radar Legislacyjny" (t.product) is set in Space Grotesk,
-// the logo's own typeface (loaded by radar.css); the subtitle keeps the app's
-// UI font. The mark is decorative here because the name is written next to it.
+// Sidebar brand block — a centred, stacked "brand plate" modelled on the
+// logo's vertical lockup (the product owner asked twice for a bigger logo and
+// a nicer design; the side-by-side 36 px / 64 px versions read as a small
+// icon next to text):
+//
+//          ( radar disc, 132 px )     ← the animated sygnet, always spinning,
+//                                       vivid strokes so it reads at this size
+//               Radar                 ← 34 px bold, wordmark green
+//            LEGISLACYJNY             ← 13 px, wide tracking, wordmark ink
+//      • MONITORING ZMIAN W PRAWIE    ← the logo's tagline (t.tagline):
+//                                       JetBrains Mono caps + pulsing amber dot
+//
+// Behind it sits a soft radial glow in the brand colour, like the light the
+// radar screen throws, plus a hairline divider separating it from the
+// department switch. All colours come from radar.css (--rl-word-*) or theme
+// tokens, so the plate follows light/dark and the chosen accent.
+// The workspace subtitle (t.app) is NOT repeated here: the user card at the
+// bottom of the sidebar already shows it, and the short fixed tagline keeps
+// the plate to one line of small print. Size budget: ~250 px tall; the nav list below scrolls on its own
+// (SidebarNav overflowY: auto), so short windows still reach every item.
+// The mark is decorative (aria-hidden) because the name is written under it;
+// t.product is split on its first space ("Radar" / "Legislacyjny").
 function Wordmark({ t }) {
+  const [first, ...rest] = String(t.product).split(" ");
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <RadarMark size={36} />
-      <div style={{ lineHeight: 1.15, minWidth: 0 }}>
-        <div style={{ fontFamily: "'Space Grotesk', var(--font-display)", fontSize: 15, fontWeight: 700, color: "var(--text-heading)", letterSpacing: "-.01em" }}>{t.product}</div>
-        <div style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.app}</div>
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
+      padding: "14px 6px 14px", marginBottom: 12, borderRadius: 16,
+      background: "radial-gradient(120% 75% at 50% 18%, color-mix(in srgb, var(--rl-word-accent) 14%, transparent), transparent 72%)",
+      borderBottom: "1px solid var(--border-subtle)",
+    }}>
+      <RadarMark size={132} vivid />
+      <div style={{ fontFamily: "'Space Grotesk', var(--font-display)", lineHeight: 1, marginTop: 16 }}>
+        <div style={{ fontSize: 34, fontWeight: 700, color: "var(--rl-word-accent)", letterSpacing: "-.02em" }}>{first}</div>
+        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--rl-word-ink)", letterSpacing: ".24em", textTransform: "uppercase", marginTop: 6, marginRight: "-.24em" }}>{rest.join(" ")}</div>
+      </div>
+      {/* .rl-tagline (radar.css) brings the mono font and the amber dot;
+          inline overrides scale it from the 15 px artboard to the sidebar. */}
+      <div className="rl-tagline" style={{ marginTop: 12, gap: 7, fontSize: 10, letterSpacing: ".12em", lineHeight: 1.3, whiteSpace: "nowrap", textTransform: "uppercase", justifyContent: "center", maxWidth: 196 }}>
+        <span>{t.tagline}</span>
       </div>
     </div>
   );
@@ -159,24 +188,29 @@ function BottomTabBar({ items, activeId, onSelect }) {
 //
 // Theme "radar" (the DEFAULT) is the dark radar-screen look of the logo. It is
 // a dark theme underneath: <html> gets data-theme="dark" (so all dark tokens
-// apply) plus data-skin="radar" (the green-black surfaces on top).
+// apply) plus data-skin="radar" (the green-black surfaces on top). Theme
+// "light" is the logo's LIGHT variant (data-theme="light" + data-skin="radar":
+// pale #F3F7F5 page, #0B7A62 brand), "system" picks one of the two by OS.
+// Only "dark" is unbranded (the older neutral dark), the one opt-out.
 //
-// accent "auto" follows the workspace's own colour so each department is
-// recognisable at a glance — except in the radar theme, where "auto" means the
-// radar's own phosphor green (the look is one brand palette by design). Any
-// explicitly picked accent still applies in every theme.
+// accent "auto" (the default) = the brand "radar" colour in every branded
+// theme, so by default the whole app wears the logo's colours (product owner:
+// "domyślnie powinne być te kolory"). In the neutral "dark" theme "auto"
+// still follows the workspace's own colour. Any explicitly picked accent
+// applies in every theme.
 //
-// Storage key: "rl-theme", NOT the old "hrbp-theme". The old key was written on
-// every visit (the effect below saves the current value), so nearly every
-// returning browser holds "system" there and would never see the new default.
-// A fresh key gives everyone the radar theme once; whoever prefers light/dark
-// picks it again and that choice is then remembered under the new key.
-// ponytail: old light/dark choices are not migrated (cannot tell a deliberate
-// "system" from the auto-saved default); add a one-off copy if users complain.
+// Storage keys: "rl-theme" and "rl-accent", NOT the old "hrbp-theme" /
+// "hrbp-accent". The old keys were written on every visit (the effect below
+// saves the current values), so returning browsers hold "system" and whatever
+// accent was showing then, and would never see the new defaults. Fresh keys
+// give everyone the radar look once; a different choice is then remembered
+// under the new keys.
+// ponytail: old choices are not migrated (cannot tell a deliberate pick from
+// the auto-saved default); add a one-off copy if users complain.
 function useAppearance(ws) {
   const read = (k, allowed, fallback) => { try { const v = localStorage.getItem(k); return allowed.includes(v) ? v : fallback; } catch (e) { return fallback; } };
   const [theme, setTheme] = React.useState(() => read("rl-theme", THEMES, "radar"));
-  const [accent, setAccent] = React.useState(() => read("hrbp-accent", ["auto", ...ACCENTS], "auto"));
+  const [accent, setAccent] = React.useState(() => read("rl-accent", ["auto", ...ACCENTS], "auto"));
   const [systemDark, setSystemDark] = React.useState(() => typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
   React.useEffect(() => {
     if (!window.matchMedia) return undefined;
@@ -187,16 +221,18 @@ function useAppearance(ws) {
   }, []);
   const radar = theme === "radar";
   const dark = radar || theme === "dark" || (theme === "system" && systemDark);
-  const effectiveAccent = accent === "auto" ? (radar ? "radar" : ws.accent || "teal") : accent;
+  // Branded = every theme except the neutral "dark" (see the comment above).
+  const branded = theme !== "dark";
+  const effectiveAccent = accent === "auto" ? (branded ? "radar" : ws.accent || "teal") : accent;
   React.useEffect(() => {
     const html = document.documentElement;
     html.setAttribute("data-theme", dark ? "dark" : "light");
-    // data-skin only exists for the radar theme; removing it restores the
-    // plain light/dark surfaces.
-    if (radar) html.setAttribute("data-skin", "radar"); else html.removeAttribute("data-skin");
+    // data-skin="radar" brands the surfaces in light and dark alike (the
+    // variant follows data-theme); removing it restores the neutral dark.
+    if (branded) html.setAttribute("data-skin", "radar"); else html.removeAttribute("data-skin");
     html.setAttribute("data-accent", effectiveAccent);
-    try { localStorage.setItem("rl-theme", theme); localStorage.setItem("hrbp-accent", accent); } catch (e) {}
-  }, [dark, radar, theme, accent, effectiveAccent]);
+    try { localStorage.setItem("rl-theme", theme); localStorage.setItem("rl-accent", accent); } catch (e) {}
+  }, [dark, branded, theme, accent, effectiveAccent]);
   // The top-bar sun/moon toggle flips between light and the DEFAULT dark look,
   // i.e. radar (leaving "system"). The neutral "dark" stays selectable in the
   // appearance menu and in Settings.
@@ -393,6 +429,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
     { id: "feed", label: t.nav.feed, icon: <Icon name="scale" size={18} />, badge: newCount },
     { id: "kb", label: t.nav.kb, icon: <Icon name="book-open" size={18} /> },
     { id: "sources", label: t.nav.sources, icon: <Icon name="radar" size={18} /> },
+    { id: "caselaw", label: t.nav.caselaw, icon: <Icon name="gavel" size={18} /> },
     { id: "help", label: t.nav.help, icon: <Icon name="help-circle" size={18} /> },
   ];
   return (

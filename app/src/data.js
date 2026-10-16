@@ -2,7 +2,7 @@
 // Department-specific content (sources, areas) lives in workspaces.js.
 export const HRBP_I18N = {
   pl: {
-    app: "Monitoring zmian w prawie pracy", nav: { feed: "Zmiany w przepisach", kb: "Baza wiedzy", sources: "Monitorowane źródła", help: "Instrukcja", settings: "Ustawienia" },
+    app: "Monitoring zmian w prawie pracy", nav: { feed: "Zmiany w przepisach", kb: "Baza wiedzy", sources: "Monitorowane źródła", caselaw: "Orzecznictwo", help: "Instrukcja", settings: "Ustawienia" },
     greet: "Dzień dobry", greetSubForms: { one: "Wykryto {n} nową zmianę w przepisach wymagającą przeglądu", few: "Wykryto {n} nowe zmiany w przepisach wymagające przeglądu", many: "Wykryto {n} nowych zmian w przepisach wymagających przeglądu" },
     kpi: { new: "Nowe zmiany", pending: "Do wdrożenia", tracked: "Monitorowane akty", updated: "Wdrożone w tym mies." },
     recent: "Najnowsze zmiany", all: "Wszystkie zmiany",
@@ -30,14 +30,14 @@ export const HRBP_I18N = {
     feedEmptyTitle: "Brak zmian w tej kategorii", feedEmptySub: "Gdy system wykryje nową zmianę pasującą do tego filtra, pojawi się tutaj.",
     kbNoResults: "Brak wyników", kbNoResultsSub: "Nie znaleziono dokumentów pasujących do wyszukiwania.",
     kbEmptyAll: "Brak dokumentów", kbEmptyAllSub: "Baza wiedzy jest pusta — dodaj pierwszy dokument.",
-    settings: { title: "Ustawienia", profile: "Profil", preferences: "Preferencje", role: "Stanowisko", dept: "Dział", language: "Język interfejsu", darkMode: "Tryb ciemny", theme: "Motyw", themes: { radar: "Radar", light: "Jasny", dark: "Ciemny", system: "Jak w systemie" }, accent: "Kolor akcentu", accentAuto: "Wg działu", saved: "Zapisano zmiany" },
+    settings: { title: "Ustawienia", profile: "Profil", preferences: "Preferencje", role: "Stanowisko", dept: "Dział", language: "Język interfejsu", darkMode: "Tryb ciemny", theme: "Motyw", themes: { radar: "Radar", light: "Jasny", dark: "Ciemny neutralny", system: "Jak w systemie" }, accent: "Kolor akcentu", accentAuto: "Domyślny", saved: "Zapisano zmiany" },
     accents: { radar: "Radar", teal: "Morski", ocean: "Niebieski", plum: "Śliwkowy", indigo: "Indygo", forest: "Leśny", terracotta: "Terakota", sunset: "Zachód słońca", rose: "Różany", graphite: "Grafitowy" },
     appearance: "Wygląd", tocTitle: "Na tej stronie",
     firstSteps: { title: "Pierwsze kroki w tym dziale", steps: ["Przejrzyj listę monitorowanych źródeł i wyłącz te, które Cię nie dotyczą.", "Uruchom pierwszy skan od 1 stycznia — zasili feed zmianami z bieżącego roku.", "Oznaczaj zmiany statusem: „W przeglądzie”, „Pilne”, „Wdrożone”. Statusy widzi cały dział."], sources: "Zobacz źródła", scanYear: "Sprawdź od 1 stycznia", guide: "Instrukcja", dismiss: "Ukryj" },
     srcFilter: { all: "Wszystkie", off: "Wyłączone", errors: "Z błędem", search: "Szukaj źródła…", none: "Brak źródeł pasujących do filtra." },
     actStatus: "Status aktu wg ISAP", actStatusAsOf: "stan na dzień wykrycia {d}", actStatusNote: "Pobrane z API Sejmu w chwili wykrycia i nieaktualizowane później. Aktualny status sprawdź w ISAP (link obok).", inForceLabel: "Obowiązywanie", inForceValues: { IN_FORCE: "obowiązuje", NOT_IN_FORCE: "nie obowiązuje", UNKNOWN: "brak danych" }, changeDate: "Ostatnia zmiana w ISAP", reviewStatus: "Status przeglądu (ustawiany ręcznie)", howListWorks: "Jak powstaje ta lista i co oznaczają statusy?", noData: "brak danych",
     // Brand name — a proper noun, kept identical in PL/DE/EN (see also root index.html).
-    product: "Radar Legislacyjny", workspace: "Dział", switchWorkspace: "Zmień dział",
+    product: "Radar Legislacyjny", tagline: "Monitoring zmian w prawie", workspace: "Dział", switchWorkspace: "Zmień dział",
     scopeHowTitle: "Jak działa skanowanie", scopeHowShow: "Pokaż szczegóły", scopeHowHide: "Ukryj szczegóły",
     scopeHow: [
       "Źródła danych: Dziennik Ustaw (Dz.U.) i Monitor Polski (M.P.) przez publiczne API Sejmu (api.sejm.gov.pl) oraz orzecznictwo sądów powszechnych przez SAOS (saos.org.pl). Prawo UE, TSUE, decyzje regulatorów, listy sankcyjne i projekty ustaw NIE są skanowane — są wymienione niżej jako źródła ręczne z zalecaną częstotliwością przeglądu.",
@@ -102,7 +102,7 @@ export const HRBP_I18N = {
     notifications: "Powiadomienia", notificationsEmpty: "Brak nowych powiadomień", notifKbNeedsUpdate: "Dokument wymaga aktualizacji", markAllRead: "Oznacz wszystkie jako przeczytane",
   },
   de: {
-    app: "Überwachung arbeitsrechtlicher Änderungen", nav: { feed: "Rechtsänderungen", kb: "Wissensbasis", sources: "Überwachte Quellen", help: "Anleitung", settings: "Einstellungen" },
+    app: "Überwachung arbeitsrechtlicher Änderungen", nav: { feed: "Rechtsänderungen", kb: "Wissensbasis", sources: "Überwachte Quellen", caselaw: "Rechtsprechung", help: "Anleitung", settings: "Einstellungen" },
     greet: "Guten Morgen", greetSubForms: { one: "{n} neue Rechtsänderung zur Prüfung erkannt", other: "{n} neue Rechtsänderungen zur Prüfung erkannt" },
     kpi: { new: "Neue Änderungen", pending: "Zur Umsetzung", tracked: "Überwachte Rechtsakte", updated: "Umgesetzt diesen Monat" },
     recent: "Neueste Änderungen", all: "Alle Änderungen",
@@ -130,13 +130,13 @@ export const HRBP_I18N = {
     feedEmptyTitle: "Keine Änderungen in dieser Kategorie", feedEmptySub: "Sobald das System eine passende Änderung erkennt, erscheint sie hier.",
     kbNoResults: "Keine Ergebnisse", kbNoResultsSub: "Es wurden keine Dokumente zu dieser Suche gefunden.",
     kbEmptyAll: "Keine Dokumente", kbEmptyAllSub: "Die Wissensbasis ist leer — fügen Sie das erste Dokument hinzu.",
-    settings: { title: "Einstellungen", profile: "Profil", preferences: "Einstellungen", role: "Position", dept: "Abteilung", language: "Sprache", darkMode: "Dunkelmodus", theme: "Design", themes: { radar: "Radar", light: "Hell", dark: "Dunkel", system: "Wie System" }, accent: "Akzentfarbe", accentAuto: "Je Abteilung", saved: "Änderungen gespeichert" },
+    settings: { title: "Einstellungen", profile: "Profil", preferences: "Einstellungen", role: "Position", dept: "Abteilung", language: "Sprache", darkMode: "Dunkelmodus", theme: "Design", themes: { radar: "Radar", light: "Hell", dark: "Dunkel neutral", system: "Wie System" }, accent: "Akzentfarbe", accentAuto: "Standard", saved: "Änderungen gespeichert" },
     accents: { radar: "Radar", teal: "Petrol", ocean: "Blau", plum: "Pflaume", indigo: "Indigo", forest: "Waldgrün", terracotta: "Terrakotta", sunset: "Sonnenuntergang", rose: "Rosé", graphite: "Graphit" },
     appearance: "Darstellung", tocTitle: "Auf dieser Seite",
     firstSteps: { title: "Erste Schritte in dieser Abteilung", steps: ["Liste der überwachten Quellen durchsehen und nicht relevante ausschalten.", "Ersten Scan ab 1. Januar starten — füllt den Feed mit Änderungen des laufenden Jahres.", "Änderungen mit Status versehen: „In Prüfung“, „Dringend“, „Umgesetzt“. Status sieht die ganze Abteilung."], sources: "Quellen ansehen", scanYear: "Ab 1. Januar prüfen", guide: "Anleitung", dismiss: "Ausblenden" },
     srcFilter: { all: "Alle", off: "Aus", errors: "Mit Fehler", search: "Quelle suchen…", none: "Keine Quelle passt zum Filter." },
     actStatus: "Status des Akts laut ISAP", actStatusAsOf: "Stand am Erkennungstag {d}", actStatusNote: "Bei der Erkennung aus der Sejm-API übernommen und danach nicht aktualisiert. Aktuellen Status in ISAP prüfen (Link daneben).", inForceLabel: "Geltung", inForceValues: { IN_FORCE: "in Kraft", NOT_IN_FORCE: "nicht in Kraft", UNKNOWN: "keine Angabe" }, changeDate: "Letzte Änderung in ISAP", reviewStatus: "Prüfstatus (manuell gesetzt)", howListWorks: "Wie entsteht diese Liste und was bedeuten die Status?", noData: "keine Angabe",
-    product: "Radar Legislacyjny", workspace: "Abteilung", switchWorkspace: "Abteilung wechseln",
+    product: "Radar Legislacyjny", tagline: "Rechtsänderungen im Blick", workspace: "Abteilung", switchWorkspace: "Abteilung wechseln",
     scopeHowTitle: "So funktioniert der Scan", scopeHowShow: "Details anzeigen", scopeHowHide: "Details ausblenden",
     scopeHow: [
       "Datenquellen: Gesetzblatt (Dz.U.) und Monitor Polski (M.P.) über die öffentliche Sejm-API (api.sejm.gov.pl) sowie Rechtsprechung der ordentlichen Gerichte über SAOS (saos.org.pl). EU-Recht, EuGH, Behördenentscheidungen, Sanktionslisten und Gesetzentwürfe werden NICHT gescannt — sie stehen unten als manuelle Quellen mit empfohlenem Prüfrhythmus.",
@@ -201,7 +201,7 @@ export const HRBP_I18N = {
     notifications: "Benachrichtigungen", notificationsEmpty: "Keine neuen Benachrichtigungen", notifKbNeedsUpdate: "Dokument benötigt Aktualisierung", markAllRead: "Alle als gelesen markieren",
   },
   en: {
-    app: "Labor-law change monitoring", nav: { feed: "Legal changes", kb: "Knowledge base", sources: "Monitored sources", help: "User guide", settings: "Settings" },
+    app: "Labor-law change monitoring", nav: { feed: "Legal changes", kb: "Knowledge base", sources: "Monitored sources", caselaw: "Case law", help: "User guide", settings: "Settings" },
     greet: "Good morning", greetSubForms: { one: "{n} new legal change detected for review", other: "{n} new legal changes detected for review" },
     kpi: { new: "New changes", pending: "Pending rollout", tracked: "Tracked acts", updated: "Implemented this month" },
     recent: "Recent changes", all: "View all",
@@ -229,13 +229,13 @@ export const HRBP_I18N = {
     feedEmptyTitle: "No changes in this category", feedEmptySub: "Once the system detects a matching legal change, it will appear here.",
     kbNoResults: "No results", kbNoResultsSub: "No documents matched your search.",
     kbEmptyAll: "No documents", kbEmptyAllSub: "The knowledge base is empty — add the first document.",
-    settings: { title: "Settings", profile: "Profile", preferences: "Preferences", role: "Role", dept: "Department", language: "Interface language", darkMode: "Dark mode", theme: "Theme", themes: { radar: "Radar", light: "Light", dark: "Dark", system: "Follow system" }, accent: "Accent colour", accentAuto: "Per department", saved: "Changes saved" },
+    settings: { title: "Settings", profile: "Profile", preferences: "Preferences", role: "Role", dept: "Department", language: "Interface language", darkMode: "Dark mode", theme: "Theme", themes: { radar: "Radar", light: "Light", dark: "Neutral dark", system: "Follow system" }, accent: "Accent colour", accentAuto: "Default", saved: "Changes saved" },
     accents: { radar: "Radar", teal: "Teal", ocean: "Ocean", plum: "Plum", indigo: "Indigo", forest: "Forest", terracotta: "Terracotta", sunset: "Sunset", rose: "Rose", graphite: "Graphite" },
     appearance: "Appearance", tocTitle: "On this page",
     firstSteps: { title: "First steps in this department", steps: ["Review the monitored sources and switch off the ones that don’t concern you.", "Run the first scan from 1 January — it fills the feed with this year’s changes.", "Mark changes with a status: “In review”, “Urgent”, “Implemented”. The whole department sees them."], sources: "See sources", scanYear: "Check from 1 January", guide: "User guide", dismiss: "Hide" },
     srcFilter: { all: "All", off: "Off", errors: "With error", search: "Search sources…", none: "No source matches the filter." },
     actStatus: "Act status per ISAP", actStatusAsOf: "as of detection day {d}", actStatusNote: "Taken from the Sejm API at detection time and not updated afterwards. Check the current status in ISAP (link alongside).", inForceLabel: "In force", inForceValues: { IN_FORCE: "in force", NOT_IN_FORCE: "not in force", UNKNOWN: "no data" }, changeDate: "Last change in ISAP", reviewStatus: "Review status (set manually)", howListWorks: "How is this list built and what do the statuses mean?", noData: "no data",
-    product: "Radar Legislacyjny", workspace: "Department", switchWorkspace: "Switch department",
+    product: "Radar Legislacyjny", tagline: "Legal change monitoring", workspace: "Department", switchWorkspace: "Switch department",
     scopeHowTitle: "How scanning works", scopeHowShow: "Show details", scopeHowHide: "Hide details",
     scopeHow: [
       "Data sources: the Journal of Laws (Dz.U.) and Monitor Polski (M.P.) via the public Sejm API (api.sejm.gov.pl), and common-court case law via SAOS (saos.org.pl). EU law, the CJEU, regulators’ decisions, sanctions lists and draft bills are NOT scanned — they are listed below as manual sources with a recommended review cadence.",

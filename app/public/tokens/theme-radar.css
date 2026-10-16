@@ -7,26 +7,28 @@
    asked for this look to become the main theme of the app.
 
    HOW IT IS SWITCHED ON (see useAppearance in src/screens/AppShell.jsx)
-   Theme "radar" puts TWO attributes on <html>:
-     data-theme="dark"   → every existing dark rule applies (tokens/dark.css,
-                           the dark accents in tokens/accents.css, the dark
-                           wordmark colours in radar.css). This file only
-                           layers the radar differences on top of them.
-     data-skin="radar"   → the neutral surfaces below (canvas, cards, borders,
-                           text) become the radar's green-tinted blacks.
-   With accent "auto" the app also sets data-accent="radar" (phosphor green
-   for --brand). Picking another accent in the appearance menu keeps the radar
-   surfaces but swaps the brand colour, exactly like in the other themes.
-
-   The "radar" ACCENT also works in the light theme (forest-like #0B7A62, the
-   light wordmark colour of the logo), so it behaves like the other 9 accents.
+   The brand colours are the DEFAULT in every theme except the neutral "dark":
+     theme "radar"  (default) → data-theme="dark"  + data-skin="radar"
+     theme "light"            → data-theme="light" + data-skin="radar"
+     theme "system"           → either of the two above, following the OS
+     theme "dark"             → data-theme="dark", NO skin (old neutral look,
+                                kept as the one unbranded option)
+   data-theme picks the base token set (colors.css or dark.css, the matching
+   accents in tokens/accents.css, the wordmark colours in radar.css);
+   data-skin="radar" then layers the logo's surfaces and text on top — the
+   green-black screen in dark, the pale #F3F7F5 page in light.
+   With accent "auto" (the default) the app sets data-accent="radar": phosphor
+   green in dark, the logo's #0B7A62 in light. Picking another accent keeps the
+   radar surfaces and swaps only the brand colour.
 
    Loaded from styles.css AFTER dark.css and accents.css: the selectors here
    have equal or higher specificity, and on a tie the later file wins.
    ========================================================================== */
 
-/* ---- Radar surfaces (only with data-skin="radar") -------------------------- */
-:root[data-skin="radar"]{
+/* ---- Radar surfaces, dark variant (design theme "ciemny") ------------------ */
+/* data-skin="radar" + data-theme="dark": themes "radar" (default) and
+   "system" on a dark OS. */
+:root[data-skin="radar"][data-theme="dark"]{
   /* Surfaces, darkest to lightest: page → sunken wells → cards. Each step is a
      little lighter and greener, so cards read as raised panels on the screen. */
   --canvas:#061517;           /* = intro background */
@@ -82,6 +84,48 @@
   /* Native controls (<select> dropdown, date pickers, scrollbars) render in
      their dark variant; without it the language <select> shows a white box. */
   color-scheme:dark;
+}
+
+/* ---- Radar surfaces, light variant (design theme "jasny") ----------------- */
+/* data-skin="radar" + data-theme="light": themes "light" and "system" on a
+   light OS. Colours from the logo's light artboard: page #F3F7F5, "Radar"
+   #0B7A62 (the light "radar" accent below), "Legislacyjny" #0B2224, tagline
+   #4A6660. They replace the old cream/sand canvas and its warm brown shadows,
+   so the light look belongs to the same brand as the dark radar screen.
+   Contrast on white cards: body #24403b ≈ 11:1, muted #4A6660 ≈ 6.1:1. */
+:root[data-skin="radar"][data-theme="light"]{
+  --canvas:#f3f7f5;           /* = logo light background */
+  --surface:#ffffff;          /* sidebar, top bar, popovers */
+  --surface-card:#ffffff;     /* cards */
+  --surface-sunken:#e8f0ec;   /* inputs, segmented controls, hover rows */
+
+  /* Borders: pale green-grey instead of sand. */
+  --border:#d7e4de;
+  --border-subtle:#d7e4de;
+  --border-default:#bfd3ca;
+  --border-strong:#bfd3ca;
+
+  /* Text: the logo's ink for headings, its tagline green for muted copy. */
+  --text-strong:#0b2224;
+  --text-heading:#0b2224;
+  --text-body:#24403b;
+  --text-muted:#4a6660;
+  --ink-300:#8aa59d;          /* placeholder / disabled */
+
+  /* Second accent = the logo's amber, as in the dark variant; dark text on it. */
+  --accent:#ffb547;
+  --accent-hover:#f2a52e;
+  --accent-soft:#fff1d6;
+  --on-accent:#2a1a00;
+
+  /* Shadows tinted with the logo ink instead of warm brown. */
+  --shadow-xs:0 1px 2px rgba(11,34,36,.06);
+  --shadow-sm:0 2px 8px rgba(11,34,36,.07);
+  --shadow-md:0 4px 14px rgba(11,34,36,.09);
+  --shadow-lg:0 16px 40px rgba(11,34,36,.14);
+
+  /* Same logo typeface for headings as in the dark variant. */
+  --font-display:"Space Grotesk","Figtree",system-ui,sans-serif;
 }
 
 /* ---- "radar" accent, light theme ------------------------------------------- */

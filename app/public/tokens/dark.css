@@ -27,3 +27,16 @@
   --shadow-md:0 6px 18px rgba(0,0,0,.4);
   --shadow-lg:0 20px 44px rgba(0,0,0,.5);
 }
+
+/* Status FOREGROUNDS for dark surfaces. The light-theme values (#137a52 green,
+   #9a6600 amber, #c23a2b red) are dark shades meant for white cards — on the
+   dark cards (#1b2224 neutral, #0b2325 radar) they fell to ~2–3:1 and success
+   text was barely visible. Every use of these three tokens is text, an icon or
+   a thin stripe/dot on a dark card or on the matching dark --*-100 tint, so
+   lifting them here fixes all of them at once. All ≥ 4.5:1 on the cards and
+   on the --*-100 tints of both dark variants. */
+:root[data-theme="dark"]{
+  --success-600:#4cd99a;
+  --warning-700:#f2b544;
+  --danger-600:#ff8a7a;
+}

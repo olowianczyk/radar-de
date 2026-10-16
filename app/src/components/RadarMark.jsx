@@ -9,6 +9,8 @@
 //   size  — rendered diameter in px (default 36, the sidebar header). The disc
 //           is designed at 300 px and scaled with the --rl-scale CSS variable,
 //           so every ring, glow and bezel stays proportional at any size.
+//   vivid — thicker, brighter strokes for small sizes (see .rl-mark--vivid in
+//           radar.css); without it ~130 px renders the 1 px rings invisible.
 //   title — optional accessible name. Omit it when the mark sits next to the
 //           written product name (then it is purely decorative: aria-hidden).
 import React from "react";
@@ -45,10 +47,10 @@ function blipStyle({ a, r }) {
   };
 }
 
-export function RadarMark({ size = 36, title }) {
+export function RadarMark({ size = 36, title, vivid = false }) {
   return (
     <span
-      className="rl-mark"
+      className={vivid ? "rl-mark rl-mark--vivid" : "rl-mark"}
       style={{ "--rl-scale": size / 300 }}
       role={title ? "img" : undefined}
       aria-label={title}

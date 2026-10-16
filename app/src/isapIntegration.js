@@ -85,6 +85,17 @@ export async function saveSourceConfig(ws, config) {
 
 // The Sejm's closed subject-keyword thesaurus (via our /api/keywords proxy).
 // Used only to tell the user whether a keyword-mode source can match anything.
+// Judgment search screen (screens/CaseLaw.jsx) → /api/scan?register=SAOS,
+// the same endpoint used to verify a source live. `q`: { phrase,
+// referencedRegulation, caseNumber, courtType, judgmentType, dateFrom, dateTo,
+// page }; empty fields are left out. Resolves to { items, total, page }.
+export async function searchCaseLaw(q, pageSize = 20) {
+  const params = new URLSearchParams({ register: "SAOS", limit: String(pageSize), page: String(q.page || 0) });
+  [["phrase", q.phrase], ["referencedRegulation", q.referencedRegulation], ["caseNumber", q.caseNumber], ["courtType", q.courtType], ["judgmentTypes", q.judgmentType], ["dateFrom", q.dateFrom], ["dateTo", q.dateTo]]
+    .forEach(([k, v]) => { if (v && String(v).trim()) params.set(k, String(v).trim()); });
+  return api(`/api/scan?${params.toString()}`);
+}
+
 export async function fetchKeywords() {
   const data = await api("/api/keywords");
   return data.keywords || [];

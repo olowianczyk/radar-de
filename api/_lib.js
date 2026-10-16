@@ -190,12 +190,16 @@ function isSaosSource(s) {
   return s && s.register === "SAOS" && SAOS_COURT_TYPES.includes(s.courtType) && !!(s.referencedRegulation || s.phrase);
 }
 
-function buildSaosParams({ courtType, judgmentTypes, referencedRegulation, phrase, dateFrom, dateTo, pageSize = 100 }) {
-  const params = new URLSearchParams({ pageSize: String(pageSize), pageNumber: "0", sortingField: "JUDGMENT_DATE", sortingDirection: "DESC" });
+// pageNumber (0-based) and caseNumber ("sygnatura", e.g. "I PK 12/15") are
+// only used by the judgment search screen (/api/scan?register=SAOS); the
+// scanner always reads page 0 and never filters by case number.
+function buildSaosParams({ courtType, judgmentTypes, referencedRegulation, phrase, caseNumber, dateFrom, dateTo, pageSize = 100, pageNumber = 0 }) {
+  const params = new URLSearchParams({ pageSize: String(pageSize), pageNumber: String(pageNumber), sortingField: "JUDGMENT_DATE", sortingDirection: "DESC" });
   if (courtType) params.set("courtType", courtType);
   (Array.isArray(judgmentTypes) ? judgmentTypes : []).filter((j) => SAOS_JUDGMENT_TYPES.includes(j)).forEach((j) => params.append("judgmentTypes", j));
   if (referencedRegulation) params.set("referencedRegulation", referencedRegulation);
   if (phrase) params.set("all", phrase);
+  if (caseNumber) params.set("caseNumber", caseNumber);
   if (dateFrom) params.set("judgmentDateFrom", dateFrom);
   if (dateTo) params.set("judgmentDateTo", dateTo);
   return params;
@@ -205,14 +209,17 @@ function stripHtml(s) {
   return String(s || "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
 }
 
-// Returns normalised judgments. Throws on HTTP errors or an unexpected shape —
-// a source then shows the error instead of silently reporting "0 found".
-async function searchJudgments(opts) {
+// One SAOS search call → { items, total }. `total` is SAOS's own
+// info.totalResults (all matches, not just this page) — the search screen
+// shows it and pages through it. Throws on HTTP errors or an unexpected
+// shape — a source then shows the error instead of silently reporting "0 found".
+async function searchJudgmentsPage(opts) {
   const res = await fetchWithTimeout(`${SAOS_SEARCH_URL}?${buildSaosParams(opts).toString()}`);
   if (!res.ok) throw new Error(`SAOS API error ${res.status}`);
   const data = await res.json();
   if (!data || !Array.isArray(data.items)) throw new Error("SAOS API: unexpected response shape (no items[])");
-  return data.items.map((j) => ({
+  const total = data.info && Number.isFinite(data.info.totalResults) ? data.info.totalResults : null;
+  return { total, items: data.items.map((j) => ({
     id: j.id,
     // Human-readable judgment page. NOT j.href — in search results that is the
     // JSON endpoint (/api/judgments/{id}), which opened raw JSON in the feed.
@@ -224,7 +231,69 @@ async function searchJudgments(opts) {
     judgmentDate: j.judgmentDate || null,
     excerpt: stripHtml(j.textContent).slice(0, 400),
     keywords: Array.isArray(j.keywords) ? j.keywords.slice(0, 10) : [],
-  }));
+  })) };
+}
+
+// Scanner entry point: just the items of page 0 (see searchJudgmentsPage).
+async function searchJudgments(opts) {
+  return (await searchJudgmentsPage(opts)).items;
+}
+
+// Server-side cache for the ad-hoc "Orzecznictwo" search (GET /api/scan with
+// register=SAOS). SAOS answers a phrase search in ~14 s, so every query's
+// result page is saved to Blob and shared by all users and all departments:
+//   - the same query again is served from Blob in ~0.2 s;
+//   - when SAOS is down or times out, the last saved page is returned instead
+//     of an error (marked `stale: true`, the UI says so).
+// Lifetime: courts that SAOS no longer receives judgments from (SN, TK, KIO,
+// NSA/WSA, see COVERAGE above) can never change, so their entries never
+// expire. Everything else (common courts, or "all courts") expires after
+// SAOS_CACHE_TTL_MS, because new judgments keep arriving there.
+// NOT used by the scanner — monitored sources must always see fresh data.
+// ponytail: one Blob read per search + one write per new query, no eviction
+// (each entry is ~15 KB). Add a cleanup of old cache/saos/* blobs if the store
+// grows large or Blob usage limits start to matter.
+const SAOS_FROZEN_COURTS = ["SUPREME", "CONSTITUTIONAL_TRIBUNAL", "NATIONAL_APPEAL_CHAMBER", "ADMINISTRATIVE"];
+const SAOS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+// `opts` goes to SAOS unchanged. `keyParts` is the query AS THE USER TYPED IT
+// (in particular without the "dateTo = today" default that scan.js adds — that
+// default changes daily and would otherwise make frozen-court entries, which
+// never expire, unreachable the next day). Phrase and act are lower-cased for
+// the key because SAOS full-text search ignores case anyway, so "Mobbing" and
+// "mobbing" share one entry. The case number stays exact.
+// Resolves to { items, total, cachedAt, stale }: cachedAt = ISO time the page
+// was saved (null = fetched live just now).
+async function searchJudgmentsCached(opts, keyParts) {
+  // No Blob store (local dev, or storage not attached) = plain live search.
+  if (!storageAvailable()) return { ...(await searchJudgmentsPage(opts)), cachedAt: null, stale: false };
+  const k = { ...keyParts, phrase: String(keyParts.phrase || "").trim().toLowerCase(), referencedRegulation: String(keyParts.referencedRegulation || "").trim().toLowerCase(), caseNumber: String(keyParts.caseNumber || "").trim() };
+  const hash = require("crypto").createHash("sha1").update(JSON.stringify(k)).digest("hex");
+  const path = `cache/saos/${hash}.json`;
+
+  // A broken cache must never break the search itself: a failed read counts
+  // as a miss.
+  let hit = null;
+  try { hit = await readBlobJson(path); } catch (e) { hit = null; }
+  const frozen = SAOS_FROZEN_COURTS.includes(opts.courtType);
+  if (hit && (frozen || Date.now() - Date.parse(hit.savedAt) < SAOS_CACHE_TTL_MS)) return { ...hit.data, cachedAt: hit.savedAt, stale: false };
+
+  let data;
+  try {
+    data = await searchJudgmentsPage(opts);
+  } catch (e) {
+    // SAOS failed — an expired entry is still far better than an error.
+    if (hit) return { ...hit.data, cachedAt: hit.savedAt, stale: true };
+    throw e;
+  }
+  const savedAt = new Date().toISOString();
+  // Awaited on purpose: a serverless function may be frozen right after it
+  // responds, which would silently drop an un-awaited write. A failed write
+  // only costs the next user a live search, so it is swallowed.
+  try {
+    await put(path, JSON.stringify({ savedAt, data }), { access: "private", contentType: "application/json", addRandomSuffix: false, allowOverwrite: true });
+  } catch (e) { /* see above */ }
+  return { ...data, cachedAt: null, stale: false };
 }
 
 // Freshness probe: the newest judgment SAOS holds for a court type, regardless
@@ -444,4 +513,4 @@ function parseBody(req) {
   return typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
 }
 
-module.exports = { WORKSPACES, normalizeWorkspace, normalizePublisher, sourceQueries, isScannable, isSaosSource, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES, searchActs, searchJudgments, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, storageAvailable, loadDoc, saveDoc, sendError, parseBody };
+module.exports = { WORKSPACES, normalizeWorkspace, normalizePublisher, sourceQueries, isScannable, isSaosSource, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES, searchActs, searchJudgments, searchJudgmentsPage, searchJudgmentsCached, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, storageAvailable, loadDoc, saveDoc, sendError, parseBody };
