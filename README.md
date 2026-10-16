@@ -58,7 +58,7 @@ ustawił. Stary pojedynczy `hrbp-state*.json` jest czytany w locie i migrowany.
 Tylko w przeglądarce użytkownika: ulubione, przeczytane powiadomienia, język, motyw.
 
 Zasada „działa albo mówi, że nie działa”: każde wywołanie `/api` zwraca błąd
-z kodem (`storage_unavailable` → 503, gdy brak `BLOB_READ_WRITE_TOKEN`), a UI
+z kodem (`storage_unavailable` → 503, gdy brak podpiętego Blob Store), a UI
 pokazuje go w pasku komunikatów i wyłącza przyciski zapisu. Skan zwraca
 `persisted: false`, jeśli wyniki nie zostały zapisane. Nic nie jest zapisywane
 „na niby” w pamięci przeglądarki.
@@ -85,7 +85,7 @@ Zmienne środowiskowe na Vercelu:
 
 | Zmienna | Po co |
 |---|---|
-| `BLOB_READ_WRITE_TOKEN` | podpięty Blob Store (Storage → Blob). **Wymagany** — bez niego aplikacja pokazuje czerwony komunikat, zapis jest wyłączony, a cron zwraca 503 |
+| `BLOB_STORE_ID` **lub** `BLOB_READ_WRITE_TOKEN` | podpięty Blob Store (Storage → Blob). Vercel ustawia je sam przy podpięciu: nowe store'y łączą się przez OIDC i dodają tylko `BLOB_STORE_ID` (token dostarcza Vercel w runtime), starsze dodają `BLOB_READ_WRITE_TOKEN`. **Wymagany** — bez żadnej z nich aplikacja pokazuje czerwony komunikat, zapis jest wyłączony, a cron zwraca 503 |
 | `CRON_SECRET` | opcjonalnie; gdy ustawiona, `GET /api/scan-all` wymaga `Authorization: Bearer …` (Vercel Cron dodaje go sam) |
 
 Build: `vercel.json` buduje `app/` do `dist/app` i kopiuje landing do `dist/`.

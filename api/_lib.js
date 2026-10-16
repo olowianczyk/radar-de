@@ -43,10 +43,30 @@ function normalizeWorkspace(ws) {
 // ponytail: this exists; move to Postgres if the state shape grows relational needs.
 const DOCS = ["scan", "kb", "triage", "config"];
 
-// No token = no store attached to the project. Every endpoint reports this
-// instead of silently working on a state that evaporates when the response ends.
+// Is a Vercel Blob store attached to this deployment? Every endpoint checks this
+// first and reports `storage_unavailable` instead of silently working on a state
+// that evaporates when the response ends (functions have no persistent disk).
+//
+// Vercel attaches a Blob store in one of two ways, and @vercel/blob accepts both:
+//
+//  1. Legacy read-write token — the store adds BLOB_READ_WRITE_TOKEN to the
+//     project's env vars. The SDK sends it as a bearer token on every call.
+//
+//  2. OIDC (the current default for newly connected stores) — the store adds only
+//     BLOB_STORE_ID (plus BLOB_WEBHOOK_PUBLIC_KEY) and NO token. At runtime Vercel
+//     issues a short-lived OIDC token to the function itself (VERCEL_OIDC_TOKEN /
+//     the x-vercel-oidc-token request header); the SDK picks it up through
+//     @vercel/oidc and pairs it with BLOB_STORE_ID. Nothing secret is stored in env.
+//
+// Checking only for the token (as this function originally did) made a store
+// connected the OIDC way look "missing": every endpoint answered 503 even though
+// the store was attached and the SDK could have talked to it. So either variable
+// counts. If BLOB_STORE_ID is set but the OIDC token is somehow unavailable (e.g.
+// OIDC disabled in project settings), the SDK throws "No blob credentials found"
+// on the first read/write, which sendError() reports as a visible 502 — still
+// loud, never a silent fallback.
 function storageAvailable() {
-  return !!process.env.BLOB_READ_WRITE_TOKEN;
+  return !!(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 }
 
 function docPath(ws, doc) {
@@ -111,7 +131,7 @@ async function saveDoc(ws, doc, data) {
 // Uniform error reporting for the HTTP handlers.
 function sendError(res, e) {
   if (e && e.message === "storage_unavailable") {
-    res.status(503).json({ error: "storage_unavailable", message: "No Vercel Blob store is attached (BLOB_READ_WRITE_TOKEN missing) — nothing can be saved or read." });
+    res.status(503).json({ error: "storage_unavailable", message: "No Vercel Blob store is attached (neither BLOB_READ_WRITE_TOKEN nor BLOB_STORE_ID is set) — nothing can be saved or read." });
     return;
   }
   res.status(502).json({ error: "backend_error", message: e && e.message ? e.message : String(e) });
