@@ -3,12 +3,15 @@
 # Vercel), compared with a reference deployment.
 #   ./server/php/test.sh [reference-base-url]     default https://radar.aospot.com
 # GET endpoints: same keys recursively as the reference (+ "same data" when equal).
-# Writes are reverted: a test KB doc is deleted, a triage status is reset to "new",
-# the source config is re-posted unchanged. Does NOT run scan-all.
+# Writes are reverted: a test KB doc is deleted, the test triage record is removed
+# from legal/triage.json over SSH ($SSH, default h94), the source config is
+# re-posted unchanged. Does NOT run scan-all and sends no mail (notify only
+# checked while unconfigured -> 409).
 set -uo pipefail
 H=hr-bp-platform.aospot.com
 REF=${1:-https://radar.aospot.com}
-C="curl -sk --resolve $H:443:213.239.134.20"
+C="curl -sk --resolve $H:443:91.236.131.94"
+SSH=${SSH:-"ssh -p 57185 -i $HOME/.ssh/id_ed25519_seohost -o IdentitiesOnly=yes -o BatchMode=yes srv127034@h94.seohost.pl"}
 T=$(mktemp -d); trap 'rm -rf $T' EXIT
 FAIL=0
 code() { $C -o /dev/null -w '%{http_code}' "$@"; }
@@ -52,6 +55,10 @@ ok "POST scan-all no sources -> 400" '[ "$(pcode scan-all '"'"'{"workspace":"hr"
 ok "triage bad status -> 400" '[ "$(pcode triage '"'"'{"workspace":"hr","status":"bogus","ids":["x"]}'"'"')" = 400 ]'
 ok "scan bad courtType -> 400" '[ "$(code "https://$H/api/scan?register=SAOS&courtType=NOPE")" = 400 ]'
 ok "GET triage -> 405" '[ "$(code https://$H/api/triage)" = 405 ]'
+ok "triage bad due -> 400" '[ "$(pcode triage '"'"'{"workspace":"hr","due":"jutro","ids":["x"]}'"'"')" = 400 ]'
+ok "triage nothing to set -> 400" '[ "$(pcode triage '"'"'{"workspace":"hr","ids":["x"]}'"'"')" = 400 ]'
+ok "GET notify -> 405" '[ "$(code https://$H/api/notify)" = 405 ]'
+ok "notify unconfigured -> 409" '[ "$(pcode notify '"'"'{"workspace":"hr"}'"'"')" = 409 ]'
 ok "unknown route -> 404" '[ "$(code https://$H/api/nope)" = 404 ]'
 
 # Writes (reverted)
@@ -62,7 +69,10 @@ ok "kb add + comment" 'post kb "$CM" | grep -q "\"comments\":\[{"'
 ok "kb delete" '[ "$(post kb "$DL")" = "{\"deleted\":$ID}" ]'
 ok "kb delete again -> 404" '[ "$(pcode kb "$DL")" = 404 ]'
 ok "triage set" 'post triage '"'"'{"workspace":"legal","ids":["TEST/port"],"status":"urgent"}'"'"' | grep -q "\"TEST/port\":{\"st\":\"urgent\""'
-ok "triage reset" '! post triage '"'"'{"workspace":"legal","ids":["TEST/port"],"status":"new"}'"'"' | grep -q TEST/port'
+ok "triage owner+due" 'post triage '"'"'{"workspace":"legal","ids":["TEST/port"],"owner":"Test","due":"2026-12-31","by":"test.sh"}'"'"' | python3 -c "import sys,json; r=json.load(sys.stdin)[\"triage\"][\"TEST/port\"]; assert r[\"st\"]==\"urgent\" and r[\"owner\"]==\"Test\" and r[\"due\"]==\"2026-12-31\" and r[\"log\"][-1][\"by\"]==\"test.sh\" and \"st\" not in r[\"log\"][-1]"'
+ok "triage reset keeps record" 'post triage '"'"'{"workspace":"legal","ids":["TEST/port"],"status":"new"}'"'"' | grep -q "\"TEST/port\":{\"st\":\"new\""'
+ok "triage unchanged write adds no log" 'post triage '"'"'{"workspace":"legal","ids":["TEST/port"],"status":"new"}'"'"' | python3 -c "import sys,json; assert len(json.load(sys.stdin)[\"triage\"][\"TEST/port\"][\"log\"])==3"'
+ok "triage test record removed" '$SSH "cd ~/private/hrbp/legal && /usr/local/bin/php -r '"'"'\$f=\"triage.json\"; \$t=json_decode(file_get_contents(\$f),true); unset(\$t[\"statuses\"][\"TEST/port\"]); \$t[\"statuses\"]=(object)\$t[\"statuses\"]; file_put_contents(\$f,json_encode(\$t,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));'"'"'" && ! $C "https://$H/api/state?ws=legal" | grep -q TEST/port'
 $C "https://$H/api/state?ws=legal" | python3 -c 'import sys,json; c=json.load(sys.stdin)["config"]; json.dump(c, open(sys.argv[1], "w")); print(json.dumps({"workspace":"legal",**c}))' "$T/cfg.json" > "$T/body.json"
 ok "sources re-post unchanged" 'post sources "$(cat $T/body.json)" | python3 -c "import sys,json; assert json.load(sys.stdin)[\"config\"] == json.load(open(\"$T/cfg.json\"))"'
 [ $FAIL = 0 ] && echo PASS || { echo FAILED; exit 1; }

@@ -6,7 +6,7 @@
 //
 // Persistence: one JSON file per workspace and per doc instead of Vercel Blob,
 // outside the docroot: ~/private/hrbp/<ws>/<doc>.json (same doc split as Blob:
-// scan, kb, triage, config) plus ~/private/hrbp/cache/ (SAOS search pages,
+// scan, kb, triage, config, notify) plus ~/private/hrbp/cache/ (SAOS search pages,
 // keyword thesaurus). Writes are tmp+rename (readers never see half a file);
 // every read-modify-write holds a per-doc flock.
 // ponytail: flat files + flock; move to MariaDB if the state shape grows relational needs.
@@ -14,15 +14,21 @@
 // CLI (cron + data import):
 //   php index.php scan-all                  — the daily scan of every workspace
 //   php index.php import https://<host>     — copy state from a live deployment's GET API
+// E-mail digest (see _mail.js): sent through ~/private/smtp.php (smtp_mail, direct
+// to MX with DKIM) to the recipients in hrbp-config.php ('notify_to' => 'a@x, b@y',
+// per department 'notify_to_hr' etc.; optional 'app_url'). No smtp.php or no
+// recipients = not configured, nothing is sent (queue kept, capped).
 // HTTP GET /api/scan-all needs Authorization: Bearer <cron_secret> from
 // ~/private/hrbp-config.php (<?php return ['cron_secret' => '...'];) — without
 // that file it always answers 401.
 date_default_timezone_set('UTC'); // Vercel functions run in UTC; lastChecked strings are UTC
 
 define('HOME_DIR', posix_getpwuid(posix_geteuid())['dir']); // HOME is unset under LiteSpeed
-define('DATA_DIR', HOME_DIR . '/private/hrbp');
+define('DATA_DIR', getenv('HRBP_DATA_DIR') ?: HOME_DIR . '/private/hrbp'); // env override = test-digest.php only
+define('CONFIG_FILE', dirname(DATA_DIR) . '/hrbp-config.php');
+define('SMTP_FILE', dirname(DATA_DIR) . '/smtp.php');
 const WORKSPACES = ['hr', 'compliance', 'legal'];
-const DOCS = ['scan', 'kb', 'triage', 'config'];
+const DOCS = ['scan', 'kb', 'triage', 'config', 'notify'];
 const SEARCH_URL = 'https://api.sejm.gov.pl/eli/acts/search';
 const KEYWORDS_URL = 'https://api.sejm.gov.pl/eli/keywords';
 const SAOS_SEARCH_URL = 'https://www.saos.org.pl/api/search/judgments';
@@ -58,7 +64,7 @@ function doc_path($ws, $doc) {
   return DATA_DIR . '/' . normalize_ws($ws) . "/$doc.json";
 }
 function empty_doc($doc) {
-  return ['scan' => ['sources' => [], 'history' => [], 'lastRun' => null], 'kb' => ['docs' => []], 'triage' => ['statuses' => []], 'config' => ['overrides' => [], 'custom' => []]][$doc];
+  return ['scan' => ['sources' => [], 'history' => [], 'lastRun' => null], 'kb' => ['docs' => []], 'triage' => ['statuses' => []], 'config' => ['overrides' => [], 'custom' => []], 'notify' => ['queue' => [], 'lastSent' => null, 'lastError' => null]][$doc];
 }
 function read_json_file($path) {
   if (!is_file($path)) return null;
@@ -405,7 +411,8 @@ function effective_sources($ws, $config) {
   }));
 }
 function dedupe_key($e) { return ($e['eli'] ?? null) ?: (($e['note'] ?? '') . '|' . ($e['url'] ?? '')); }
-function merge_history($prev, $results) {
+// $freshOut collects ['sourceId', 'e'] for every entry seen for the first time — what the digest reports.
+function merge_history($prev, $results, &$freshOut = []) {
   $history = [];
   foreach ($prev as $id => $list) {
     $seen = [];
@@ -421,6 +428,7 @@ function merge_history($prev, $results) {
     $seen = array_flip(array_map('dedupe_key', $existing));
     $fresh = array_values(array_filter($r['detected'], fn($e) => !isset($seen[dedupe_key($e)])));
     if ($fresh) $history[$r['id']] = array_merge($fresh, $existing);
+    foreach ($fresh as $e) $freshOut[] = ['sourceId' => $r['id'], 'e' => $e];
   }
   return $history;
 }
@@ -439,14 +447,16 @@ function scan_workspace($ws, $sources, $range) {
   $results = scan_sources($sources, $range);
   $lastRun = iso_now();
   $persisted = false;
+  $fresh = [];
   if (!$persistError) {
     try {
-      update_doc($ws, 'scan', function ($prev) use ($results, $lastRun) {
+      update_doc($ws, 'scan', function ($prev) use ($results, $lastRun, &$fresh) {
+        $fresh = [];
         $ids = array_column($results, 'id');
         $untouched = array_values(array_filter($prev['sources'], fn($p) => !in_array($p['id'], $ids)));
         return [
           'sources' => array_merge($untouched, array_map(fn($r) => ['id' => $r['id'], 'lastChecked' => $r['lastChecked'], 'found' => $r['found']] + (isset($r['freshness']) ? ['freshness' => $r['freshness']] : []), $results)),
-          'history' => obj(merge_history($prev['history'] ?? [], $results)),
+          'history' => obj(merge_history($prev['history'] ?? [], $results, $fresh)),
           'lastRun' => $lastRun,
         ];
       });
@@ -455,6 +465,8 @@ function scan_workspace($ws, $sources, $range) {
       $persistError = $e->getMessage();
     }
   }
+  // Queue only what really got persisted; a queue failure must not fail the scan.
+  if ($persisted) try { queue_for_digest($ws, $fresh); } catch (Exception $e) { /* as in scan-all.js */ }
   return ['workspace' => $ws, 'results' => $results, 'lastRun' => $lastRun, 'persisted' => $persisted, 'persistError' => $persistError];
 }
 
@@ -462,7 +474,8 @@ function scan_all() {
   $runs = [];
   foreach (WORKSPACES as $ws) {
     $r = scan_workspace($ws, null, null);
-    $runs[] = ['workspace' => $ws, 'lastRun' => $r['lastRun'], 'persisted' => $r['persisted'], 'persistError' => $r['persistError'], 'found' => array_sum(array_column($r['results'], 'found')), 'errors' => count(array_filter($r['results'], fn($x) => isset($x['error'])))];
+    // After each department's scan its daily digest goes out (no-op when nothing is queued or mail is not configured).
+    $runs[] = ['workspace' => $ws, 'lastRun' => $r['lastRun'], 'persisted' => $r['persisted'], 'persistError' => $r['persistError'], 'found' => array_sum(array_column($r['results'], 'found')), 'errors' => count(array_filter($r['results'], fn($x) => isset($x['error']))), 'mail' => send_digest($ws)];
   }
   return ['runs' => $runs];
 }
@@ -486,7 +499,112 @@ function clean_source($s, $trim) {
   ];
 }
 
+// ---- e-mail digest (port of _mail.js) ----------------------------------------------
+const MAX_QUEUE = 300;      // backlog kept while mail is not configured yet
+const MAX_PER_SECTION = 40;
+const WS_LABEL = ['hr' => 'HR', 'compliance' => 'Compliance', 'legal' => 'Dział prawny'];
+const TEST_EVERY_S = 600;   // POST /api/notify: one test mail per department per 10 min
+
+function hrbp_config() { static $c; return $c ??= (is_file(CONFIG_FILE) ? (require CONFIG_FILE) : []); }
+function smtp_configured() { return is_file(SMTP_FILE); }
+// notify_to_<ws> wins over notify_to; only strings that look like an address are kept.
+function recipients_for($ws) {
+  $c = hrbp_config();
+  $raw = (string)(($c["notify_to_$ws"] ?? '') ?: ($c['notify_to'] ?? ''));
+  return array_values(array_filter(preg_split('/[,;\s]+/', $raw), fn($s) => preg_match('/^[^@\s]+@[^@\s]+\.[^@\s]+$/', $s)));
+}
+// /api/state is public, so full addresses never leave the server.
+function mask_email($e) { [$u, $d] = explode('@', $e, 2); return mb_substr($u, 0, 1) . "***@$d"; }
+function notify_status($ws, $doc) {
+  return ['smtp' => smtp_configured(), 'recipients' => array_map('mask_email', recipients_for($ws)), 'queued' => count($doc['queue'] ?? []), 'lastSent' => $doc['lastSent'] ?? null, 'lastError' => $doc['lastError'] ?? null];
+}
+function queue_for_digest($ws, $fresh) {
+  if (!$fresh) return;
+  $items = array_map(function ($f) {
+    $e = $f['e'];
+    $kind = ($e['kind'] ?? null) ?: 'act';
+    $i = ['sourceId' => $f['sourceId'], 'kind' => $kind, 'title' => $e['note'] ?? null, 'url' => ($e['url'] ?? null) ?: null, 'ts' => ($e['ts'] ?? null) ?: null, 'stage' => ($e['stage'] ?? null) ?: null];
+    if ($kind === 'bill') $i['passed'] = !empty($e['passed']);
+    $i['courtName'] = ($e['courtName'] ?? null) ?: null;
+    if (!empty($e['caseNumbers'])) $i['caseNumbers'] = $e['caseNumbers'];
+    $i['entryIntoForce'] = ($e['entryIntoForce'] ?? null) ?: null;
+    return $i;
+  }, $fresh);
+  update_doc($ws, 'notify', function ($doc) use ($items) {
+    $doc['queue'] = array_slice(array_merge($doc['queue'] ?? [], $items), -MAX_QUEUE);
+    return $doc;
+  });
+}
+// Plain-text digest (smtp_mail sends text/plain) — the text part of buildDigest.
+function build_digest($ws, $items, $names) {
+  $appUrl = rtrim((string)(hrbp_config()['app_url'] ?? 'https://radar.aospot.com'), '/') . "/app/#/$ws/feed";
+  $sections = array_filter([
+    ['Nowe i zmienione akty prawne', array_values(array_filter($items, fn($i) => $i['kind'] === 'act'))],
+    ['Projekty ustaw w Sejmie — nowy etap', array_values(array_filter($items, fn($i) => $i['kind'] === 'bill'))],
+    ['Nowe orzeczenia sądów', array_values(array_filter($items, fn($i) => $i['kind'] === 'judgment'))],
+  ], fn($s) => $s[1]);
+  $detail = fn($i) => implode(' · ', array_filter([
+    $names[$i['sourceId']] ?? null,
+    $i['kind'] === 'bill' && !empty($i['stage']) ? "etap: {$i['stage']}" . (!empty($i['passed']) ? ' (uchwalona)' : '') : null,
+    $i['kind'] === 'judgment' ? implode(' · ', array_filter([$i['courtName'] ?? null, implode(', ', $i['caseNumbers'] ?? [])])) : null,
+    !empty($i['entryIntoForce']) ? "wejście w życie: {$i['entryIntoForce']}" : null,
+    !empty($i['ts']) ? explode(' ', $i['ts'])[0] : null,
+  ]));
+  $n = count($items);
+  $subject = 'Radar Legislacyjny (' . (WS_LABEL[$ws] ?? $ws) . "): $n " . ($n === 1 ? 'nowa pozycja' : 'nowych pozycji');
+  $parts = ["$subject\n"];
+  foreach ($sections as [$title, $list]) {
+    $lines = ["== $title (" . count($list) . ') =='];
+    foreach (array_slice($list, 0, MAX_PER_SECTION) as $i) $lines[] = "- {$i['title']}\n  " . $detail($i) . (!empty($i['url']) ? "\n  {$i['url']}" : '');
+    $lines[] = count($list) > MAX_PER_SECTION ? '… i ' . (count($list) - MAX_PER_SECTION) . ' więcej w aplikacji' : '';
+    $parts[] = implode("\n", $lines);
+  }
+  $parts[] = "\nOtwórz w aplikacji: $appUrl";
+  $parts[] = 'Ten mail wysyła Radar Legislacyjny po codziennym skanie. Odbiorców zmienia administrator (notify_to w ~/private/hrbp-config.php).';
+  return ['subject' => $subject, 'text' => implode("\n\n", $parts)];
+}
+// smtp_mail takes one recipient and returns bool; any failure fails the whole send.
+// ponytail: a partial failure re-sends to everyone next time; track per-recipient if lists grow.
+function send_mail($to, $m) {
+  require_once SMTP_FILE;
+  $failed = array_values(array_filter($to, fn($t) => !smtp_mail($t, $m['subject'], $m['text'], '', 'Radar Legislacyjny')));
+  if ($failed) throw new Exception('send failed: ' . implode(', ', array_map('mask_email', $failed)));
+}
+function source_names($ws, $config) {
+  $names = [];
+  foreach (array_merge(default_sources()[$ws] ?? [], is_array($config['custom'] ?? null) ? $config['custom'] : []) as $s) $names[$s['id']] = $s['name'] ?? null;
+  return $names;
+}
+// Sends the queued digest of one department. Never throws: the outcome goes to the notify doc.
+function send_digest($ws) {
+  $to = recipients_for($ws);
+  if (!smtp_configured() || !$to) return ['sent' => false, 'reason' => 'not_configured'];
+  $res = null;
+  try {
+    update_doc($ws, 'notify', function ($doc) use ($ws, $to, &$res) {
+      $items = $doc['queue'] ?? [];
+      if (!$items) { $res = ['sent' => false, 'reason' => 'nothing_new']; return null; }
+      try {
+        $config = [];
+        try { $config = load_doc($ws, 'config'); } catch (Exception $e) { /* names fall back to empty */ }
+        send_mail($to, build_digest($ws, $items, source_names($ws, $config)));
+        $doc['queue'] = [];
+        $doc['lastSent'] = iso_now();
+        $doc['lastError'] = null;
+      } catch (Exception $e) {
+        $doc['lastError'] = mb_substr(substr(iso_now(), 0, 16) . ' ' . $e->getMessage(), 0, 300);
+      }
+      $res = ['sent' => !$doc['lastError'], 'count' => count($items)] + ($doc['lastError'] ? ['error' => $doc['lastError']] : []);
+      return $doc;
+    });
+  } catch (Exception $e) {
+    return $res ?? ['sent' => false, 'reason' => $e->getMessage()];
+  }
+  return $res;
+}
+
 // ---- CLI ---------------------------------------------------------------------
+if (PHP_SAPI === 'cli' && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') !== __FILE__) return; // included by test-digest.php
 if (PHP_SAPI === 'cli') {
   $cmd = $argv[1] ?? '';
   if ($cmd === 'scan-all') {
@@ -529,7 +647,7 @@ try {
       // Everything the frontend needs on load for one workspace.
       $ws = normalize_ws($_GET['ws'] ?? null);
       $scan = load_doc($ws, 'scan');
-      out(200, ['workspace' => $ws, 'storage' => storage_available(), 'sources' => $scan['sources'], 'history' => obj($scan['history']), 'lastRun' => $scan['lastRun'], 'triage' => obj(load_doc($ws, 'triage')['statuses']), 'config' => config_out(load_doc($ws, 'config'))], 'public, max-age=0, must-revalidate');
+      out(200, ['workspace' => $ws, 'storage' => storage_available(), 'sources' => $scan['sources'], 'history' => obj($scan['history']), 'lastRun' => $scan['lastRun'], 'triage' => obj(load_doc($ws, 'triage')['statuses']), 'config' => config_out(load_doc($ws, 'config')), 'notify' => notify_status($ws, load_doc($ws, 'notify'))], 'public, max-age=0, must-revalidate');
 
     case 'keywords':
       $kw = fetch_keywords();
@@ -623,20 +741,52 @@ try {
       out(200, $result);
 
     case 'triage':
+      // Shared review record per change id: { st, ts, owner?, due?, log: [{ at, by?, st?, owner?, due? }] }
+      // (see triage.js). Any of status / owner / due alone; "" clears owner/due. null = not sent, false = invalid.
       if ($method !== 'POST') out(405, ['error' => 'method_not_allowed']);
       $ws = normalize_ws($body['workspace'] ?? null);
-      $status = in_array($body['status'] ?? null, ['new', 'progress', 'waiting', 'urgent', 'done'], true) ? $body['status'] : null;
       $ids = array_slice(array_values(array_filter(is_array($body['ids'] ?? null) ? $body['ids'] : [], fn($x) => is_string($x) && mb_strlen($x) <= 120)), 0, 500);
-      if (!$status || !$ids) out(400, ['error' => 'bad_request', 'message' => 'ids[] and a valid status are required']);
-      $t = update_doc($ws, 'triage', function ($t) use ($ids, $status) {
+      $opt = fn($k, $n) => is_string($body[$k] ?? null) ? mb_substr(trim($body[$k]), 0, $n) : null;
+      $status = !array_key_exists('status', $body) ? null : (in_array($body['status'], ['new', 'progress', 'waiting', 'urgent', 'done'], true) ? $body['status'] : false);
+      $owner = $opt('owner', 80);
+      $due = $opt('due', 10);
+      if ($due !== null && $due !== '' && !is_iso_date($due)) $due = false;
+      $by = $opt('by', 80) ?: null;
+      if (!$ids || $status === false || $due === false || ($status === null && $owner === null && $due === null)) out(400, ['error' => 'bad_request', 'message' => 'ids[] and at least one of a valid status, owner or due (YYYY-MM-DD) are required']);
+      $t = update_doc($ws, 'triage', function ($t) use ($ids, $status, $owner, $due, $by) {
+        $now = iso_now();
         foreach ($ids as $id) {
-          if ($status === 'new') unset($t['statuses'][$id]);
-          else $t['statuses'][$id] = ['st' => $status, 'ts' => date('Y-m-d')];
+          $rec = $t['statuses'][$id] ?? ['st' => 'new', 'ts' => null];
+          $entry = ['at' => $now]; // only fields whose value really changes
+          if ($status !== null && $status !== ($rec['st'] ?? null)) { $rec['st'] = $status; $rec['ts'] = substr($now, 0, 10); $entry['st'] = $status; }
+          if ($owner !== null && $owner !== ($rec['owner'] ?? '')) { $rec['owner'] = $owner; $entry['owner'] = $owner; }
+          if ($due !== null && $due !== ($rec['due'] ?? '')) { $rec['due'] = $due; $entry['due'] = $due; }
+          if (count($entry) === 1) continue;
+          if ($by) $entry['by'] = $by;
+          $rec['log'] = array_merge(array_slice($rec['log'] ?? [], -29), [$entry]); // MAX_LOG 30
+          $t['statuses'][$id] = $rec;
         }
         $t['statuses'] = obj($t['statuses']);
         return $t;
       });
       out(200, ['workspace' => $ws, 'triage' => $t['statuses']]);
+
+    case 'notify':
+      // Test mail to the department's configured recipients; rate-limited (no login).
+      if ($method !== 'POST') out(405, ['error' => 'method_not_allowed']);
+      $ws = normalize_ws($body['workspace'] ?? null);
+      $to = recipients_for($ws);
+      if (!smtp_configured() || !$to) out(409, ['error' => 'not_configured', 'message' => 'Put smtp.php in ~/private and notify_to (or notify_to_<dept>) in ~/private/hrbp-config.php.']);
+      $doc = update_doc($ws, 'notify', function ($doc) use ($to) {
+        if (!empty($doc['lastTest']) && time() - strtotime($doc['lastTest']) < TEST_EVERY_S) out(429, ['error' => 'too_often', 'message' => 'One test mail per 10 minutes.']);
+        $doc['lastTest'] = iso_now();
+        $text = 'To jest testowy mail z Radaru Legislacyjnego. Skoro dotarł, codzienne podsumowanie nowych zmian też dotrze.';
+        try { send_mail($to, ['subject' => 'Radar Legislacyjny: testowy mail', 'text' => $text]); $doc['lastError'] = null; }
+        catch (Exception $e) { $doc['lastError'] = mb_substr(substr($doc['lastTest'], 0, 16) . ' ' . $e->getMessage(), 0, 300); }
+        return $doc;
+      });
+      if ($doc['lastError']) out(502, ['error' => 'send_failed', 'message' => $doc['lastError'], 'notify' => notify_status($ws, $doc)]);
+      out(200, ['workspace' => $ws, 'ok' => true, 'notify' => notify_status($ws, $doc)]);
 
     case 'sources':
       // Team source configuration (on/off overrides + hand-added sources), honoured by the cron.
