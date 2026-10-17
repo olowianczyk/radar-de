@@ -5,10 +5,11 @@ import { KnowledgeBase } from "./screens/KnowledgeBase.jsx";
 import { Sources } from "./screens/Sources.jsx";
 import { Settings } from "./screens/Settings.jsx";
 import { Help } from "./screens/Help.jsx";
+import { Features } from "./screens/Features.jsx";
 import { CaseLaw } from "./screens/CaseLaw.jsx";
 import { WORKSPACE_IDS, DEFAULT_WORKSPACE, getWorkspace } from "./workspaces.js";
 
-const SCREENS = ["feed", "kb", "sources", "caselaw", "help", "settings"];
+const SCREENS = ["feed", "kb", "sources", "caselaw", "features", "help", "settings"];
 
 // Routing lives in the URL hash — "#/compliance/sources" — so a department can
 // be sent a link straight to its own workspace (open tool, no login) and a
@@ -58,7 +59,8 @@ export default function App() {
   else if (active === "sources") screen = <Sources lang={lang} />;
   // Case-law search (SAOS); ws arrives via AppShell's cloneElement.
   else if (active === "caselaw") screen = <CaseLaw lang={lang} />;
-  else if (active === "help") screen = <Help lang={lang} />;
+  else if (active === "features") screen = <Features lang={lang} setActive={setActive} />;
+  else if (active === "help") screen = <Help lang={lang} setActive={setActive} />;
   else screen = <Settings lang={lang} setLang={setLang} setActive={setActive} />;
 
   return (

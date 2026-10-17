@@ -51,8 +51,8 @@ function LangSwitch({ lang, setLang }) {
 // tokens, so the plate follows light/dark and the chosen accent.
 // The workspace subtitle (t.app) is NOT repeated here: the user card at the
 // bottom of the sidebar already shows it, and the short fixed tagline keeps
-// the plate to one line of small print. Size budget: ~250 px tall; the nav list below scrolls on its own
-// (SidebarNav overflowY: auto), so short windows still reach every item.
+// the plate to one line of small print. Size budget: ~250 px tall; the sidebar is as tall as the page
+// (one page scrollbar, see the layout in AppShell), so no menu item is clipped.
 // The mark is decorative (aria-hidden) because the name is written under it;
 // t.product is split on its first space ("Radar" / "Legislacyjny").
 // The whole plate is a link to the home page — the intro at the site root
@@ -435,17 +435,26 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
   const markAllRead = () => { const next = new Set(readIds); notifChanges.forEach((c) => next.add(`c${c.id}`)); notifKb.forEach((k) => next.add(`k${k.id}`)); persistRead(next); };
   const unreadTotal = notifChanges.filter((c) => !readIds.has(`c${c.id}`)).length + notifKb.filter((k) => !readIds.has(`k${k.id}`)).length;
   const newCount = notifChanges.length;
+  // The page (not <main>) scrolls on desktop, so a new screen would otherwise
+  // open at the scroll position of the previous one — start every screen at the top.
+  React.useEffect(() => { window.scrollTo(0, 0); }, [active]);
   const items = [
     { id: "feed", label: t.nav.feed, icon: <Icon name="scale" size={18} />, badge: newCount },
     { id: "kb", label: t.nav.kb, icon: <Icon name="book-open" size={18} /> },
     { id: "sources", label: t.nav.sources, icon: <Icon name="radar" size={18} /> },
     { id: "caselaw", label: t.nav.caselaw, icon: <Icon name="gavel" size={18} /> },
+    { id: "features", label: t.nav.features, icon: <Icon name="layout-grid" size={18} /> },
     { id: "help", label: t.nav.help, icon: <Icon name="help-circle" size={18} /> },
   ];
   return (
-    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "100vh", background: "var(--canvas)", overflow: "hidden" }}>
+    // Desktop: ONE scrollbar for the whole page. The sidebar is a normal column
+    // as tall as the page (no inner scroll box hiding menu items), the top bar
+    // sticks to the top of the window, and the content scrolls with the page.
+    // Phone: unchanged — fixed-height column with its own scrolling <main>
+    // between the top bar and the bottom tab bar.
+    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", ...(isMobile ? { height: "100vh", overflow: "hidden" } : { minHeight: "100vh" }), background: "var(--canvas)" }}>
       {!isMobile && (
-        <SidebarNav
+        <SidebarNav style={{ height: "auto", minHeight: "100vh" }}
           items={items} activeId={active} onSelect={setActive}
           header={<div><Wordmark t={t} /><WorkspaceSwitch ws={ws} setWorkspace={setWorkspace} lang={lang} t={t} /></div>}
           footer={
@@ -461,6 +470,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
       )}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
         <header style={{
+          ...(isMobile ? {} : { position: "sticky", top: 0, zIndex: 30 }),
           height: "var(--topbar-h)", flex: "0 0 var(--topbar-h)", display: "flex", alignItems: "center",
           gap: isMobile ? 10 : 16, padding: isMobile ? "0 14px" : "0 24px", background: "var(--surface)", borderBottom: "1px solid var(--border-subtle)",
         }}>
@@ -554,13 +564,16 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
             <button onClick={() => setNotice(null)} aria-label={t.notice.dismiss} style={{ border: "none", background: "transparent", cursor: "pointer", color: "inherit", padding: 2, display: "inline-flex" }}><Icon name="x" size={14} /></button>
           </div>
         )}
-        <main style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? 16 : 28 }}>
+        <main style={{ flex: 1, ...(isMobile ? { minHeight: 0, overflowY: "auto" } : {}), padding: isMobile ? 16 : 28 }}>
           <div key={active} className="hrbp-screen" style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
             {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, appearance, backend, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment, removeKb }) : children}
           </div>
         </main>
       </div>
-      {isMobile && <BottomTabBar items={[...items, { id: "settings", label: t.nav.settings, icon: <Icon name="settings" size={18} /> }]} activeId={active} onSelect={setActive} />}
+      {/* ponytail: "Funkcje aplikacji" is left out of the phone bar — 7 tabs do not fit
+          at 375 px; on a phone the page stays reachable by link (#/{ws}/features) and
+          from the Instrukcja header. A "more" menu would be the upgrade if needed. */}
+      {isMobile && <BottomTabBar items={[...items.filter((i) => i.id !== "features"), { id: "settings", label: t.nav.settings, icon: <Icon name="settings" size={18} /> }]} activeId={active} onSelect={setActive} />}
     </div>
   );
 }

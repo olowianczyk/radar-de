@@ -49,7 +49,7 @@ function ScanBanner({ t, backend, sources, scanning, runScan, scanFrom, setScanF
   );
 }
 
-export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, backend, sources, scanning, runScan, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound }) {
+export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, backend, sources, scanning, runScan, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb }) {
   const t = tFor(lang, ws);
   const [period, setPeriod] = React.useState("all");
   const [customDate, setCustomDate] = React.useState("");
@@ -74,6 +74,31 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
     return c.title[lang].toLowerCase().includes(q) || c.act.toLowerCase().includes(q) || c.summary[lang].toLowerCase().includes(q);
   });
   const sel = changes.find((c) => c.id === selectedId);
+  // "Zapisz w bazie wiedzy" in the detail panel — same idea as on the case-law
+  // screen: the change becomes an ordinary KB document (title, labelled lines,
+  // summary, link), so the team can comment on it and find it later. "Already
+  // saved" = some KB document's body contains this change's source link; that
+  // survives reloads without storing any extra flag.
+  // ponytail: body-contains-link check, an explicit changeId on KB docs if the
+  // same link ever needs saving twice or the check gets slow on a huge base.
+  const [savingKb, setSavingKb] = React.useState(false);
+  const [saveKbErr, setSaveKbErr] = React.useState(null);
+  const canSaveKb = backend === "ok" && typeof addKb === "function";
+  const isSavedKb = (c) => !!c.source && (kbDocs || []).some((d) => (d.body || "").includes(c.source));
+  const saveChangeToKb = (c) => {
+    if (savingKb) return;
+    const body = [
+      c.act && `${t.kbSave.act}: ${c.act}`,
+      c.date && `${t.kbSave.date}: ${c.date}`,
+      c.summary[lang] && `\n${c.summary[lang]}`,
+      c.source && `\n${t.kbSave.link}: ${c.source}`,
+    ].filter(Boolean).join("\n");
+    setSavingKb(true);
+    setSaveKbErr(null);
+    addKb({ title: c.title[lang].slice(0, 200), area: ws.areas[c.area] ? c.area : "other", body })
+      .catch((e) => setSaveKbErr(e.message || String(e)))
+      .finally(() => setSavingKb(false));
+  };
   const newCount = changes.filter((c) => c.status === "new").length;
   const pendingCount = changes.filter((c) => c.status === "progress" || c.status === "waiting").length;
   const doneCount = changes.filter((c) => c.status === "done").length;
@@ -213,7 +238,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
         {/* Sticky detail panel capped at viewport height with its own scroll —
             without the cap a long entry (e.g. Sejm bill with stages + description)
             was taller than the screen and its bottom (links) unreachable. */}
-        <Card padding="lg" style={{ position: "sticky", top: 0, maxHeight: "calc(100vh - 120px)", overflowY: "auto" }}>
+        <Card padding="lg" style={{ position: "sticky", top: "calc(var(--topbar-h) + 16px)", maxHeight: "calc(100vh - var(--topbar-h) - 32px)", overflowY: "auto" }}>
           {sel ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
@@ -303,6 +328,10 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                 {sel.status !== "done" && <Button variant="ghost" disabled={backend !== "ok"} iconLeft={<Icon name="file-check-2" size={16} />} onClick={() => setChangeStatus(sel.id, "done")}>{t.updateDoc}</Button>}
                 {sel.status !== "urgent" && sel.status !== "done" && <Button variant="ghost" disabled={backend !== "ok"} iconLeft={<Icon name="alert-triangle" size={16} />} onClick={() => setChangeStatus(sel.id, "urgent")}>{t.markUrgent}</Button>}
                 <Button variant="secondary" iconLeft={<Icon name="printer" size={16} />} onClick={() => openPrint([sel])}>{t.print}</Button>
+                {canSaveKb && (isSavedKb(sel)
+                  ? <span style={{ fontSize: 12.5, color: "var(--success-600)", display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="bookmark-check" size={15} />{t.kbSave.saved}</span>
+                  : <Button variant="secondary" disabled={savingKb} iconLeft={<Icon name="bookmark" size={16} />} onClick={() => saveChangeToKb(sel)}>{savingKb ? t.kbSave.saving : t.kbSave.save}</Button>)}
+                {saveKbErr && <span style={{ fontSize: 12, color: "var(--danger-600)" }}>{t.kbSave.error}: {saveKbErr}</span>}
                 <span style={{ fontSize: 11.5, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5 }}><Icon name="users" size={13} />{t.statusShared}</span>
               </div>
             </div>

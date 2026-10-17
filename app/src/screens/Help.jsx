@@ -441,7 +441,9 @@ function H2({ icon, children }) {
 const th = { textAlign: "left", fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, padding: "8px 10px", borderBottom: "1px solid var(--border-subtle)" };
 const td = { fontSize: 12.5, color: "var(--text-body)", padding: "8px 10px", borderBottom: "1px solid var(--border-subtle)", verticalAlign: "top" };
 
-export function Help({ lang, ws }) {
+// setActive (from App.jsx) is used by the header button that opens the
+// "Funkcje aplikacji" overview — the short what-is-where companion of this guide.
+export function Help({ lang, ws, setActive }) {
   const t = tFor(lang, ws);
   React.useEffect(() => {
     let anchor = null;
@@ -473,7 +475,10 @@ export function Help({ lang, ws }) {
           <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-3xl)", color: "var(--text-heading)", margin: 0 }}>{h.title}</h1>
           <p style={{ margin: "8px 0 0", color: "var(--text-body)", fontSize: 14, lineHeight: 1.6 }}>{h.intro}</p>
         </div>
-        <Button variant="secondary" iconLeft={<Icon name="printer" size={16} />} onClick={() => window.print()}>{h.print}</Button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {setActive && <Button variant="secondary" iconLeft={<Icon name="layout-grid" size={16} />} onClick={() => setActive("features")}>{t.nav.features}</Button>}
+          <Button variant="secondary" iconLeft={<Icon name="printer" size={16} />} onClick={() => window.print()}>{h.print}</Button>
+        </div>
       </div>
 
       <CoverageCard t={t} ws={ws} />
@@ -668,7 +673,7 @@ export function Help({ lang, ws }) {
         </div>
       </Card>
     </div>
-    <aside className="hrbp-help-toc" style={{ position: "sticky", top: 8 }}>
+    <aside className="hrbp-help-toc" style={{ position: "sticky", top: "calc(var(--topbar-h) + 8px)" }}>
       <div className="ui-eyebrow" style={{ padding: "0 10px 8px" }}>{t.tocTitle}</div>
       <nav className="ui-toc">{toc.map(([id, label]) => <a key={id} href={`#${id}`} onClick={jump(id)} className={activeId === id ? "on" : ""}>{label}</a>)}</nav>
     </aside>

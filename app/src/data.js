@@ -2,7 +2,7 @@
 // Department-specific content (sources, areas) lives in workspaces.js.
 export const HRBP_I18N = {
   pl: {
-    app: "Monitoring zmian w prawie pracy", nav: { feed: "Zmiany w przepisach", kb: "Baza wiedzy", sources: "Monitorowane źródła", caselaw: "Orzecznictwo", help: "Instrukcja", settings: "Ustawienia" },
+    app: "Monitoring zmian w prawie pracy", nav: { feed: "Zmiany w przepisach", kb: "Baza wiedzy", sources: "Monitorowane źródła", caselaw: "Orzecznictwo", features: "Funkcje aplikacji", help: "Instrukcja", settings: "Ustawienia" },
     greet: "Dzień dobry", greetSubForms: { one: "Wykryto {n} nową zmianę w przepisach wymagającą przeglądu", few: "Wykryto {n} nowe zmiany w przepisach wymagające przeglądu", many: "Wykryto {n} nowych zmian w przepisach wymagających przeglądu" },
     kpi: { new: "Nowe zmiany", pending: "Do wdrożenia", tracked: "Monitorowane akty", updated: "Wdrożone w tym mies." },
     recent: "Najnowsze zmiany", all: "Wszystkie zmiany",
@@ -24,6 +24,7 @@ export const HRBP_I18N = {
     checkNow: "Sprawdź teraz", scanning: "Skanowanie…", scanDone: "Skanowanie zakończone", loading: "Wczytywanie danych…",
     periodLabel: "Okres", periodAll: "Wszystkie", periodCustom: "Niestandardowy zakres", periodFrom: "Od dnia", periodTo: "Do dnia",
     autoScan: "automatyczne skanowanie codziennie nad ranem (04:00 UTC)", print: "Drukuj",
+    kbSave: { save: "Zapisz w bazie wiedzy", saving: "Zapisuję…", saved: "Zapisane w bazie wiedzy", error: "Nie udało się zapisać", act: "Akt", date: "Data", link: "Źródło" },
     periodQuarter: "Ostatni kwartał", period6m: "Ostatnie 6 miesięcy", periodYear: "Ostatni rok",
     periodPrevYear: "Poprzedni rok", periodCurYear: "Bieżący rok",
     history: "Historia", hideHistory: "Ukryj historię", evDetected: "Wykryto zmianę",
@@ -140,7 +141,7 @@ export const HRBP_I18N = {
     notifications: "Powiadomienia", notificationsEmpty: "Brak nowych powiadomień", notifKbNeedsUpdate: "Dokument wymaga aktualizacji", markAllRead: "Oznacz wszystkie jako przeczytane",
   },
   de: {
-    app: "Überwachung arbeitsrechtlicher Änderungen", nav: { feed: "Rechtsänderungen", kb: "Wissensbasis", sources: "Überwachte Quellen", caselaw: "Rechtsprechung", help: "Anleitung", settings: "Einstellungen" },
+    app: "Überwachung arbeitsrechtlicher Änderungen", nav: { feed: "Rechtsänderungen", kb: "Wissensbasis", sources: "Überwachte Quellen", caselaw: "Rechtsprechung", features: "Funktionen", help: "Anleitung", settings: "Einstellungen" },
     greet: "Guten Morgen", greetSubForms: { one: "{n} neue Rechtsänderung zur Prüfung erkannt", other: "{n} neue Rechtsänderungen zur Prüfung erkannt" },
     kpi: { new: "Neue Änderungen", pending: "Zur Umsetzung", tracked: "Überwachte Rechtsakte", updated: "Umgesetzt diesen Monat" },
     recent: "Neueste Änderungen", all: "Alle Änderungen",
@@ -162,6 +163,7 @@ export const HRBP_I18N = {
     checkNow: "Jetzt prüfen", scanning: "Scanne…", scanDone: "Scan abgeschlossen", loading: "Daten werden geladen…",
     periodLabel: "Zeitraum", periodAll: "Alle", periodCustom: "Benutzerdefinierter Zeitraum", periodFrom: "Ab dem", periodTo: "Bis zum",
     autoScan: "automatischer Scan täglich früh morgens (04:00 UTC)", print: "Drucken",
+    kbSave: { save: "In der Wissensbasis speichern", saving: "Wird gespeichert…", saved: "In der Wissensbasis gespeichert", error: "Speichern fehlgeschlagen", act: "Akt", date: "Datum", link: "Quelle" },
     periodQuarter: "Letztes Quartal", period6m: "Letzte 6 Monate", periodYear: "Letztes Jahr",
     periodPrevYear: "Vorjahr", periodCurYear: "Laufendes Jahr",
     history: "Verlauf", hideHistory: "Verlauf ausblenden", evDetected: "Änderung erkannt",
@@ -275,7 +277,7 @@ export const HRBP_I18N = {
     notifications: "Benachrichtigungen", notificationsEmpty: "Keine neuen Benachrichtigungen", notifKbNeedsUpdate: "Dokument benötigt Aktualisierung", markAllRead: "Alle als gelesen markieren",
   },
   en: {
-    app: "Labor-law change monitoring", nav: { feed: "Legal changes", kb: "Knowledge base", sources: "Monitored sources", caselaw: "Case law", help: "User guide", settings: "Settings" },
+    app: "Labor-law change monitoring", nav: { feed: "Legal changes", kb: "Knowledge base", sources: "Monitored sources", caselaw: "Case law", features: "Features", help: "User guide", settings: "Settings" },
     greet: "Good morning", greetSubForms: { one: "{n} new legal change detected for review", other: "{n} new legal changes detected for review" },
     kpi: { new: "New changes", pending: "Pending rollout", tracked: "Tracked acts", updated: "Implemented this month" },
     recent: "Recent changes", all: "View all",
@@ -297,6 +299,7 @@ export const HRBP_I18N = {
     checkNow: "Check now", scanning: "Scanning…", scanDone: "Scan complete", loading: "Loading data…",
     periodLabel: "Period", periodAll: "All", periodCustom: "Custom range", periodFrom: "From", periodTo: "To",
     autoScan: "automatic scan daily in the early morning (04:00 UTC)", print: "Print",
+    kbSave: { save: "Save to knowledge base", saving: "Saving…", saved: "Saved to knowledge base", error: "Could not save", act: "Act", date: "Date", link: "Source" },
     periodQuarter: "Last quarter", period6m: "Last 6 months", periodYear: "Last year",
     periodPrevYear: "Previous year", periodCurYear: "Current year",
     history: "History", hideHistory: "Hide history", evDetected: "Change detected",

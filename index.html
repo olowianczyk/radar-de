@@ -17,7 +17,7 @@
   /* ==========================================================================
      INTRO — "Radar Legislacyjny"
      ==========================================================================
-     A ~10 s timed sequence of four scenes, then an automatic hand-off to the
+     A ~22 s timed sequence of four scenes, then an automatic hand-off to the
      app (app/index.html). Skippable any time (button, Esc / Enter / Space).
 
        1. logo    — the animated horizontal logo (beam spinning)
@@ -337,10 +337,12 @@ const HIGHLIGHT = new Set(['krok']);
 
 const SCENES = ['scene-logo', 'scene-scan', 'scene-feed', 'scene-promise'];
 // How long each scene stays on screen (ms): logo, scan, feed, promise.
-// The logo gets enough time for the beam to sweep about half a turn; scan and
-// feed are long enough for their staggered rows to finish appearing (~1.5 s)
-// and be read. Total ≈ 10 s.
-const DURATIONS = [2600, 2500, 2800, 2600];
+// Slowed down (roughly 2x the first version) so a first-time visitor can
+// actually read every line: the staggered rows of the scan and feed scenes
+// finish appearing after ~1.5 s and then stay up for another ~4 s, and the
+// closing quote gets ~5 s. Returning visitors skip with Esc / Enter / Space or
+// the skip button, so a longer intro costs them nothing. Total ≈ 22 s.
+const DURATIONS = [4500, 5500, 6500, 5500];
 const APP_URL = 'app/index.html';
 
 // Label for the scan scene: date + local time of the most recent scheduled
