@@ -6,7 +6,7 @@
 //
 // A record per change id:
 //   { st, ts, owner?, due?, log: [{ at, by?, st?, owner?, due? }] }
-//   st    — review status ("new" | "progress" | "waiting" | "urgent" | "done")
+//   st    — review status ("new" | "progress" | "urgent" | "done")
 //   ts    — YYYY-MM-DD of the last STATUS change (the "implemented this month"
 //           KPI counts on it, so owner/due edits must not move it)
 //   owner — free-text name of the person responsible ("" / missing = nobody)
@@ -26,7 +26,7 @@
 // tamper-evident history.
 const { loadDoc, saveDoc, normalizeWorkspace, parseBody, sendError } = require("./_lib.js");
 
-const STATUSES = ["new", "progress", "waiting", "urgent", "done"];
+const STATUSES = ["new", "progress", "urgent", "done"];
 const MAX_IDS = 500;
 const MAX_LOG = 30;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

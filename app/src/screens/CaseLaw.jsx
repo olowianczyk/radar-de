@@ -15,8 +15,10 @@
 //
 // COVERAGE (measured 2026-10, see api/_lib.js): only common courts are current
 // in SAOS. SN ends 06.2016, TK 12.2015, KIO 09.2018 and NSA/WSA has no data.
-// Searching them still works for older case law, so they stay selectable, but
-// the court picker says how far each one goes and points to the court portal.
+// Searching SN/TK/KIO still works for older case law, so they stay selectable,
+// but the court picker says how far each one goes and points to the court
+// portal. NSA/WSA is NOT offered at all: SAOS has zero judgments for it, so the
+// option could only ever return an empty list.
 //
 // CACHE: the backend saves every result page to Blob (searchJudgmentsCached
 // in api/_lib.js), so a repeated query is instant for every user and still
@@ -53,12 +55,11 @@ const PAGE_SIZE = 20;
 // picker so an empty result for "SN, 2024" is explained, not mysterious.
 // ponytail: hard-coded from the 2026-10 measurement; re-measure yearly
 // together with the COVERAGE table in api/_lib.js.
-const SAOS_UNTIL = { COMMON: null, SUPREME: "06.2016", CONSTITUTIONAL_TRIBUNAL: "12.2015", NATIONAL_APPEAL_CHAMBER: "09.2018", ADMINISTRATIVE: "—" };
+const SAOS_UNTIL = { COMMON: null, SUPREME: "06.2016", CONSTITUTIONAL_TRIBUNAL: "12.2015", NATIONAL_APPEAL_CHAMBER: "09.2018" };
 // The court's own portal for judgments SAOS no longer receives (same URLs as
 // the manual sources in workspaces.js).
 const PORTAL = {
   SUPREME: "https://www.sn.pl/orzecznictwo/SitePages/Wyszukiwarka.aspx",
-  ADMINISTRATIVE: "https://orzeczenia.nsa.gov.pl/",
   CONSTITUTIONAL_TRIBUNAL: "https://ipo.trybunal.gov.pl/",
   NATIONAL_APPEAL_CHAMBER: "https://orzeczenia.uzp.gov.pl/",
 };
@@ -82,9 +83,8 @@ const COPY = {
     none: "Brak orzeczeń dla tych kryteriów.",
     prev: "Poprzednia", next: "Następna",
     open: "Otwórz w SAOS",
-    until: "do {d}", untilNone: "brak w SAOS",
+    until: "do {d}",
     frozen: "SAOS ma orzeczenia tego sądu tylko do {d}. Nowsze znajdziesz na portalu sądu:",
-    frozenNone: "SAOS nie ma orzeczeń tego sądu. Szukaj na portalu sądu:",
     portal: "portal orzeczeń",
     source: "Źródło: SAOS (ICM UW), saos.org.pl",
     cached: "Wyniki z pamięci podręcznej (zapisane {d}).",
@@ -109,9 +109,8 @@ const COPY = {
     none: "Keine Entscheidungen für diese Kriterien.",
     prev: "Zurück", next: "Weiter",
     open: "In SAOS öffnen",
-    until: "bis {d}", untilNone: "nicht in SAOS",
+    until: "bis {d}",
     frozen: "SAOS hat Entscheidungen dieses Gerichts nur bis {d}. Neuere im Portal des Gerichts:",
-    frozenNone: "SAOS hat keine Entscheidungen dieses Gerichts. Suche im Portal des Gerichts:",
     portal: "Entscheidungsportal",
     source: "Quelle: SAOS (ICM UW), saos.org.pl",
     cached: "Ergebnisse aus dem Cache (gespeichert {d}).",
@@ -136,9 +135,8 @@ const COPY = {
     none: "No judgments match these criteria.",
     prev: "Previous", next: "Next",
     open: "Open in SAOS",
-    until: "until {d}", untilNone: "not in SAOS",
+    until: "until {d}",
     frozen: "SAOS has this court's judgments only until {d}. Newer ones are on the court's portal:",
-    frozenNone: "SAOS has no judgments from this court. Search the court's portal:",
     portal: "judgment portal",
     source: "Source: SAOS (ICM UW), saos.org.pl",
     cached: "Results from cache (saved {d}).",
@@ -282,7 +280,7 @@ export function CaseLaw({ lang, ws, sources, kbDocs, addKb, backend }) {
   const courtLabel = (ct) => {
     const u = SAOS_UNTIL[ct];
     const name = t.saos.courts[ct];
-    return u ? `${name} (${u === "—" ? c.untilNone : c.until.replace("{d}", u)})` : name;
+    return u ? `${name} (${c.until.replace("{d}", u)})` : name;
   };
   const frozenCourt = form.courtType && SAOS_UNTIL[form.courtType] ? form.courtType : null;
 
@@ -306,7 +304,7 @@ export function CaseLaw({ lang, ws, sources, kbDocs, addKb, backend }) {
             <Input label={c.caseNumber} placeholder={c.caseNumberPh} value={form.caseNumber} onChange={set("caseNumber")} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
-            <Select label={c.court} value={form.courtType} onChange={set("courtType")} options={[{ value: "", label: c.allCourts }, ...["COMMON", ...SAOS_COURT_TYPES.filter((x) => x !== "COMMON")].map((ct) => ({ value: ct, label: courtLabel(ct) }))]} />
+            <Select label={c.court} value={form.courtType} onChange={set("courtType")} options={[{ value: "", label: c.allCourts }, ...["COMMON", ...SAOS_COURT_TYPES.filter((x) => x !== "COMMON" && x !== "ADMINISTRATIVE")].map((ct) => ({ value: ct, label: courtLabel(ct) }))]} />
             <Select label={c.type} value={form.judgmentType} onChange={set("judgmentType")} options={[{ value: "", label: c.allTypes }, ...SAOS_JUDGMENT_TYPES.map((jt) => ({ value: jt, label: t.saos.types[jt] }))]} />
             <Input label={c.from} type="date" value={form.dateFrom} onChange={set("dateFrom")} />
             <Input label={c.to} type="date" value={form.dateTo} onChange={set("dateTo")} />
@@ -314,7 +312,7 @@ export function CaseLaw({ lang, ws, sources, kbDocs, addKb, backend }) {
           {frozenCourt && (
             <div style={{ fontSize: 12.5, color: "var(--warning-700)", display: "flex", gap: 6, alignItems: "baseline", flexWrap: "wrap" }}>
               <Icon name="alert-triangle" size={14} />
-              <span>{SAOS_UNTIL[frozenCourt] === "—" ? c.frozenNone : c.frozen.replace("{d}", SAOS_UNTIL[frozenCourt])}</span>
+              <span>{c.frozen.replace("{d}", SAOS_UNTIL[frozenCourt])}</span>
               <a href={PORTAL[frozenCourt]} target="_blank" rel="noreferrer" style={{ color: "var(--brand)", fontWeight: 600 }}>{c.portal} ↗</a>
             </div>
           )}

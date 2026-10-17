@@ -39,7 +39,7 @@ function ThesaurusSearch({ h }) {
 const HELP = {
   pl: {
     title: "Instrukcja",
-    intro: "To narzędzie codziennie sprawdza, czy w polskich dziennikach urzędowych pojawiły się nowe akty prawne dotyczące obszarów, które monitoruje Twój dział. Każdy dział (HR, Compliance, Dział prawny) ma własną listę źródeł, własny feed zmian i własną bazę wiedzy. Nie ma logowania — narzędzie działa z linku, a wyniki skanów są wspólne dla wszystkich.",
+    intro: "To narzędzie codziennie sprawdza, czy w Dzienniku Ustaw, Monitorze Polskim, Sejmie (projekty ustaw), EUR-Lex (prawo UE) i SAOS (orzeczenia sądów powszechnych) pojawiło się coś nowego w obszarach, które monitoruje Twój dział. Każdy dział (HR, Compliance, Dział prawny) ma własną listę źródeł, własny feed zmian i własną bazę wiedzy. Nie ma logowania — narzędzie działa z linku, a wyniki skanów są wspólne dla wszystkich.",
     howTitle: "Jak korzystać",
     how: [
       ["Wybierz dział", "W pasku bocznym (na telefonie: lista rozwijana u góry) przełącz się na HR, Compliance albo Dział prawny. Adres w przeglądarce zmienia się razem z działem, więc możesz wysłać komuś link prosto do jego widoku."],
@@ -54,16 +54,16 @@ const HELP = {
     howWorksTitle: "Na jakiej zasadzie działa skanowanie",
     howWorksExtra: [
       "Automatyczny skan uruchamia się codziennie nad ranem (04:00 UTC, czyli 05:00/06:00 czasu polskiego). Wynik zobaczysz przy następnym otwarciu aplikacji — przeglądarka nie musi być włączona.",
-      "Pierwsze skanowanie każdego źródła sięga do 1 stycznia bieżącego roku; kolejne obejmują tylko okres od ostatniego sprawdzenia.",
+      "Pierwsze skanowanie każdego źródła sięga do 1 stycznia bieżącego roku; kolejne obejmują okres od ostatniego sprawdzenia (z kilkudniowym zapasem — patrz niżej).",
       "Ten sam akt wykryty przez kilka źródeł lub kilka skanów pojawia się raz (rozpoznawany po identyfikatorze ELI).",
-      "Narzędzie wykrywa publikację aktu. Nie ocenia, czy zmiana jest istotna, i nie czyta treści — to zadanie osoby, która przegląda zmianę. Status aktu i datę wejścia w życie pokazuje dokładnie tak, jak podało je API Sejmu w dniu wykrycia (szczegóły w sekcji „Dwa różne statusy”).",
+      "Narzędzie wykrywa publikację aktu, nowy etap projektu albo nowe orzeczenie. Nie ocenia, czy zmiana jest istotna, i nie czyta treści — to zadanie osoby, która przegląda zmianę. Status aktu i datę wejścia w życie pokazuje dokładnie tak, jak podało je API Sejmu w dniu wykrycia (szczegóły w sekcji „Dwa różne statusy”).",
     ],
     pipelineTitle: "Krok po kroku: jak powstaje wpis w feedzie",
     pipelineIntro: "Dokładny przebieg jednego skanowania — od harmonogramu do karty w feedzie. Każdy etap jest deterministyczny i możesz go odtworzyć ręcznie linkiem „Otwórz zapytanie w API Sejmu”.",
     pipeline: [
       ["Start skanowania", "Codziennie o 04:00 UTC uruchamia go harmonogram (Vercel Cron) dla wszystkich trzech działów. Dodatkowo każdy może kliknąć „Sprawdź teraz” — wtedy skanowane są źródła aktywne w danym dziale. Oba skany działają identycznie."],
-      ["Ustalenie okna dat dla każdego źródła", "Dla każdego aktywnego źródła liczy się okno „od – do” według DATY OGŁOSZENIA aktu: „od” = data ostatniego sprawdzenia tego źródła (pole „Ostatnie sprawdzenie”), „do” = dziś. Źródło sprawdzane po raz pierwszy ma „od” = 1 stycznia bieżącego roku. Jeśli w formularzu podasz własne daty „Od dnia / Do dnia”, zastępują one to okno dla wszystkich źródeł w tym jednym skanie."],
-      ["Zapytania do API Sejmu", "Dla każdego źródła wysyłane są 1–2 zapytania do api.sejm.gov.pl/eli/acts/search: po słowie kluczowym (parametr keyword — oficjalne hasło nadane aktowi przez Bibliotekę Sejmową) i/lub po fragmencie tytułu (parametr title). Zawsze z rejestrem (publisher=DU albo MP), oknem dat (dateFrom/dateTo) i limitem 100 wyników. Treść aktów nie jest pobierana ani czytana."],
+      ["Ustalenie okna dat dla każdego źródła", "Dla każdego aktywnego źródła liczy się okno „od – do” według DATY OGŁOSZENIA aktu w Dz.U./M.P. (nie daty podpisania): „od” = data ostatniego sprawdzenia tego źródła (pole „Ostatnie sprawdzenie”) minus 7 dni zapasu na opóźnienie bazy ELI, „do” = dziś. Źródło, którego skan zakończył się błędem, nie przesuwa „Ostatniego sprawdzenia” — następny skan powtórzy jego okno. Źródło sprawdzane po raz pierwszy ma „od” = 1 stycznia bieżącego roku. Jeśli w formularzu podasz własne daty „Od dnia / Do dnia”, zastępują one to okno dla wszystkich źródeł w tym jednym skanie."],
+      ["Zapytania do API Sejmu", "Dla każdego źródła wysyłane są 1–2 zapytania do api.sejm.gov.pl/eli/acts/search: po słowie kluczowym (parametr keyword — oficjalne hasło nadane aktowi przez Bibliotekę Sejmową) i/lub po fragmencie tytułu (parametr title). Zawsze z rejestrem (publisher=DU albo MP), oknem dat publikacji w dzienniku (pubDateFrom/pubDateTo — nie daty podpisania aktu), cofniętym o 7 dni za ostatnie sprawdzenie, i stronicowaniem po 100 wyników (do 500; powyżej źródło dostaje ostrzeżenie). Treść aktów nie jest pobierana ani czytana."],
       ["Odpowiedź: lista aktów", "API zwraca akty ogłoszone w oknie dat, które pasują do zapytania. Z każdego aktu zapisujemy: tytuł, identyfikator ELI, adres publikacyjny (Dz.U. rok poz.), datę ogłoszenia, typ aktu (ustawa, rozporządzenie, obwieszczenie…), status aktu wg ISAP, informację czy obowiązuje, datę wejścia w życie i datę ostatniej zmiany w ISAP, jeśli API je podaje."],
       ["Deduplikacja i zapis", "Akt jest rozpoznawany po identyfikatorze ELI. Jeśli ten sam akt znalazło słowo kluczowe i tytuł, albo wykryły go dwa źródła, albo pojawił się w poprzednim skanie — trafia do historii tylko raz. Historia źródła i nowa data „Ostatnie sprawdzenie” zapisują się w magazynie danych. Jeśli zapis się nie uda, zobaczysz czerwony komunikat „wyniki NIE zostały zapisane”."],
       ["Karta w feedzie", "Każdy wpis w historii źródła = jedna karta w „Zmianach w przepisach”. Tytuł, data, typ i status aktu pochodzą 1:1 z API; obszar prawa pochodzi z konfiguracji źródła (to nasza klasyfikacja, nie Sejmu). Karta zaczyna ze statusem przeglądu „Nowe”, bo nikt jej jeszcze nie oznaczył."],
@@ -74,7 +74,7 @@ const HELP = {
     reviewStatusIntro: "Mówi o tym, co WASZ zespół zrobił ze zmianą. Narzędzie nigdy nie zmienia go samo.",
     reviewStatuses: [
       ["Nowe", "Nikt jeszcze nie oznaczył tej zmiany. To jedyny status nadawany automatycznie — i oznacza wyłącznie „nieprzejrzane”, nie „ważne”."],
-      ["W przeglądzie", "Ktoś analizuje zmianę (przycisk „Oznacz jako przejrzane” lub akcja zbiorcza)."],
+      ["W przeglądzie", "Ktoś analizuje zmianę (przycisk „Rozpocznij przegląd” lub akcja zbiorcza)."],
       ["Pilne", "Zespół uznał, że wymaga natychmiastowej reakcji. Trafia do powiadomień razem z „Nowe”."],
       ["Wdrożone", "Sprawa zamknięta — działania wykonane lub uznano, że zmiana nie dotyczy firmy. Znika z listy nowych; w KPI „Wdrożone w tym miesiącu” liczy się data oznaczenia."],
     ],
@@ -93,7 +93,7 @@ const HELP = {
     autoTitle: "Skanowane automatycznie",
     manualTitle: "Poza automatycznym skanem (przegląd ręczny)",
     manualIntro: "Tych źródeł API Sejmu nie obejmuje. Są wymienione, żeby luka była widoczna; zalecana częstotliwość przeglądu pochodzi z dokumentu wymagań.",
-    colSource: "Źródło", colMatch: "Dopasowanie", colRegister: "Rejestr", colDefault: "Domyślnie", colCadence: "Częstotliwość", colWhy: "Dlaczego ręcznie",
+    colSource: "Źródło", colMatch: "Dopasowanie", colRegister: "Rejestr", colDefault: "Stan", colCadence: "Częstotliwość", colWhy: "Dlaczego ręcznie",
     on: "włączone", off: "wyłączone",
     selectionTitle: "Jak dobrane są akty i słowa kluczowe",
     selectionIntro: "Lista źródeł nie jest automatyczna — to decyzja redakcyjna oparta na dokumencie wymagań dla działu prawnego i compliance (sekcje: fundament, spory, prawo korporacyjne, podatki, prawo pracy, konkurencja, dane, IP, produkt, zamówienia, nieruchomości, AML/sankcje/ESG). Każdy akt z tej listy, który jest publikowany w Dz.U. lub M.P., ma swoje źródło. Dla każdego źródła wybraliśmy sposób dopasowania według poniższych zasad:",
@@ -113,7 +113,7 @@ const HELP = {
     addTitle: "Czy można dodawać własne źródła? Tak — i są wspólne dla działu",
     addSteps: [
       ["Wejdź w „Monitorowane źródła” → „Nowe źródło”", "Formularz jest nad listą. Dodane źródło zapisuje się na serwerze i od następnego skanu (ręcznego lub nocnego) jest traktowane jak każde inne — widzą je wszyscy w dziale."],
-      ["Wybierz rejestr", "Dziennik Ustaw (ustawy, rozporządzenia, teksty jednolite), Monitor Polski (obwieszczenia, komunikaty), Sejm (projekty ustaw — tylko tryb „tytuł zawiera”) albo SAOS (orzecznictwo — wtedy wybierasz też sąd i rodzaj orzeczenia)."],
+      ["Wybierz rejestr", "Dziennik Ustaw (ustawy, rozporządzenia, teksty jednolite), Monitor Polski (obwieszczenia, komunikaty), Sejm (projekty ustaw — tylko tryb „tytuł zawiera”), EUR-Lex (prawo UE i projekty Komisji — fragment polskiego tytułu) albo SAOS (orzeczenia sądów powszechnych — wtedy wybierasz też rodzaj orzeczenia)."],
       ["Wybierz tryb i wpisz termin", "„Tytuł zawiera” — wklej fragment oficjalnego tytułu w odmianie, jak w ISAP (np. „o prawach konsumenta”, nie „prawa konsumenta”). „Słowo kluczowe Sejmu” — podczas pisania pokazują się pasujące hasła ze słownika; wybierz jedno z nich. W SAOS: „powołany akt zawiera” (np. „Kodeks cywilny”) lub „fraza w treści”."],
       ["Nadaj nazwę i obszar", "Nazwa jest tym, co zobaczysz w feedzie przy każdej wykrytej zmianie. Obszar służy filtrowaniu."],
       ["Sprawdź, czy źródło działa", "Rozwiń jego panel „Zakres przeszukiwania”: zobaczysz dokładne zapytanie (link „Otwórz zapytanie…” pokazuje surową odpowiedź API) i znacznik słowa kluczowego. Potem kliknij „Sprawdź teraz” z zakresem dat, np. od 1 stycznia — jeśli akt był w tym okresie nowelizowany, powinien się pojawić. Jeśli nic nie ma, otwórz zapytanie i oceń, czy to brak publikacji, czy zły fragment."],
@@ -133,7 +133,7 @@ const HELP = {
       ["Dodaj źródło", "„Monitorowane źródła” → „Nowe źródło” → rejestr „Sejm — projekty ustaw”. Tryb jest jeden: „tytuł zawiera”."],
       ["Wpisz frazę z tytułu", "Fragment tytułu projektu w tej odmianie, w jakiej stoi w tytule. Wielkość liter nie ma znaczenia."],
       ["Nadaj nazwę i obszar, zapisz", "Nazwa będzie widoczna przy każdym wpisie, który znajdzie to źródło."],
-      ["Kliknij „Sprawdź teraz”", "Pierwszy skan sięga do 1 stycznia bieżącego roku. Potem źródło jest sprawdzane codziennie ok. 06:00."],
+      ["Kliknij „Sprawdź teraz”", "Pierwszy skan sięga do 1 stycznia bieżącego roku. Potem źródło jest sprawdzane codziennie o 04:00 UTC (06:00 latem, 05:00 zimą)."],
     ],
     billsPhrasesTitle: "Jak dobrać frazę",
     billsPhrases: [
@@ -170,7 +170,7 @@ const HELP = {
   },
   en: {
     title: "User guide",
-    intro: "This tool checks every day whether new legal acts concerning the areas your department monitors have appeared in the Polish official journals. Each department (HR, Compliance, Legal) has its own source list, its own change feed and its own knowledge base. There is no login — the tool works from a link, and scan results are shared by everyone.",
+    intro: "This tool checks every day whether anything new concerning the areas your department monitors has appeared in the Journal of Laws, Monitor Polski, the Sejm (bills), EUR-Lex (EU law) or SAOS (common-court judgments). Each department (HR, Compliance, Legal) has its own source list, its own change feed and its own knowledge base. There is no login — the tool works from a link, and scan results are shared by everyone.",
     howTitle: "How to use it",
     how: [
       ["Pick a department", "In the sidebar (on a phone: the dropdown at the top) switch to HR, Compliance or Legal. The browser address changes with the department, so you can send someone a link straight to their view."],
@@ -185,16 +185,16 @@ const HELP = {
     howWorksTitle: "How the scan works",
     howWorksExtra: [
       "The automatic scan runs daily in the early morning (04:00 UTC). You see the result the next time you open the app — no browser needs to be running.",
-      "The first scan of each source reaches back to 1 January of the current year; later scans cover only the period since the last check.",
+      "The first scan of each source reaches back to 1 January of the current year; later scans cover the period since the last check (plus a few days of slack — see below).",
       "The same act detected by several sources or several scans appears once (recognised by its ELI identifier).",
-      "The tool detects publication of an act. It does not judge whether the change matters and does not read the text — that is the reviewer's job. The act's status and entry-into-force date are shown exactly as the Sejm API reported them on the detection day (see “Two different statuses”).",
+      "The tool detects publication of an act, a new bill stage or a new judgment. It does not judge whether the change matters and does not read the text — that is the reviewer's job. The act's status and entry-into-force date are shown exactly as the Sejm API reported them on the detection day (see “Two different statuses”).",
     ],
     pipelineTitle: "Step by step: how a feed entry is produced",
     pipelineIntro: "The exact course of one scan — from the schedule to a card in the feed. Every step is deterministic and you can replay it by hand with “Open query in the Sejm API”.",
     pipeline: [
       ["Scan start", "Every day at 04:00 UTC the schedule (Vercel Cron) runs it for all three departments. Anyone can also click “Check now” — that scans the sources active in that department. Both scans behave identically."],
-      ["Date window per source", "For each active source a “from – to” window is computed by the act’s ANNOUNCEMENT DATE: “from” = that source’s last check (the “Last checked” field), “to” = today. A source checked for the first time gets “from” = 1 January of the current year. Dates you enter in “From / To” replace this window for all sources in that one scan."],
-      ["Queries to the Sejm API", "For each source 1–2 requests go to api.sejm.gov.pl/eli/acts/search: by keyword (parameter keyword — the official subject heading assigned by the Sejm Library) and/or by title fragment (parameter title). Always with the register (publisher=DU or MP), the date window (dateFrom/dateTo) and a limit of 100 results. The acts’ text is neither fetched nor read."],
+      ["Date window per source", "For each active source a “from – to” window is computed by the act’s PUBLICATION DATE in Dz.U./M.P. (not the signing date): “from” = that source’s last check (the “Last checked” field) minus 7 days of slack for the ELI database delay, “to” = today. A source whose scan failed keeps its “Last checked”, so the next scan repeats its window. A source checked for the first time gets “from” = 1 January of the current year. Dates you enter in “From / To” replace this window for all sources in that one scan."],
+      ["Queries to the Sejm API", "For each source 1–2 requests go to api.sejm.gov.pl/eli/acts/search: by keyword (parameter keyword — the official subject heading assigned by the Sejm Library) and/or by title fragment (parameter title). Always with the register (publisher=DU or MP), a publication-date window (pubDateFrom/pubDateTo — not the signing date), reaching 7 days back behind the last check, paged 100 at a time (up to 500; beyond that the source shows a warning). The acts’ text is neither fetched nor read."],
       ["Response: a list of acts", "The API returns acts announced within the window that match the query. From each act we store: title, ELI identifier, publication address (Dz.U. year item), announcement date, act type (statute, regulation, notice…), the act’s status per ISAP, whether it is in force, entry-into-force date and last-change date, where the API provides them."],
       ["Deduplication and saving", "An act is identified by its ELI. If keyword and title both found it, or two sources did, or it appeared in a previous scan — it enters the history once. The source history and the new “Last checked” date are saved to the data store. If saving fails you see a red “results were NOT saved” message."],
       ["Card in the feed", "Each history entry = one card in “Legal changes”. Title, date, type and act status come 1:1 from the API; the legal area comes from the source configuration (our classification, not the Sejm’s). The card starts with review status “New” because nobody has marked it yet."],
@@ -205,7 +205,7 @@ const HELP = {
     reviewStatusIntro: "Says what YOUR team did with the change. The tool never changes it on its own.",
     reviewStatuses: [
       ["New", "Nobody has marked this change yet. The only status assigned automatically — and it means “unreviewed”, not “important”."],
-      ["In review", "Someone is analysing the change (“Mark reviewed” or the bulk action)."],
+      ["In review", "Someone is analysing the change (“Start review” or the bulk action)."],
       ["Urgent", "The team decided it needs an immediate reaction. Appears in notifications together with “New”."],
       ["Implemented", "Closed — actions done, or the change was judged not to concern the company. Leaves the new list; the “Implemented this month” KPI counts the marking date."],
     ],
@@ -224,7 +224,7 @@ const HELP = {
     autoTitle: "Scanned automatically",
     manualTitle: "Outside the automatic scan (manual review)",
     manualIntro: "The Sejm API does not cover these sources. They are listed so the gap is visible; the recommended cadence comes from the requirements document.",
-    colSource: "Source", colMatch: "Matching", colRegister: "Register", colDefault: "Default", colCadence: "Cadence", colWhy: "Why manual",
+    colSource: "Source", colMatch: "Matching", colRegister: "Register", colDefault: "State", colCadence: "Cadence", colWhy: "Why manual",
     on: "on", off: "off",
     selectionTitle: "How the acts and keywords were chosen",
     selectionIntro: "The source list is not automatic — it is an editorial decision based on the legal/compliance requirements document (sections: fundamentals, disputes, corporate, tax, labour, competition, data, IP, product, procurement, real estate, AML/sanctions/ESG). Every act on that list that is published in Dz.U. or M.P. has a source. For each one the matching mode was chosen by these rules:",
@@ -244,7 +244,7 @@ const HELP = {
     addTitle: "Can you add your own sources? Yes — and they are shared by the department",
     addSteps: [
       ["Go to “Monitored sources” → “New source”", "The form sits above the list. A new source is saved on the server and treated like any other from the next scan (manual or nightly) — everyone in the department sees it."],
-      ["Pick the register", "Journal of Laws (statutes, regulations, consolidated texts), Monitor Polski (notices), the Sejm (bills — “title contains” only) or SAOS (case law — then also pick the court and judgment type)."],
+      ["Pick the register", "Journal of Laws (statutes, regulations, consolidated texts), Monitor Polski (notices), the Sejm (bills — “title contains” only), EUR-Lex (EU law and Commission proposals — Polish title fragment) or SAOS (common-court judgments — then also pick the judgment type)."],
       ["Pick the mode and type the term", "“Title contains” — paste a fragment of the official title declined as in ISAP (e.g. “o prawach konsumenta”). “Sejm keyword” — matching thesaurus headings appear as you type; pick one. In SAOS: “cited act contains” (e.g. “Kodeks cywilny”) or “phrase in text”."],
       ["Name it and pick an area", "The name is what you will see in the feed next to each detected change. The area is for filtering."],
       ["Check that it works", "Expand its “Search scope” panel: you see the exact query (“Open query…” shows the raw API response) and the keyword marker. Then click “Check now” with a date range, e.g. from 1 January — if the act was amended in that period it should appear. If nothing shows, open the query and judge whether nothing was published or the fragment is wrong."],
@@ -263,7 +263,7 @@ const HELP = {
       ["Add a source", "“Monitored sources” → “New source” → register “Sejm — bills”. There is one mode: “title contains”."],
       ["Type a phrase from the title", "A fragment of the bill title declined exactly as in the title. Case does not matter."],
       ["Give it a name and area, save", "The name is shown on every entry this source finds."],
-      ["Click “Check now”", "The first scan goes back to 1 January of the current year. After that the source is checked daily around 06:00."],
+      ["Click “Check now”", "The first scan goes back to 1 January of the current year. After that the source is checked daily at 04:00 UTC (06:00 in summer, 05:00 in winter, Polish time)."],
     ],
     billsPhrasesTitle: "Choosing the phrase",
     billsPhrases: [
@@ -300,7 +300,7 @@ const HELP = {
   },
   de: {
     title: "Anleitung",
-    intro: "Dieses Tool prüft täglich, ob in den polnischen Amtsblättern neue Rechtsakte zu den Bereichen erschienen sind, die Ihre Abteilung überwacht. Jede Abteilung (HR, Compliance, Rechtsabteilung) hat eigene Quellen, einen eigenen Änderungs-Feed und eine eigene Wissensbasis. Es gibt kein Login — das Tool läuft über einen Link, Scan-Ergebnisse sind für alle gemeinsam.",
+    intro: "Dieses Tool prüft täglich, ob im Gesetzblatt, im Monitor Polski, im Sejm (Gesetzentwürfe), in EUR-Lex (EU-Recht) oder in SAOS (Urteile ordentlicher Gerichte) etwas Neues zu den Bereichen erschienen ist, die Ihre Abteilung überwacht. Jede Abteilung (HR, Compliance, Rechtsabteilung) hat eigene Quellen, einen eigenen Änderungs-Feed und eine eigene Wissensbasis. Es gibt kein Login — das Tool läuft über einen Link, Scan-Ergebnisse sind für alle gemeinsam.",
     howTitle: "So nutzen Sie das Tool",
     how: [
       ["Abteilung wählen", "In der Seitenleiste (am Telefon: Auswahlliste oben) zu HR, Compliance oder Rechtsabteilung wechseln. Die Adresse im Browser ändert sich mit, sodass Sie einen Link direkt zur jeweiligen Ansicht verschicken können."],
@@ -315,16 +315,16 @@ const HELP = {
     howWorksTitle: "So funktioniert der Scan",
     howWorksExtra: [
       "Der automatische Scan läuft täglich früh morgens (04:00 UTC). Das Ergebnis sehen Sie beim nächsten Öffnen — kein Browser muss laufen.",
-      "Der erste Scan jeder Quelle reicht bis zum 1. Januar des laufenden Jahres; spätere Scans decken nur den Zeitraum seit der letzten Prüfung ab.",
+      "Der erste Scan jeder Quelle reicht bis zum 1. Januar des laufenden Jahres; spätere Scans decken den Zeitraum seit der letzten Prüfung ab (mit einigen Tagen Puffer — siehe unten).",
       "Derselbe Akt, von mehreren Quellen oder Scans erkannt, erscheint einmal (erkannt an der ELI-Kennung).",
-      "Das Tool erkennt die Verkündung eines Akts. Es bewertet nicht, ob die Änderung relevant ist, und liest den Text nicht — das ist Aufgabe der prüfenden Person. Status und Inkrafttreten des Akts werden genau so gezeigt, wie die Sejm-API sie am Erkennungstag meldete (siehe „Zwei verschiedene Status“).",
+      "Das Tool erkennt die Verkündung eines Akts, eine neue Stufe eines Entwurfs oder ein neues Urteil. Es bewertet nicht, ob die Änderung relevant ist, und liest den Text nicht — das ist Aufgabe der prüfenden Person. Status und Inkrafttreten des Akts werden genau so gezeigt, wie die Sejm-API sie am Erkennungstag meldete (siehe „Zwei verschiedene Status“).",
     ],
     pipelineTitle: "Schritt für Schritt: So entsteht ein Feed-Eintrag",
     pipelineIntro: "Der genaue Ablauf eines Scans — vom Zeitplan bis zur Karte im Feed. Jeder Schritt ist deterministisch und lässt sich mit „Abfrage in der Sejm-API öffnen“ von Hand nachvollziehen.",
     pipeline: [
       ["Scan-Start", "Täglich um 04:00 UTC startet ihn der Zeitplan (Vercel Cron) für alle drei Abteilungen. Zusätzlich kann jeder „Jetzt prüfen“ klicken — dann werden die in der Abteilung aktiven Quellen gescannt. Beide Scans arbeiten identisch."],
-      ["Zeitfenster je Quelle", "Für jede aktive Quelle wird ein „von – bis“-Fenster nach dem VERKÜNDUNGSDATUM des Akts berechnet: „von“ = letzte Prüfung dieser Quelle (Feld „Zuletzt geprüft“), „bis“ = heute. Eine erstmals geprüfte Quelle erhält „von“ = 1. Januar des laufenden Jahres. Eigene Daten in „Von / Bis“ ersetzen dieses Fenster für alle Quellen in diesem einen Scan."],
-      ["Abfragen an die Sejm-API", "Je Quelle gehen 1–2 Anfragen an api.sejm.gov.pl/eli/acts/search: nach Schlagwort (Parameter keyword — das offizielle, von der Sejm-Bibliothek vergebene Schlagwort) und/oder nach Titelfragment (Parameter title). Immer mit Register (publisher=DU oder MP), Zeitfenster (dateFrom/dateTo) und Limit 100. Der Text der Akte wird weder geladen noch gelesen."],
+      ["Zeitfenster je Quelle", "Für jede aktive Quelle wird ein „von – bis“-Fenster nach dem VERKÜNDUNGSDATUM des Akts in Dz.U./M.P. (nicht nach Unterzeichnung) berechnet: „von“ = letzte Prüfung dieser Quelle (Feld „Zuletzt geprüft“) minus 7 Tage Puffer für die Verzögerung der ELI-Datenbank, „bis“ = heute. Eine Quelle mit Scan-Fehler behält ihr „Zuletzt geprüft“, der nächste Scan wiederholt ihr Fenster. Eine erstmals geprüfte Quelle erhält „von“ = 1. Januar des laufenden Jahres. Eigene Daten in „Von / Bis“ ersetzen dieses Fenster für alle Quellen in diesem einen Scan."],
+      ["Abfragen an die Sejm-API", "Je Quelle gehen 1–2 Anfragen an api.sejm.gov.pl/eli/acts/search: nach Schlagwort (Parameter keyword — das offizielle, von der Sejm-Bibliothek vergebene Schlagwort) und/oder nach Titelfragment (Parameter title). Immer mit Register (publisher=DU oder MP), Fenster nach Verkündungsdatum (pubDateFrom/pubDateTo — nicht nach Unterzeichnung), 7 Tage hinter die letzte Prüfung zurück, seitenweise je 100 (bis 500; darüber zeigt die Quelle eine Warnung). Der Text der Akte wird weder geladen noch gelesen."],
       ["Antwort: Liste von Akten", "Die API liefert im Fenster verkündete Akte, die zur Abfrage passen. Je Akt speichern wir: Titel, ELI-Kennung, Fundstelle (Dz.U. Jahr Pos.), Verkündungsdatum, Aktart (Gesetz, Verordnung, Bekanntmachung …), Status laut ISAP, ob in Kraft, Inkrafttreten und letzte Änderung, soweit die API sie liefert."],
       ["Deduplizierung und Speichern", "Ein Akt wird an seiner ELI erkannt. Haben Schlagwort und Titel ihn beide gefunden, zwei Quellen, oder war er schon im vorigen Scan — kommt er nur einmal in den Verlauf. Quellenverlauf und neues „Zuletzt geprüft“ werden im Datenspeicher abgelegt. Schlägt das fehl, erscheint rot „Ergebnisse wurden NICHT gespeichert“."],
       ["Karte im Feed", "Jeder Verlaufseintrag = eine Karte unter „Rechtsänderungen“. Titel, Datum, Art und Aktstatus kommen 1:1 aus der API; das Rechtsgebiet stammt aus der Quellenkonfiguration (unsere Einordnung, nicht die des Sejm). Die Karte beginnt mit Prüfstatus „Neu“, weil sie noch niemand markiert hat."],
@@ -335,7 +335,7 @@ const HELP = {
     reviewStatusIntro: "Sagt, was IHR Team mit der Änderung gemacht hat. Das Tool ändert ihn nie von selbst.",
     reviewStatuses: [
       ["Neu", "Noch niemand hat diese Änderung markiert. Der einzige automatisch vergebene Status — und er bedeutet „ungeprüft“, nicht „wichtig“."],
-      ["In Prüfung", "Jemand analysiert die Änderung („Als geprüft markieren“ oder Sammelaktion)."],
+      ["In Prüfung", "Jemand analysiert die Änderung („Prüfung starten“ oder Sammelaktion)."],
       ["Dringend", "Das Team hält sofortiges Handeln für nötig. Erscheint zusammen mit „Neu“ in den Benachrichtigungen."],
       ["Umgesetzt", "Abgeschlossen — Maßnahmen erledigt oder als nicht einschlägig bewertet. Verlässt die Neu-Liste; die KPI „Umgesetzt diesen Monat“ zählt das Markierungsdatum."],
     ],
@@ -354,7 +354,7 @@ const HELP = {
     autoTitle: "Automatisch gescannt",
     manualTitle: "Außerhalb des automatischen Scans (manuelle Prüfung)",
     manualIntro: "Diese Quellen deckt die Sejm-API nicht ab. Sie sind aufgeführt, damit die Lücke sichtbar ist; der empfohlene Rhythmus stammt aus dem Anforderungsdokument.",
-    colSource: "Quelle", colMatch: "Treffer", colRegister: "Register", colDefault: "Standard", colCadence: "Rhythmus", colWhy: "Warum manuell",
+    colSource: "Quelle", colMatch: "Treffer", colRegister: "Register", colDefault: "Status", colCadence: "Rhythmus", colWhy: "Warum manuell",
     on: "ein", off: "aus",
     selectionTitle: "Wie Akte und Schlagwörter ausgewählt wurden",
     selectionIntro: "Die Quellenliste ist nicht automatisch — sie ist eine redaktionelle Entscheidung auf Basis des Anforderungsdokuments für Recht und Compliance (Abschnitte: Grundlagen, Streitigkeiten, Gesellschaftsrecht, Steuern, Arbeitsrecht, Wettbewerb, Daten, IP, Produkt, Vergabe, Immobilien, AML/Sanktionen/ESG). Jeder Akt dieser Liste, der im Dz.U. oder M.P. erscheint, hat eine Quelle. Die Trefferart wurde nach diesen Regeln gewählt:",
@@ -374,7 +374,7 @@ const HELP = {
     addTitle: "Kann man eigene Quellen hinzufügen? Ja — abteilungsweit gemeinsam",
     addSteps: [
       ["„Überwachte Quellen“ → „Neue Quelle“", "Das Formular steht über der Liste. Eine neue Quelle wird auf dem Server gespeichert und ab dem nächsten Scan (manuell oder nächtlich) wie jede andere behandelt — alle in der Abteilung sehen sie."],
-      ["Register wählen", "Gesetzblatt (Gesetze, Verordnungen, konsolidierte Fassungen), Monitor Polski (Bekanntmachungen), Sejm (Gesetzentwürfe — nur „Titel enthält“) oder SAOS (Rechtsprechung — dann auch Gericht und Entscheidungsart wählen)."],
+      ["Register wählen", "Gesetzblatt (Gesetze, Verordnungen, konsolidierte Fassungen), Monitor Polski (Bekanntmachungen), Sejm (Gesetzentwürfe — nur „Titel enthält“), EUR-Lex (EU-Recht und Kommissionsvorschläge — polnisches Titelfragment) oder SAOS (Urteile ordentlicher Gerichte — dann auch die Entscheidungsart wählen)."],
       ["Trefferart wählen und Begriff eingeben", "„Titel enthält“ — Fragment des amtlichen Titels dekliniert wie in ISAP (z. B. „o prawach konsumenta“). „Sejm-Schlagwort“ — beim Tippen erscheinen passende Thesaurus-Einträge; einen wählen. In SAOS: „zitierter Akt enthält“ (z. B. „Kodeks cywilny“) oder „Phrase im Text“."],
       ["Name und Bereich vergeben", "Der Name erscheint im Feed bei jeder erkannten Änderung. Der Bereich dient dem Filtern."],
       ["Prüfen, ob die Quelle funktioniert", "„Suchumfang“ aufklappen: genaue Abfrage („Abfrage öffnen…“ zeigt die Rohantwort) und Schlagwort-Markierung. Dann „Jetzt prüfen“ mit Zeitraum, z. B. ab 1. Januar — wurde der Akt in dieser Zeit novelliert, sollte er erscheinen. Erscheint nichts, Abfrage öffnen und beurteilen: keine Verkündung oder falsches Fragment."],
@@ -393,7 +393,7 @@ const HELP = {
       ["Quelle hinzufügen", "„Überwachte Quellen“ → „Neue Quelle“ → Register „Sejm — Gesetzentwürfe“. Es gibt einen Modus: „Titel enthält“."],
       ["Phrase aus dem Titel eingeben", "Fragment des Entwurfstitels genau so dekliniert wie im Titel. Groß-/Kleinschreibung egal."],
       ["Name und Bereich vergeben, speichern", "Der Name steht an jedem Eintrag, den diese Quelle findet."],
-      ["„Jetzt prüfen“ klicken", "Der erste Scan reicht bis zum 1. Januar des laufenden Jahres. Danach wird die Quelle täglich gegen 06:00 geprüft."],
+      ["„Jetzt prüfen“ klicken", "Der erste Scan reicht bis zum 1. Januar des laufenden Jahres. Danach wird die Quelle täglich um 04:00 UTC geprüft (06:00 im Sommer, 05:00 im Winter)."],
     ],
     billsPhrasesTitle: "Die Phrase wählen",
     billsPhrases: [
@@ -443,7 +443,7 @@ const td = { fontSize: 12.5, color: "var(--text-body)", padding: "8px 10px", bor
 
 // setActive (from App.jsx) is used by the header button that opens the
 // "Funkcje aplikacji" overview — the short what-is-where companion of this guide.
-export function Help({ lang, ws, setActive }) {
+export function Help({ lang, ws, setActive, sources }) {
   const t = tFor(lang, ws);
   React.useEffect(() => {
     let anchor = null;
@@ -451,11 +451,21 @@ export function Help({ lang, ws, setActive }) {
     if (anchor) setTimeout(() => { const el = document.getElementById(anchor); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 150);
   }, []);
   const h = HELP[lang] || HELP.pl;
-  const auto = ws.sources.filter((s) => !isManualSource(s));
-  const manual = ws.sources.filter(isManualSource);
+  // Live config (AppShell's sources: incl. custom sources and the current
+  // on/off switches) — that is what the scanner really reads. The static
+  // ws.sources defaults only stand in while the state hasn't loaded.
+  const cfg = sources && sources.length ? sources : ws.sources;
+  const auto = cfg.filter((s) => !isManualSource(s));
+  const manual = cfg.filter(isManualSource);
   const areas = Object.keys(ws.areas);
   const byArea = areas.map((a) => [a, auto.filter((s) => s.area === a)]).filter(([, list]) => list.length);
-  const matchLabel = (s) => [s.keyword ? `${t.scopeMatchKeyword} „${s.keyword}”` : null, s.title ? `${t.scopeMatchTitle} „${s.title}”` : null].filter(Boolean);
+  const matchLabel = (s) => [
+    s.keyword ? `${t.scopeMatchKeyword} „${s.keyword}”` : null,
+    s.title ? `${t.scopeMatchTitle} „${s.title}”` : null,
+    s.referencedRegulation ? `${t.saos.matchReferenced} „${s.referencedRegulation}”` : null,
+    s.phrase ? `${t.saos.matchPhrase} „${s.phrase}”` : null,
+  ].filter(Boolean);
+  const registerLabel = (s) => ({ SEJM: t.sejm.registerShort, EURLEX: t.eu.registerShort, SAOS: t.saos.registerShort }[s.register] || (s.publisher === "MP" ? "M.P." : "Dz.U."));
 
   const toc = [["how", h.howTitle], ["works", h.howWorksTitle], ["pipeline", h.pipelineTitle], ["statuses", h.twoStatusesTitle], ["selection", h.selectionTitle], ["add-source", h.addTitle], ["bills", h.billsTitle], ["sources", h.sourcesTitle], ["faq", h.faqTitle]];
   const [activeId, setActiveId] = React.useState("how");
@@ -566,7 +576,7 @@ export function Help({ lang, ws, setActive }) {
                     <tr key={s.id}>
                       <td style={{ ...td, fontWeight: 600, color: "var(--text-heading)" }}>{s.name}</td>
                       <td style={td}>{matchLabel(s).map((m, i) => <div key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 11.5 }}>{m}</div>)}</td>
-                      <td style={td}>{s.publisher === "MP" ? "M.P." : "Dz.U."}</td>
+                      <td style={td}>{registerLabel(s)}</td>
                       <td style={td}><Badge tone={s.active === false ? "neutral" : "green"}>{s.active === false ? h.off : h.on}</Badge></td>
                     </tr>
                   ))}

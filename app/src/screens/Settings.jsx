@@ -5,7 +5,7 @@
 // recipients live in Vercel env vars (api/_mail.js), so nobody with the link
 // can redirect the mails. It can send one test mail (rate-limited server-side).
 import React from "react";
-import { Card, Avatar, Select, Switch, Badge, Icon, Button } from "../components/index.js";
+import { Card, Select, Badge, Icon, Button } from "../components/index.js";
 import { tFor, ACCENTS, WORKSPACES, THEMES, THEME_ICON, ACCENT_SWATCH as SWATCH } from "../workspaces.js";
 import { sendTestMail } from "../isapIntegration.js";
 
@@ -91,10 +91,12 @@ export function Settings({ lang, ws, setLang, appearance, backend, notify, setNo
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
       <Card padding="lg">
         <div style={{ display: "flex", alignItems: "center", gap: 16, paddingBottom: 18, borderBottom: "1px solid var(--border-subtle)" }}>
-          <Avatar name={tRoot.persona} size="lg" tone={1} />
+          {/* Workspace card, not a user profile: there are no accounts, so an
+              avatar with a job title read as a logged-in person who doesn't exist. */}
+          <span style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--brand-soft)", color: "var(--on-brand-soft)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 44px" }}><Icon name={ws.icon} size={20} /></span>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-heading)", fontFamily: "var(--font-display)" }}>{tRoot.persona}</div>
-            <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>{tRoot.app}</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-heading)", fontFamily: "var(--font-display)" }}>{tRoot.app}</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>{tRoot.product}</div>
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>

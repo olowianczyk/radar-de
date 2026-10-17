@@ -10,13 +10,14 @@
 //
 const SEJM_SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
 const SAOS_SEARCH_URL = "https://www.saos.org.pl/api/search/judgments";
-export const SAOS_LOOKBACK_DAYS = 60;
+// Days every incremental scan reaches back behind lastChecked, per register —
+// mirrors api/_lib.js LOOKBACK_DAYS (reasons documented there).
+export const LOOKBACK_DAYS = { ELI: 7, SEJM: 7, SAOS: 180, EURLEX: 180 };
 // Sejm bills in progress — mirrors api/_lib.js SEJM_API (term 10).
 const SEJM_PROCESSES_URL = "https://api.sejm.gov.pl/sejm/term10/processes";
 // EUR-Lex (Cellar SPARQL) — mirrors api/_lib.js EURLEX_* constants. Kept in
 // sync by scripts/check-eurlex.mjs, which compares both query builders.
 const EURLEX_SPARQL = "https://publications.europa.eu/webapi/rdf/sparql";
-export const EURLEX_LOOKBACK_DAYS = 60;
 const EURLEX_RT = "http://publications.europa.eu/resource/authority/resource-type/";
 const EURLEX_TYPES = ["DIR", "REG", "DIR_IMPL", "REG_IMPL", "DIR_DEL", "REG_DEL", "CORRIGENDUM", "PROP_DIR", "PROP_REG"];
 
@@ -177,8 +178,9 @@ export function sourceQueryUrl(source, dateFrom, dateTo, mode) {
   const params = new URLSearchParams({ publisher: source.publisher === "MP" ? "MP" : "DU", limit: "100" });
   const m = mode || (source.keyword ? "keyword" : "title");
   params.set(m, m === "keyword" ? source.keyword : source.title);
-  if (dateFrom) params.set("dateFrom", dateFrom);
-  if (dateTo) params.set("dateTo", dateTo);
+  // Publication-date window, as the backend (see buildSearchParams in _lib.js).
+  if (dateFrom) params.set("pubDateFrom", dateFrom);
+  if (dateTo) params.set("pubDateTo", dateTo);
   return `${SEJM_SEARCH_URL}?${params.toString()}`;
 }
 
@@ -215,17 +217,14 @@ export function isoToday() {
 }
 
 // What the NEXT incremental scan of this source will cover — mirrors the
-// backend's fallback chain (lastChecked → start of year).
+// backend's fallback chain (lastChecked → start of year) minus the lookback.
 export function nextScanRange(source) {
   const datePart = (source.lastChecked || "").split(" ")[0];
   const [d, m, y] = datePart.split(".").map(Number);
   let from = d ? `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : `${new Date().getFullYear()}-01-01`;
   const first = !d;
-  // SAOS sources look back behind the incremental window (publication lag).
-  // SAOS and EUR-Lex sources look back behind the incremental window
-  // (publication / translation lag).
-  const back = source.register === "SAOS" ? SAOS_LOOKBACK_DAYS : source.register === "EURLEX" ? EURLEX_LOOKBACK_DAYS : 0;
-  if (back) {
+  const back = LOOKBACK_DAYS[["SAOS", "SEJM", "EURLEX"].includes(source.register) ? source.register : "ELI"];
+  if (back && !first) {
     const dt = new Date(`${from}T00:00:00Z`); dt.setUTCDate(dt.getUTCDate() - back); from = dt.toISOString().slice(0, 10);
   }
   return { from, to: isoToday(), first };
@@ -280,9 +279,12 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
         // (saos.org.pl/api/judgments/{id}); rewrite it to the human page
         // (saos.org.pl/judgments/{id}) so old feed entries open correctly too.
         source: (e.url || source.url || "").replace("saos.org.pl/api/judgments/", "saos.org.pl/judgments/"),
+        // true only when the link points at THIS entry — the source.url fallback
+        // is shared by every entry of the source, so it can't identify one (see
+        // isSavedKb in LegalChanges.jsx).
+        ownUrl: !!e.url,
         title: { pl: e.note, de: e.note, en: e.note },
         summary: isJudgment ? { pl: e.excerpt || "", de: e.excerpt || "", en: e.excerpt || "" } : isBill ? { pl: e.description || "", de: e.description || "", en: e.description || "" } : summary,
-        affected: [],
         matchedBy: (() => {
           // `via` is recorded by the backend since the multi-query engine;
           // older history entries fall back to the source's first query.

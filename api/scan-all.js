@@ -82,9 +82,15 @@ async function scanWorkspace(ws, sources, range) {
   // instead of dropping their lastChecked.
   const untouched = prev.sources.filter((p) => !results.some((r) => r.id === p.id));
   const fresh = [];
+  const history = mergeHistory(prev.history, results, fresh);
+  // `found` = matches in the scanned window (incl. ones already in history —
+  // every scan looks back, see LOOKBACK_DAYS in _lib.js); `fresh` = really new.
+  results.forEach((r) => { r.fresh = fresh.filter((f) => f.sourceId === r.id).length; });
   const next = {
-    sources: [...untouched, ...results.map((r) => ({ id: r.id, lastChecked: r.lastChecked, found: r.found, ...(r.freshness ? { freshness: r.freshness } : {}) }))],
-    history: mergeHistory(prev.history, results, fresh),
+    // error / truncated are persisted too, so a failure in the nightly cron is
+    // visible in the UI next morning — not only to whoever clicked "Sprawdź teraz".
+    sources: [...untouched, ...results.map((r) => ({ id: r.id, lastChecked: r.lastChecked, found: r.found, ...(r.error ? { error: r.error } : {}), ...(r.truncated ? { truncated: true } : {}), ...(r.freshness ? { freshness: r.freshness } : {}) }))],
+    history,
     lastRun,
   };
   let persisted = false;
@@ -156,7 +162,7 @@ module.exports = async (req, res) => {
       run.mail = await sendDigest(ws);
       runs.push(run);
     }
-    res.status(200).json({ runs: runs.map((r) => ({ workspace: r.workspace, lastRun: r.lastRun, persisted: r.persisted, persistError: r.persistError, found: r.results.reduce((n, x) => n + (x.found || 0), 0), errors: r.results.filter((x) => x.error).length, mail: r.mail })) });
+    res.status(200).json({ runs: runs.map((r) => ({ workspace: r.workspace, lastRun: r.lastRun, persisted: r.persisted, persistError: r.persistError, found: r.results.reduce((n, x) => n + (x.found || 0), 0), fresh: r.results.reduce((n, x) => n + (x.fresh || 0), 0), errors: r.results.filter((x) => x.error).length, mail: r.mail })) });
   } catch (e) {
     sendError(res, e);
   }

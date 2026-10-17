@@ -8,8 +8,8 @@
 // source it says why it isn't scanned and how often to review it.
 import React from "react";
 import { Card, Badge, Switch, Icon, Button, IconButton, Input, Select, Hint } from "../components/index.js";
-import { tFor, isManualSource, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES } from "../workspaces.js";
-import { fetchKeywords, sourceQueryUrl, sourceQueries, nextScanRange } from "../isapIntegration.js";
+import { tFor, isManualSource, SAOS_JUDGMENT_TYPES } from "../workspaces.js";
+import { fetchKeywords, sourceQueryUrl, sourceQueries, nextScanRange, LOOKBACK_DAYS } from "../isapIntegration.js";
 import { CoverageCard } from "../components/CoverageCard.jsx";
 import { ScanPeriod } from "../components/ScanPeriod.jsx";
 
@@ -123,7 +123,9 @@ function ScopePanel({ source, lang, t, thesaurus }) {
         </ScopeRow>
         <ScopeRow label={t.scopeNext}>
           {range.first ? t.scopeSinceYearStart.replace("{y}", range.from.slice(0, 4)) : t.scopeSinceLast.replace("{d}", fmtIso(range.from, lang))}
-          {source.register === "SAOS" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.saos.lookback.replace("{n}", "60")}</div>}
+          {/* The "from" date above already includes the lookback; these say why. */}
+          {!range.first && !["SAOS", "SEJM", "EURLEX"].includes(source.register) && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.eliLookback.replace("{n}", String(LOOKBACK_DAYS.ELI))}</div>}
+          {source.register === "SAOS" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.saos.lookback.replace("{n}", String(LOOKBACK_DAYS.SAOS))}</div>}
           {source.register === "SEJM" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.sejm.lookback}</div>}
           {source.register === "EURLEX" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.eu.lookback}</div>}
         </ScopeRow>
@@ -184,7 +186,10 @@ function AddSourceForm({ t, ws, onAdd, onCancel, thesaurus }) {
   const [mode, setMode] = React.useState("title");
   const [term, setTerm] = React.useState("");
   const [publisher, setPublisher] = React.useState("DU");
-  const [courtType, setCourtType] = React.useState("SUPREME");
+  // Only COMMON courts: SAOS stopped updating SN/TK/KIO/NSA (see COVERAGE in
+  // api/_lib.js), so a new monitored source on those would never find anything.
+  // ponytail: single option kept as a Select so the field still explains itself.
+  const [courtType, setCourtType] = React.useState("COMMON");
   const [judgmentType, setJudgmentType] = React.useState("");
   const [area, setArea] = React.useState("other");
   const isSaos = publisher === "SAOS";
@@ -208,7 +213,7 @@ function AddSourceForm({ t, ws, onAdd, onCancel, thesaurus }) {
           </div>
           {isSaos && (
             <>
-              <div style={{ width: 220 }}><Select label={<>{t.saos.court}<Hint text={t.hints.court} /></>} value={courtType} onChange={(e) => setCourtType(e.target.value)} options={SAOS_COURT_TYPES.map((c) => ({ value: c, label: t.saos.courts[c] }))} /></div>
+              <div style={{ width: 220 }}><Select label={<>{t.saos.court}<Hint text={t.hints.court} /></>} value={courtType} onChange={(e) => setCourtType(e.target.value)} options={[{ value: "COMMON", label: t.saos.courts.COMMON }]} /></div>
               <div style={{ width: 180 }}><Select label={<>{t.saos.judgmentTypes}<Hint text={t.hints.judgmentType} /></>} value={judgmentType} onChange={(e) => setJudgmentType(e.target.value)} options={[{ value: "", label: t.saos.allTypes }, ...SAOS_JUDGMENT_TYPES.map((j) => ({ value: j, label: t.saos.types[j] }))]} /></div>
             </>
           )}
@@ -302,7 +307,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
   const areaOrder = Object.keys(ws.areas);
   auto.sort((a, b) => areaOrder.indexOf(a.area) - areaOrder.indexOf(b.area));
   const counts = { all: allAuto.length, DU: allAuto.filter((s) => s.register !== "SAOS" && s.register !== "SEJM" && s.register !== "EURLEX" && s.publisher !== "MP").length, EURLEX: allAuto.filter((s) => s.register === "EURLEX").length, SEJM: allAuto.filter((s) => s.register === "SEJM").length, MP: allAuto.filter((s) => s.publisher === "MP").length, SAOS: allAuto.filter((s) => s.register === "SAOS").length, off: allAuto.filter((s) => !s.active).length, errors: allAuto.filter((s) => s.error).length };
-  const stripeFor = (s) => (s.register === "SAOS" ? "var(--info-600)" : s.register === "SEJM" ? "var(--amber-600)" : s.register === "EURLEX" ? "var(--green-700)" : s.publisher === "MP" ? "var(--warning-500)" : "var(--brand)");
+  const stripeFor = (s) => (s.register === "SAOS" ? "var(--info-600)" : s.register === "SEJM" ? "var(--warning-700)" : s.register === "EURLEX" ? "var(--success-600)" : s.publisher === "MP" ? "var(--warning-500)" : "var(--brand)");
 
   const addSource = ({ name, mode, term, publisher, courtType, judgmentType, area }) => {
     const id = Math.max(1000, ...auto.map((s) => s.id)) + 1;
@@ -382,6 +387,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
                     <span>· {t.lastChecked}: {s.lastChecked || "—"}</span>
                   </div>
                   {s.error && <div style={{ fontSize: 11.5, color: "var(--danger-600)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{s.error}</div>}
+                  {s.truncated && <div style={{ fontSize: 11.5, color: "var(--warning-700)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{t.truncated}</div>}
                 </div>
                 {s.register !== "SAOS" && <Badge tone="neutral">{s.type}</Badge>}
                 <div style={{ minWidth: 90, textAlign: "center" }}>

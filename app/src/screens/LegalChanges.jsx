@@ -2,7 +2,6 @@
 import React from "react";
 import { Card, StatCard, StatusPill, Badge, Button, Input, Tabs, Icon, Select, Checkbox, Hint } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
-import { HRBP_STATUS_MAP } from "../data.js";
 import { tFor, areaTone, isManualSource } from "../workspaces.js";
 import { latestIsapCheck } from "../isapIntegration.js";
 import { CoverageCard } from "../components/CoverageCard.jsx";
@@ -37,9 +36,13 @@ function ScanBanner({ t, backend, sources, scanning, runScan, scanFrom, setScanF
         <span style={{ fontWeight: 600, color: "var(--text-heading)" }}>{t.monitoring}</span>
         <span style={{ color: "var(--text-muted)" }}>{t.autoScan}</span>
         <span style={{ color: "var(--text-muted)" }}>· {t.lastChecked.toLowerCase()}: <strong style={{ color: "var(--text-heading)", fontWeight: 600 }}>{latestIsapCheck(sources) || "—"}</strong></span>
-        {lastScanFound != null && !scanning && <span style={{ fontWeight: 600, color: "var(--success-600)" }}>· {t.scanDone} ({lastScanFound})</span>}
+        {lastScanFound != null && !scanning && <span style={{ fontWeight: 600, color: "var(--success-600)" }}>· {t.scanDone} ({t.freshCount.replace("{n}", String(lastScanFound))})</span>}
       </div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", flex: "0 0 auto" }}>
+      {/* flex-shrink 1 + minWidth 0: on a phone the controls (period select +
+          two dates + button ≈ 670px) must shrink to the card width and wrap
+          inside; with "0 0 auto" they kept their full width and the card's
+          overflow:hidden cut off "Do dnia" and "Sprawdź teraz". */}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", flex: "0 1 auto", minWidth: 0 }}>
         <ScanPeriod t={t} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} />
         <Button variant="primary" disabled={scanning || backend === "down"} onClick={() => runScan()} iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={15} className={scanning ? "hrbp-spin" : ""} />} style={{ marginBottom: 1 }}>
           {scanning ? t.scanning : t.checkNow}
@@ -84,7 +87,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
   const [savingKb, setSavingKb] = React.useState(false);
   const [saveKbErr, setSaveKbErr] = React.useState(null);
   const canSaveKb = backend === "ok" && typeof addKb === "function";
-  const isSavedKb = (c) => !!c.source && (kbDocs || []).some((d) => (d.body || "").includes(c.source));
+  const isSavedKb = (c) => c.ownUrl && !!c.source && (kbDocs || []).some((d) => (d.body || "").includes(c.source));
   const saveChangeToKb = (c) => {
     if (savingKb) return;
     const body = [
@@ -100,17 +103,18 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
       .finally(() => setSavingKb(false));
   };
   const newCount = changes.filter((c) => c.status === "new").length;
-  const pendingCount = changes.filter((c) => c.status === "progress" || c.status === "waiting").length;
+  const pendingCount = changes.filter((c) => c.status === "progress").length;
   const doneCount = changes.filter((c) => c.status === "done").length;
   const thisMonth = new Date().toISOString().slice(0, 7);
   const doneThisMonth = changes.filter((c) => c.status === "done" && (c.statusTs || "").startsWith(thisMonth)).length;
   // print.html is a separate static page — hand it the rows via localStorage
   // (real scan data lives only in React state, not in any static file).
   const openPrint = (rows) => {
-    // Area labels are workspace-specific, so resolve them here — print.html only
-    // has the shared dictionary.
-    const printable = rows.map((c) => ({ ...c, areaLabel: t.area[c.area] || t.area.other, product: t.product, wsLabel: t.wsLabel, appTitle: t.app }));
-    try { localStorage.setItem("hrbp-print", JSON.stringify(printable)); } catch (e) {}
+    // print.html has NO dictionary of its own (it used to load a stale demo copy,
+    // print-data.js) — every label is resolved here from the app's real one.
+    const printable = rows.map((c) => ({ ...c, areaLabel: t.area[c.area] || t.area.other, areaTone: areaTone(ws, c.area), statusLabel: t.st[c.status] || "" }));
+    const labels = { product: t.product, wsLabel: t.wsLabel, appTitle: t.app, published: t.published, effective: t.effective, source: t.source, empty: t.feedEmptyTitle };
+    try { localStorage.setItem("hrbp-print", JSON.stringify({ labels, rows: printable })); } catch (e) {}
     window.open(`${printBase || "print.html"}?lang=${lang}`, "_blank");
   };
   const exportPdf = () => openPrint(filtered);
@@ -219,7 +223,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                       <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14, lineHeight: 1.35, minWidth: 0 }}>{c.title[lang]}</div>
-                      <StatusPill status={HRBP_STATUS_MAP[c.status]} lang={lang} label={t.st[c.status]} style={{ flex: "0 0 auto" }} />
+                      <StatusPill status={c.status} lang={lang} label={t.st[c.status]} style={{ flex: "0 0 auto" }} />
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>{c.act}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
@@ -251,7 +255,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                   <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{sel.act}</div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                  <StatusPill status={HRBP_STATUS_MAP[sel.status]} lang={lang} label={t.st[sel.status]} />
+                  <StatusPill status={sel.status} lang={lang} label={t.st[sel.status]} />
                   <span style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{t.reviewStatus}<Hint text={t.hints.reviewStatus} size={11} /></span>
                 </div>
               </div>
@@ -271,7 +275,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                   <Meta label={t.saos.judgmentTypes} value={t.saos.types[sel.judgment.judgmentType] || sel.judgment.judgmentType || t.noData} small />
                   <Meta label={t.saos.judgmentDate} value={sel.date} small />
                 </div>
-                {sel.judgment.excerpt && <div style={{ fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.55 }}><span style={{ fontWeight: 600, color: "var(--text-heading)" }}>{t.saos.excerpt}: </span>{sel.judgment.excerpt}…</div>}
+                {sel.judgment.excerpt && <div style={{ fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.55 }}><span style={{ fontWeight: 600, color: "var(--text-heading)" }}>{t.saos.excerpt}: </span>{sel.judgment.excerpt}{sel.judgment.excerpt.length >= 400 ? "…" : ""}</div>}
                 {sel.judgment.keywords.length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{sel.judgment.keywords.map((k) => <Badge key={k} tone="neutral">{k}</Badge>)}</div>}
                 <a href={sel.source} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="external-link" size={12} />{t.saos.openSaos}</a>
               </div>

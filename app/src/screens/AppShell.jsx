@@ -1,7 +1,7 @@
 // AppShell — sidebar (with department switcher) + top bar + PL/DE/EN language
 // switcher. Composes SidebarNav. Mounted once per workspace (see App.jsx key=).
 import React from "react";
-import { SidebarNav, IconButton, Avatar, Icon, Badge } from "../components/index.js";
+import { SidebarNav, IconButton, Icon, Badge } from "../components/index.js";
 import { LoadingState } from "../components/Loading.jsx";
 import { RadarMark } from "../components/RadarMark.jsx";
 import { WORKSPACES, ACCENTS, ACCENT_SWATCH, THEMES, THEME_ICON, initialSources, isManualSource, tFor } from "../workspaces.js";
@@ -282,7 +282,7 @@ function applyConfig(ws, base, config) {
   return [...fromCatalogue, ...extra];
 }
 
-export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, children, onSelectChange, onSelectKb }) {
+export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, children, onSelectChange }) {
   const isMobile = useIsMobile();
   const appearance = useAppearance(ws);
   const { dark, setDark } = appearance;
@@ -342,7 +342,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
       if (!state.storage) setNotice({ tone: "error", text: t.notice.storage });
       setSourcesRaw((prev) => applyConfig(ws, prev, state.config).map((s) => {
         const p = (state.sources || []).find((x) => x.id === s.id);
-        return p ? { ...s, lastChecked: p.lastChecked, found: p.found, freshness: p.freshness || null } : s;
+        return p ? { ...s, lastChecked: p.lastChecked, found: p.found, error: p.error || null, truncated: !!p.truncated, freshness: p.freshness || null } : s;
       }));
       setSourceHistory(state.history || {});
       setStatusMap(state.triage || {});
@@ -388,12 +388,15 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
     const scanned = sources.filter((s) => s.active && !isManualSource(s));
     forceScan(ws.id, scanned, range).then((data) => {
       const results = data.results || [];
+      // found = matches in the window (scans look back, so it includes known
+      // ones); fresh = not seen before (counted server-side against history).
       const found = results.reduce((n, r) => n + (r.found || 0), 0);
+      const freshN = results.reduce((n, r) => n + (r.fresh || 0), 0);
       const errored = results.filter((r) => r.error).length;
-      setLastScanFound(found);
+      setLastScanFound(freshN);
       setSourcesRaw((prev) => prev.map((s) => {
         const r = results.find((x) => x.id === s.id);
-        return r ? { ...s, lastChecked: r.lastChecked, found: r.found, error: r.error || null, freshness: r.freshness || s.freshness } : s;
+        return r ? { ...s, lastChecked: r.lastChecked, found: r.found, error: r.error || null, truncated: !!r.truncated, freshness: r.freshness || s.freshness } : s;
       }));
       setSourceHistory((prev) => {
         const next = { ...prev };
@@ -407,7 +410,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
         });
         return next;
       });
-      const fmt = (s) => s.replace("{found}", String(found)).replace("{n}", String(errored || scanned.length));
+      const fmt = (s) => s.replace("{found}", String(found)).replace("{fresh}", String(freshN)).replace("{n}", String(errored || scanned.length));
       if (!data.persisted) setNotice({ tone: "error", text: fmt(t.notice.scanNotPersisted), detail: data.persistError === "storage_unavailable" ? t.notice.storage : data.persistError });
       else if (errored === results.length) setNotice({ tone: "error", text: t.notice.scanFailed, detail: results[0] && results[0].error });
       else if (errored) setNotice({ tone: "warn", text: fmt(t.notice.scanPartial) });
@@ -428,15 +431,16 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
   }, [notifOpen]);
   const changes = React.useMemo(() => buildChangesFromHistory(sourceHistory, sources, statusMap), [sourceHistory, sources, statusMap]);
   const notifChanges = changes.filter((c) => c.status === "new" || c.status === "urgent");
-  const notifKb = kbDocs.filter((k) => k.needsUpdate);
-  const notifTotal = notifChanges.length + notifKb.length;
+  // Notifications = new/urgent detections only. (A KB "needs update" branch used
+  // to live here, but nothing ever sets needsUpdate on a KB doc — removed.)
+  const notifTotal = notifChanges.length;
   const [readIds, setReadIds] = React.useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem(wsKey("hrbp-notifs-read", ws.id)) || "[]")); } catch (e) { return new Set(); }
   });
   const persistRead = (next) => { setReadIds(next); try { localStorage.setItem(wsKey("hrbp-notifs-read", ws.id), JSON.stringify([...next])); } catch (e) {} };
   const markRead = (key) => { if (readIds.has(key)) return; persistRead(new Set(readIds).add(key)); };
-  const markAllRead = () => { const next = new Set(readIds); notifChanges.forEach((c) => next.add(`c${c.id}`)); notifKb.forEach((k) => next.add(`k${k.id}`)); persistRead(next); };
-  const unreadTotal = notifChanges.filter((c) => !readIds.has(`c${c.id}`)).length + notifKb.filter((k) => !readIds.has(`k${k.id}`)).length;
+  const markAllRead = () => { const next = new Set(readIds); notifChanges.forEach((c) => next.add(`c${c.id}`)); persistRead(next); };
+  const unreadTotal = notifChanges.filter((c) => !readIds.has(`c${c.id}`)).length;
   const newCount = notifChanges.length;
   // The page (not <main>) scrolls on desktop, so a new screen would otherwise
   // open at the scroll position of the previous one — start every screen at the top.
@@ -462,9 +466,11 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
           header={<div><Wordmark t={t} /><WorkspaceSwitch ws={ws} setWorkspace={setWorkspace} lang={lang} t={t} /></div>}
           footer={
             <button onClick={() => setActive("settings")} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", border: "none", background: "transparent", cursor: "pointer", padding: 0, textAlign: "left" }}>
-              <Avatar name={t.persona} size="sm" tone={1} />
+              {/* No user accounts exist, so this is a plain link to Settings —
+                  not an avatar pretending to be a logged-in person. */}
+              <Icon name="settings" size={18} style={{ color: "var(--text-muted)", flex: "0 0 auto" }} />
               <div style={{ lineHeight: 1.2, overflow: "hidden" }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-heading)", whiteSpace: "nowrap" }}>{t.persona}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-heading)", whiteSpace: "nowrap" }}>{t.nav.settings}</div>
                 <div style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{t.wsLabel} · {t.app}</div>
               </div>
             </button>
@@ -481,10 +487,13 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
           <div style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: isMobile ? 13.5 : 15, color: "var(--text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {t.nav[active] || t.app}
           </div>
+          {/* Department pill. It used to show a job title ("HR Business Partner"),
+              which read as the signed-in user's role — there are no user accounts,
+              so it now names the department whose data is on screen. */}
           {!isMobile && (
             <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--brand)", background: "var(--brand-soft)", padding: "4px 10px", borderRadius: "var(--radius-pill)" }}>
               <Icon name={ws.icon} size={12} />
-              {t.persona}
+              {t.wsLabel}
             </span>
           )}
           <div style={{ flex: 1 }} />
@@ -528,18 +537,6 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 12.5, fontWeight: unread ? 700 : 600, color: "var(--text-heading)" }}>{c.title[lang]}</div>
                             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{c.act} · {c.date}</div>
-                          </div>
-                          {unread && <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--brand)", flex: "0 0 7px", marginTop: 4 }} />}
-                        </button>
-                      );})}
-                      {notifKb.map((k) => {
-                        const key = `k${k.id}`; const unread = !readIds.has(key);
-                        return (
-                        <button key={key} onClick={() => { markRead(key); onSelectKb ? onSelectKb(k.id) : setActive("kb"); setNotifOpen(false); }} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", border: "none", borderBottom: "1px solid var(--border-subtle)", background: unread ? "var(--brand-soft)" : "transparent", cursor: "pointer", textAlign: "left" }}>
-                          <Icon name="file-warning" size={15} style={{ color: "var(--amber-600)", flex: "0 0 auto", marginTop: 1 }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12.5, fontWeight: unread ? 700 : 600, color: "var(--text-heading)" }}>{k.title[lang]}</div>
-                            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{t.notifKbNeedsUpdate}</div>
                           </div>
                           {unread && <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--brand)", flex: "0 0 7px", marginTop: 4 }} />}
                         </button>

@@ -11,7 +11,7 @@ const KEYWORDS_URL = "https://api.sejm.gov.pl/eli/keywords";
 // SAOS — System Analizy Orzeczeń Sądowych (ICM UW): public JSON API, no key.
 // Docs: https://www.saos.org.pl/help/index.php/dokumentacja-api
 // Aggregates court portals with a publication delay, so every SAOS scan looks
-// back SAOS_LOOKBACK_DAYS behind the last check and relies on dedupe by id.
+// back LOOKBACK_DAYS.SAOS behind the last check and relies on dedupe by id.
 //
 // COVERAGE (measured live on 2026-10-16 — newest judgmentDate per courtType):
 //   COMMON                   current (judgments up to last week, ~1.5k/month)
@@ -28,7 +28,6 @@ const KEYWORDS_URL = "https://api.sejm.gov.pl/eli/keywords";
 // cap judgmentDateTo at today, or those records sort to the top.
 const SAOS_SEARCH_URL = "https://www.saos.org.pl/api/search/judgments";
 const SAOS_JUDGMENT_URL = "https://www.saos.org.pl/judgments/";
-const SAOS_LOOKBACK_DAYS = 60;
 const SAOS_COURT_TYPES = ["COMMON", "SUPREME", "ADMINISTRATIVE", "CONSTITUTIONAL_TRIBUNAL", "NATIONAL_APPEAL_CHAMBER"];
 const SAOS_JUDGMENT_TYPES = ["SENTENCE", "DECISION", "RESOLUTION", "REGULATION", "REASONS"];
 const FETCH_TIMEOUT_MS = 20000;
@@ -161,27 +160,56 @@ function sendError(res, e) {
 //   title   — substring match on the act's title. Catches amendments
 //             ("o zmianie ustawy – Kodeks spółek handlowych") and consolidated
 //             texts, which is what a legal team usually wants.
-// limit 100: broad terms ("czas pracy") can exceed 10 hits in a wide range;
-// 100 covers any realistic period without pagination.
+// Date window = PUBLICATION date in Dz.U./M.P. (pubDateFrom/pubDateTo), NOT
+// dateFrom/dateTo — those filter on the signing date (announcementDate). An act
+// signed 4.09 and published 15.10 (e.g. Dz.U. 2026 poz. 1340, measured
+// 10.2026) is invisible to a dateFrom window starting 10.10; for the week
+// 10–17.10.2026 dateFrom returned 7 acts, pubDateFrom 23. "New in the gazette"
+// is what a monitoring tool must report, so publication date it is.
+// Pages of ELI_PAGE (the API's max per call), at most ELI_MAX_PAGES per query;
+// past that the scan result is flagged `truncated` instead of silently cut.
 const PUBLISHERS = ["DU", "MP"];
+const ELI_PAGE = 100;
+const ELI_MAX_PAGES = 5;
 function normalizePublisher(p) {
   return PUBLISHERS.includes(p) ? p : "DU";
 }
 
-function buildSearchParams({ keyword, title, dateFrom, dateTo, publisher = "DU", limit = 100 }) {
+function buildSearchParams({ keyword, title, dateFrom, dateTo, publisher = "DU", limit = ELI_PAGE, offset = 0 }) {
   const params = new URLSearchParams({ publisher: normalizePublisher(publisher), limit: String(limit) });
+  if (offset) params.set("offset", String(offset));
   if (keyword) params.set("keyword", keyword);
   if (title) params.set("title", title);
-  if (dateFrom) params.set("dateFrom", dateFrom);
-  if (dateTo) params.set("dateTo", dateTo);
+  if (dateFrom) params.set("pubDateFrom", dateFrom);
+  if (dateTo) params.set("pubDateTo", dateTo);
   return params;
 }
 
-async function searchActs(opts) {
+// One ELI search call → { items, total } (total = the API's totalCount, all
+// matches across pages; null if the API ever stops sending it).
+async function searchActsPage(opts) {
   const res = await fetchWithTimeout(`${SEARCH_URL}?${buildSearchParams(opts).toString()}`);
   if (!res.ok) throw new Error(`Sejm API error ${res.status}`);
   const data = await res.json();
-  return data.items || [];
+  if (!data || !Array.isArray(data.items)) throw new Error("Sejm API: unexpected response shape (no items[])");
+  return { items: data.items, total: Number.isFinite(data.totalCount) ? data.totalCount : null };
+}
+
+// Single page — the ad-hoc /api/scan endpoint (it asks for ≤ 100 anyway).
+async function searchActs(opts) {
+  return (await searchActsPage(opts)).items;
+}
+
+// Scanner: every page of a query, up to ELI_MAX_PAGES. `truncated` = the API
+// reports more matches than we read (never silently dropped).
+async function searchAllActs(opts) {
+  const items = [];
+  for (let page = 0; page < ELI_MAX_PAGES; page++) {
+    const r = await searchActsPage({ ...opts, limit: ELI_PAGE, offset: page * ELI_PAGE });
+    items.push(...r.items);
+    if (r.items.length < ELI_PAGE || (r.total != null && items.length >= r.total)) return { items, truncated: false };
+  }
+  return { items, truncated: true };
 }
 
 // ---- SAOS (case law) ------------------------------------------------------
@@ -326,12 +354,14 @@ function shiftIsoDays(iso, days) {
   return d.toISOString().slice(0, 10);
 }
 
-async function scanSaosSource(s, dateFrom, dateTo, nowStr, forcedRange) {
-  // Look back behind the incremental window: judgments reach SAOS late.
-  const from = forcedRange ? dateFrom : shiftIsoDays(dateFrom, -SAOS_LOOKBACK_DAYS);
-  const opts = { courtType: s.courtType, judgmentTypes: s.judgmentTypes, referencedRegulation: s.referencedRegulation || undefined, phrase: s.phrase || undefined, dateFrom: from, dateTo };
-  const query = { mode: s.referencedRegulation ? "referencedRegulation" : "phrase", term: s.referencedRegulation || s.phrase, register: "SAOS", courtType: s.courtType, judgmentTypes: s.judgmentTypes || [], dateFrom: from, dateTo, lookbackDays: forcedRange ? 0 : SAOS_LOOKBACK_DAYS, url: `${SAOS_SEARCH_URL}?${buildSaosParams(opts).toString()}` };
-  const [latest, outcome] = await Promise.all([saosLatestFor(s.courtType), searchJudgments(opts).then((items) => ({ items })).catch((e) => ({ error: e.message }))]);
+// `dateFrom` already includes the lookback (see scanSources / LOOKBACK_DAYS).
+// ponytail: page 0 only (100 newest judgments in the window); a broader match
+// is flagged `truncated` from SAOS's own total. Page through it if users hit it
+// often — each SAOS phrase call takes ~14 s, so the cron's 60 s budget decides.
+async function scanSaosSource(s, dateFrom, dateTo, nowStr, lookbackDays) {
+  const opts = { courtType: s.courtType, judgmentTypes: s.judgmentTypes, referencedRegulation: s.referencedRegulation || undefined, phrase: s.phrase || undefined, dateFrom, dateTo };
+  const query = { mode: s.referencedRegulation ? "referencedRegulation" : "phrase", term: s.referencedRegulation || s.phrase, register: "SAOS", courtType: s.courtType, judgmentTypes: s.judgmentTypes || [], dateFrom, dateTo, lookbackDays, url: `${SAOS_SEARCH_URL}?${buildSaosParams(opts).toString()}` };
+  const [latest, outcome] = await Promise.all([saosLatestFor(s.courtType), searchJudgmentsPage(opts).catch((e) => ({ error: e.message }))]);
   const freshness = { courtType: s.courtType, latestJudgmentDate: latest, checkedOn: isoToday() };
   if (outcome.error) return { id: s.id, lastChecked: nowStr, found: 0, detected: [], error: outcome.error, queries: [query], query, freshness };
   const detected = outcome.items.map((j) => ({
@@ -352,7 +382,8 @@ async function scanSaosSource(s, dateFrom, dateTo, nowStr, forcedRange) {
     keywords: j.keywords,
     detectedOn: isoToday(),
   }));
-  return { id: s.id, lastChecked: nowStr, found: detected.length, detected, queries: [query], query, freshness };
+  const truncated = outcome.total != null && outcome.total > outcome.items.length;
+  return { id: s.id, lastChecked: nowStr, found: detected.length, detected, queries: [query], query, freshness, ...(truncated ? { truncated: true } : {}) };
 }
 
 // ---- Sejm (bills in progress — "Projekty w Sejmie") ---------------------------
@@ -409,9 +440,9 @@ function sejmCurrentStage(stages, dateTo) {
   return cur;
 }
 
-async function scanSejmSource(s, dateFrom, dateTo, nowStr) {
+async function scanSejmSource(s, dateFrom, dateTo, nowStr, lookbackDays) {
   const url = sejmListUrl(s.title);
-  const query = { mode: "title", term: s.title, register: "SEJM", dateFrom, dateTo, url };
+  const query = { mode: "title", term: s.title, register: "SEJM", dateFrom, dateTo, lookbackDays, url };
   let list;
   try {
     list = await sejmJson(url);
@@ -477,7 +508,7 @@ async function scanSejmSource(s, dateFrom, dateTo, nowStr) {
 //               EU law "w fazie projektu", months or years before it is adopted.
 // Dated by cdm:work_date_document (adoption / COM date). The Polish title only
 // appears once the act is published in the OJ or the proposal is translated —
-// days to weeks later — so like SAOS every scan looks back EURLEX_LOOKBACK_DAYS
+// days to weeks later — so like SAOS every scan looks back LOOKBACK_DAYS.EURLEX
 // and relies on dedupe by CELEX number.
 // The endpoint occasionally answers 502 for a single request — one retry.
 // ponytail: substring match on titles only (no EUROVOC descriptors, no
@@ -485,7 +516,6 @@ async function scanSejmSource(s, dateFrom, dateTo, nowStr) {
 // noisy or too narrow. Decisions (DEC, incl. CFSP sanctions decisions) are left
 // out — mostly appointments and international agreements.
 const EURLEX_SPARQL = "https://publications.europa.eu/webapi/rdf/sparql";
-const EURLEX_LOOKBACK_DAYS = 60;
 const EURLEX_RT = "http://publications.europa.eu/resource/authority/resource-type/";
 const EURLEX_ACT_TYPES = ["DIR", "REG", "DIR_IMPL", "REG_IMPL", "DIR_DEL", "REG_DEL", "CORRIGENDUM"];
 const EURLEX_PROPOSAL_TYPES = ["PROP_DIR", "PROP_REG"];
@@ -598,12 +628,11 @@ function eurlexEntries(bindings, todayIso) {
   });
 }
 
-async function scanEurlexSource(s, dateFrom, dateTo, nowStr, forcedRange) {
-  const from = forcedRange ? dateFrom : shiftIsoDays(dateFrom, -EURLEX_LOOKBACK_DAYS);
-  const sparql = eurlexQuery(eurlexFragments(s.title), from, dateTo);
+async function scanEurlexSource(s, dateFrom, dateTo, nowStr, lookbackDays) {
+  const sparql = eurlexQuery(eurlexFragments(s.title), dateFrom, dateTo);
   // Replayable in a browser: the endpoint renders an HTML table for format=text/html.
   const url = `${EURLEX_SPARQL}?${new URLSearchParams({ query: sparql, format: "text/html" }).toString()}`;
-  const query = { mode: "title", term: s.title, register: "EURLEX", dateFrom: from, dateTo, lookbackDays: forcedRange ? 0 : EURLEX_LOOKBACK_DAYS, url };
+  const query = { mode: "title", term: s.title, register: "EURLEX", dateFrom, dateTo, lookbackDays, url };
   try {
     const detected = eurlexEntries(await eurlexSparql(sparql), isoToday());
     return { id: s.id, lastChecked: nowStr, found: detected.length, detected, queries: [query], query };
@@ -611,6 +640,18 @@ async function scanEurlexSource(s, dateFrom, dateTo, nowStr, forcedRange) {
     return { id: s.id, lastChecked: nowStr, found: 0, detected: [], error: e.message, queries: [query], query };
   }
 }
+
+// How far every incremental scan reaches back behind the source's lastChecked
+// (a forced period scan uses exactly the picked dates). Re-found entries are
+// harmless: history and the digest dedupe them (scan-all.js mergeHistory).
+//   ELI    7 d — the ELI index lags publication by ~1 day; a missed cron or a
+//                late-indexed act must still be caught.
+//   SEJM   7 d — stage dates are entered after the fact (a committee sitting
+//                dated 10.10 can appear in the record on 12.10).
+//   SAOS 180 d — common courts keep sending judgments to SAOS for months.
+//   EURLEX 180 d — the Polish title (what we match on) appears weeks after
+//                the act's/proposal's date; SPARQL is cheap (≤ ~150 rows/year).
+const LOOKBACK_DAYS = { ELI: 7, SEJM: 7, SAOS: 180, EURLEX: 180 };
 
 // The official keyword thesaurus. Cached per function instance — it changes
 // rarely and is ~3k strings; the endpoint also sets a day-long CDN cache.
@@ -651,8 +692,8 @@ function formatNow() {
   return `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
 
-function formatDetectedTs(announcementDate) {
-  const [y, m, d] = (announcementDate || "").split("-");
+function formatDetectedTs(isoDate) {
+  const [y, m, d] = (isoDate || "").split("-");
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");
   return `${d}.${m}.${y} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -711,13 +752,69 @@ function isScannable(s) {
   return sourceQueries(s).length > 0;
 }
 
-// Runs one real scan per source against the live Sejm/ELI API. `sources` items
-// need { id, keyword|title, publisher?, lastChecked } (lastChecked in
-// "DD.MM.YYYY HH:MM" — from the frontend's real state) or just
-// { id, keyword|title } (cron path — falls back to start-of-year on a source's
-// very first run; subsequent runs use the persisted lastChecked). `range`, when
-// given ({from, to} as YYYY-MM-DD), overrides per-source lastChecked entirely —
-// a manual scan for a user-picked period.
+// One ELI (Dz.U./M.P.) source: its 1–2 queries, every page each, deduped by
+// ELI id across the queries.
+async function scanEliSource(s, qs, dateFrom, dateTo, nowStr, lookbackDays) {
+  const todayIso = isoToday();
+  const publisher = normalizePublisher(s.publisher);
+  const queries = qs.map((q) => {
+    const opts = { [q.mode]: q.term, publisher, dateFrom, dateTo };
+    return { ...q, publisher, dateFrom, dateTo, lookbackDays, url: `${SEARCH_URL}?${buildSearchParams(opts).toString()}` };
+  });
+  const detected = [];
+  const seen = new Set();
+  const errors = [];
+  let truncated = false;
+  for (const q of queries) {
+    try {
+      const r = await searchAllActs({ [q.mode]: q.term, publisher, dateFrom, dateTo });
+      if (r.truncated) truncated = true;
+      r.items.forEach((item) => {
+        const key = item.ELI || `${item.title}|${item.address}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        detected.push({
+          // Feed date = publication in the gazette (what the window filters
+          // on); signing date only as a fallback for a record without one.
+          ts: formatDetectedTs(item.promulgation || item.announcementDate),
+          type: "detected",
+          note: item.title,
+          url: isapDocUrl(item.address),
+          eli: item.ELI,
+          actType: item.type,
+          via: q.mode,
+          publisher,
+          // The act's own legal status AS REPORTED BY THE SEJM API AT SCAN
+          // TIME. Never re-checked afterwards — the UI says so and links ISAP.
+          legalStatus: item.status || null,
+          inForce: item.inForce || null,
+          entryIntoForce: item.entryIntoForce || null,
+          changeDate: item.changeDate || null,
+          displayAddress: item.displayAddress || null,
+          detectedOn: todayIso,
+        });
+      });
+    } catch (e) {
+      errors.push(e.message);
+    }
+  }
+  const result = { id: s.id, lastChecked: nowStr, found: detected.length, detected, queries, query: queries[0] };
+  if (truncated) result.truncated = true;
+  if (errors.length) result.error = errors.join("; ");
+  return result;
+}
+
+// Runs one real scan per source against the live APIs. `sources` items need
+// { id, register?, keyword|title|…, publisher?, lastChecked } (lastChecked in
+// "DD.MM.YYYY HH:MM" — from the frontend's real state or the persisted scan
+// doc; a source's very first run falls back to start-of-year).
+// Incremental window = lastChecked − LOOKBACK_DAYS[register] … today.
+// `range`, when given ({from, to} as YYYY-MM-DD), replaces that window with
+// exactly the user-picked period (no lookback).
+// lastChecked only moves forward on a COMPLETE incremental scan: a source that
+// reported any error, or a forced-period scan, keeps its previous lastChecked —
+// otherwise a failed night (or a manual look at last March) would silently
+// skip the gap for good.
 // Each result carries the exact `queries` it ran (mode, term, register, dates,
 // URL) so the UI can show — and the user can replay — precisely what was
 // searched; each detected entry records `via` (which query found it).
@@ -728,53 +825,20 @@ async function scanSources(sources, range) {
   const rangeTo = range && isIsoDate(range.to) ? range.to : todayIso;
   return mapPool(sources, 6, async (s) => {
     const qs = sourceQueries(s);
-    if (!qs.length) return { id: s.id, lastChecked: nowStr, found: 0, detected: [] };
-    const dateFrom = rangeFrom || toIsoDate(s.lastChecked) || isoYearStart();
+    if (!qs.length) return { id: s.id, lastChecked: s.lastChecked || null, found: 0, detected: [] };
+    const register = ["SAOS", "SEJM", "EURLEX"].includes(s.register) ? s.register : "ELI";
+    const last = toIsoDate(s.lastChecked);
+    // No lookback on a forced period or on a source's first-ever scan (that one
+    // already starts at 1 January).
+    const lookbackDays = rangeFrom || !last ? 0 : LOOKBACK_DAYS[register];
+    const dateFrom = rangeFrom || (last ? shiftIsoDays(last, -lookbackDays) : isoYearStart());
     const dateTo = rangeFrom ? rangeTo : todayIso;
-    if (s.register === "SAOS") return scanSaosSource(s, dateFrom, dateTo, nowStr, !!rangeFrom);
-    if (s.register === "SEJM") return scanSejmSource(s, dateFrom, dateTo, nowStr);
-    if (s.register === "EURLEX") return scanEurlexSource(s, dateFrom, dateTo, nowStr, !!rangeFrom);
-    const publisher = normalizePublisher(s.publisher);
-    const queries = qs.map((q) => {
-      const opts = { [q.mode]: q.term, publisher, dateFrom, dateTo };
-      return { ...q, publisher, dateFrom, dateTo, url: `${SEARCH_URL}?${buildSearchParams(opts).toString()}` };
-    });
-    const detected = [];
-    const seen = new Set();
-    const errors = [];
-    for (const q of queries) {
-      try {
-        const items = await searchActs({ [q.mode]: q.term, publisher, dateFrom, dateTo });
-        items.forEach((item) => {
-          const key = item.ELI || `${item.title}|${item.address}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-          detected.push({
-            ts: formatDetectedTs(item.announcementDate),
-            type: "detected",
-            note: item.title,
-            url: isapDocUrl(item.address),
-            eli: item.ELI,
-            actType: item.type,
-            via: q.mode,
-            publisher,
-            // The act's own legal status AS REPORTED BY THE SEJM API AT SCAN
-            // TIME. Never re-checked afterwards — the UI says so and links ISAP.
-            legalStatus: item.status || null,
-            inForce: item.inForce || null,
-            entryIntoForce: item.entryIntoForce || null,
-            changeDate: item.changeDate || null,
-            displayAddress: item.displayAddress || null,
-            detectedOn: todayIso,
-          });
-        });
-      } catch (e) {
-        errors.push(e.message);
-      }
-    }
-    const result = { id: s.id, lastChecked: nowStr, found: detected.length, detected, queries, query: queries[0] };
-    if (errors.length) result.error = errors.join("; ");
-    return result;
+    const r = register === "SAOS" ? await scanSaosSource(s, dateFrom, dateTo, nowStr, lookbackDays)
+      : register === "SEJM" ? await scanSejmSource(s, dateFrom, dateTo, nowStr, lookbackDays)
+      : register === "EURLEX" ? await scanEurlexSource(s, dateFrom, dateTo, nowStr, lookbackDays)
+      : await scanEliSource(s, qs, dateFrom, dateTo, nowStr, lookbackDays);
+    if (rangeFrom || r.error) r.lastChecked = s.lastChecked || null;
+    return r;
   });
 }
 

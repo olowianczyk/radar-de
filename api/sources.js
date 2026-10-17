@@ -22,8 +22,11 @@ module.exports = async (req, res) => {
         name: typeof (s && s.name) === "string" ? s.name.trim().slice(0, 200) : "",
         keyword: typeof (s && s.keyword) === "string" && s.keyword.trim() ? s.keyword.trim().slice(0, 200) : null,
         title: typeof (s && s.title) === "string" && s.title.trim() ? s.title.trim().slice(0, 200) : null,
-        publisher: s && s.register === "SEJM" ? "SEJM" : s && s.publisher === "MP" ? "MP" : "DU",
-        register: s && (s.register === "SAOS" || s.register === "SEJM") ? s.register : "ELI",
+        // Same mapping as scan-all.js: EUR-Lex keeps publisher "EU" / register
+        // "EURLEX" — before, a hand-added EUR-Lex source was saved as a Dz.U.
+        // title search and silently scanned the wrong register.
+        publisher: s && s.register === "SEJM" ? "SEJM" : s && s.register === "EURLEX" ? "EU" : s && s.publisher === "MP" ? "MP" : "DU",
+        register: s && (s.register === "SAOS" || s.register === "SEJM" || s.register === "EURLEX") ? s.register : "ELI",
         courtType: s && SAOS_COURT_TYPES.includes(s.courtType) ? s.courtType : null,
         judgmentTypes: s && Array.isArray(s.judgmentTypes) ? s.judgmentTypes.filter((j) => SAOS_JUDGMENT_TYPES.includes(j)).slice(0, 5) : [],
         referencedRegulation: typeof (s && s.referencedRegulation) === "string" && s.referencedRegulation.trim() ? s.referencedRegulation.trim().slice(0, 200) : null,

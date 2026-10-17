@@ -34,9 +34,16 @@
    text was barely visible. Every use of these three tokens is text, an icon or
    a thin stripe/dot on a dark card or on the matching dark --*-100 tint, so
    lifting them here fixes all of them at once. All ≥ 4.5:1 on the cards and
-   on the --*-100 tints of both dark variants. */
+   on the --*-100 tints of both dark variants.
+   --info-600 (blue #1f6fb0) had the same problem — ~2.8:1 on --blue-100 in the
+   "Nowe" status pill, SAOS badges and feed stripes — so it is lifted too
+   (#6cb6f2 ≈ 6.8:1 on both dark --blue-100 tints, ≈ 7.4:1 on the cards).
+   Badge.jsx and Avatar.jsx read these semantic tokens (not the raw --green-700
+   / --blue-700 …), so they pick up the lift; in light mode the semantic tokens
+   equal the raw ones, so nothing changes there. */
 :root[data-theme="dark"]{
   --success-600:#4cd99a;
   --warning-700:#f2b544;
   --danger-600:#ff8a7a;
+  --info-600:#6cb6f2;
 }

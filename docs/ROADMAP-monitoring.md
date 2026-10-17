@@ -92,7 +92,7 @@ Projekt w aplikacji — ten sam model co dziś, czwarty rejestr obok DU/MP/SEJM:
 | Element | Decyzja |
 |---|---|
 | Typ źródła | `register: "SAOS"`, pola: `courtType` (jeden lub kilka), `phrase` (= `all`) **albo** `referencedRegulation` (akt bazowy, np. „Kodeks pracy”) — to drugie jest dużo precyzyjniejsze niż fraza. |
-| Okno dat | `judgmentDateFrom` = ostatnie sprawdzenie, `judgmentDateTo` = dziś — ale ponieważ orzeczenia trafiają do SAOS z opóźnieniem, skan cofa się dodatkowo o 60 dni i deduplikuje po `id` orzeczenia (inaczej gubimy wyroki dopisane po czasie). |
+| Okno dat | `judgmentDateFrom` = ostatnie sprawdzenie, `judgmentDateTo` = dziś — ale ponieważ orzeczenia trafiają do SAOS z opóźnieniem, skan cofa się dodatkowo o 180 dni i deduplikuje po `id` orzeczenia (inaczej gubimy wyroki dopisane po czasie). |
 | Co zapisujemy | sąd, sygnatura, data orzeczenia, typ (wyrok/postanowienie/uchwała), fragment tezy/`textContent` (pierwsze ~400 znaków), link do SAOS i, gdy jest, do portalu źródłowego. |
 | W feedzie | osobna zakładka/filtr „Orzeczenia” (inny obieg niż akt prawny: nie „wdrażamy” wyroku); te same statusy przeglądu. |
 | Zakres w UI | panel pokazuje dokładny URL zapytania SAOS do odtworzenia + datę najnowszego orzeczenia w bazie dla danego sądu (miara opóźnienia). |
@@ -102,7 +102,7 @@ Projekt w aplikacji — ten sam model co dziś, czwarty rejestr obok DU/MP/SEJM:
 ## 4. Status SAOS (zrobione) i kolejne API do rozważenia
 
 SAOS jest wdrożony jako czwarty rejestr (`register: "SAOS"`): źródła domyślne w
-trzech działach, cofnięcie okna o 60 dni, pomiar opóźnienia per sąd, orzeczenia
+trzech działach, cofnięcie okna o 180 dni, pomiar opóźnienia per sąd, orzeczenia
 w feedzie z filtrem „Akty / Orzeczenia”. **Nazwy parametrów i kształt odpowiedzi
 API SAOS nie były weryfikowane z tego środowiska** — błąd lub nieoczekiwany
 format pokaże się jako czerwony komunikat przy źródle, nie jako „0 wyników”.

@@ -3,7 +3,6 @@ import React from 'react';
 const states = {
   new: { bg: 'var(--info-100)', fg: 'var(--info-600)', pl: 'Nowe', de: 'Neu', en: 'New' },
   progress: { bg: 'var(--warning-100)', fg: 'var(--warning-700)', pl: 'W toku', de: 'In Bearbeitung', en: 'In progress' },
-  waiting: { bg: 'var(--surface-sunken)', fg: 'var(--ink-700)', pl: 'Oczekuje', de: 'Wartet', en: 'Waiting' },
   urgent: { bg: 'var(--danger-100)', fg: 'var(--danger-600)', pl: 'Pilne', de: 'Dringend', en: 'Urgent' },
   done: { bg: 'var(--success-100)', fg: 'var(--success-600)', pl: 'Zamknięte', de: 'Geschlossen', en: 'Done' },
 };

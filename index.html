@@ -21,7 +21,7 @@
      app (app/index.html). Skippable any time (button, Esc / Enter / Space).
 
        1. logo    — the animated horizontal logo (beam spinning)
-       2. scan    — the three public registers the app checks every morning
+       2. scan    — the five public registers the app checks every morning
        3. feed    — how a detected change travels through the review statuses
        4. promise — the tagline + one rotating closing line
 
@@ -116,8 +116,6 @@
     font-size: 13px; letter-spacing: .18em; text-transform: uppercase;
     color: var(--i-sub); display: flex; align-items: center; gap: 10px;
   }
-  /* Pulsing amber dot in front of an eyebrow = "live / just now". */
-  .eyebrow .live { width: 8px; height: 8px; border-radius: 50%; background: var(--i-amber); box-shadow: 0 0 10px var(--i-amber); animation: rl-pulse 1.6s ease-in-out infinite; }
   /* Scene heading in the logo face. clamp() keeps it readable from phones
      (≈28 px) to large screens (≈52 px) without media queries. */
   /* font-family set explicitly: tokens/base.css gives h1 the app's serif
@@ -162,16 +160,14 @@
   #scene-logo .eyebrow { margin-top: 44px; color: var(--i-dim); }
 
   /* ---- 2. Scan: the registers, printed like a terminal log ----------------
-     Each .reg row = register name · dotted leader · what it covers · "OK".
-     Rows appear one after another (staggered --d), and each row's OK lights
-     up a moment after the row itself, as if the check just completed. */
+     Each .reg row = register name · dotted leader · what it covers.
+     Rows appear one after another (staggered --d). No status badge: the intro
+     does not call the API, so it cannot know whether a register is up. */
   .scan-log { margin-top: 40px; width: min(720px, 100%); display: flex; flex-direction: column; gap: 14px; font-family: 'JetBrains Mono', monospace; }
   .reg { display: flex; align-items: baseline; gap: 12px; font-size: clamp(13px, 1.6vw, 17px); }
   .reg .name { color: var(--i-ink); font-weight: 500; white-space: nowrap; }
   .reg .lead { flex: 1; border-bottom: 2px dotted var(--i-dim); transform: translateY(-4px); min-width: 20px; }
   .reg .what { color: var(--i-sub); white-space: nowrap; }
-  .reg .ok { color: var(--i-phosphor); font-weight: 500; opacity: 0; transition: opacity .3s ease; transition-delay: calc(var(--d, 0s) + .35s); text-shadow: 0 0 10px rgba(61,245,176,.6); }
-  .scene.active .reg .ok { opacity: 1; }
   /* On phones the "what it covers" column would not fit — drop it. */
   @media (max-width: 640px) { .reg .what { display: none; } }
 
@@ -260,21 +256,29 @@
     <div class="eyebrow rise" style="--d:.5s">HR · Compliance · Dział prawny</div>
   </div>
 
-  <!-- 2. SCAN — the three registers the backend actually queries
-       (api.sejm.gov.pl/eli for DU + MP, saos.org.pl for case law). -->
+  <!-- 2. SCAN — the registers the backend actually queries: api.sejm.gov.pl
+       (eli: DU + MP, sejm: bills), Cellar SPARQL (EUR-Lex), saos.org.pl.
+       No "OK" badges and no scan time: the intro does not call the API, so it
+       must not show a status or a run it cannot know about. SAOS is named for
+       common courts only — its SN/NSA/TK/KIO data stopped years ago (see
+       COVERAGE in api/_lib.js). -->
   <div class="scene" id="scene-scan">
-    <div class="eyebrow rise"><span class="live"></span><span id="scan-label">SKAN</span></div>
-    <h1 class="heading rise" style="--d:.1s">Codziennie rano sprawdzamy <em>trzy rejestry</em></h1>
+    <div class="eyebrow rise">SKAN · CODZIENNIE RANO</div>
+    <h1 class="heading rise" style="--d:.1s">Codziennie rano sprawdzamy <em>pięć rejestrów</em></h1>
     <div class="scan-log">
-      <div class="reg rise" style="--d:.45s"><span class="name">Dziennik Ustaw</span><span class="lead"></span><span class="what">ustawy, rozporządzenia</span><span class="ok">OK</span></div>
-      <div class="reg rise" style="--d:.8s"><span class="name">Monitor Polski</span><span class="lead"></span><span class="what">obwieszczenia, komunikaty</span><span class="ok">OK</span></div>
-      <div class="reg rise" style="--d:1.15s"><span class="name">SAOS</span><span class="lead"></span><span class="what">orzecznictwo SN, NSA, TK, KIO</span><span class="ok">OK</span></div>
+      <div class="reg rise" style="--d:.45s"><span class="name">Dziennik Ustaw</span><span class="lead"></span><span class="what">ustawy, rozporządzenia</span></div>
+      <div class="reg rise" style="--d:.7s"><span class="name">Monitor Polski</span><span class="lead"></span><span class="what">obwieszczenia, komunikaty</span></div>
+      <div class="reg rise" style="--d:.95s"><span class="name">Sejm</span><span class="lead"></span><span class="what">projekty ustaw i ich etapy</span></div>
+      <div class="reg rise" style="--d:1.2s"><span class="name">EUR-Lex</span><span class="lead"></span><span class="what">prawo UE i projekty Komisji</span></div>
+      <div class="reg rise" style="--d:1.45s"><span class="name">SAOS</span><span class="lead"></span><span class="what">orzeczenia sądów powszechnych</span></div>
     </div>
   </div>
 
   <!-- 3. FEED — example of one change in each review status. Titles are
        generic types of acts on purpose: the intro must not invent specific
-       acts or claim a number of real detections. -->
+       acts or claim a number of real detections. The SAOS card is a common
+       court on purpose: SAOS stopped receiving Supreme Court judgments in
+       2016, so an "SN" example would show something the app cannot detect. -->
   <div class="scene" id="scene-feed">
     <div class="eyebrow rise">Przykład · feed działu</div>
     <h1 class="heading rise" style="--d:.1s">Każda zmiana trafia <em>do przeglądu</em></h1>
@@ -289,7 +293,7 @@
         <span class="pill review">W PRZEGLĄDZIE</span>
       </div>
       <div class="feed-card" style="--d:.9s">
-        <div><div class="tag">SAOS · SĄD NAJWYŻSZY</div><div class="title">Uchwała powołująca Kodeks pracy</div></div>
+        <div><div class="tag">SAOS · SĄD POWSZECHNY</div><div class="title">Wyrok powołujący Kodeks pracy</div></div>
         <span class="pill done">WDROŻONE</span>
       </div>
     </div>
@@ -345,19 +349,6 @@ const SCENES = ['scene-logo', 'scene-scan', 'scene-feed', 'scene-promise'];
 const DURATIONS = [4500, 5500, 6500, 5500];
 const APP_URL = 'app/index.html';
 
-// Label for the scan scene: date + local time of the most recent scheduled
-// scan. The cron (vercel.json) runs daily at 04:00 UTC; converting that to the
-// visitor's time zone gives 06:00 in Polish summer time and 05:00 in winter.
-// If today's run is still in the future, show yesterday's.
-// (This is the schedule, not a live read of the last run — the intro does not
-// call the API, so it stays instant and works even if the backend is down.)
-function lastScanLabel() {
-  const now = new Date();
-  const scan = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 4, 0, 0));
-  if (scan > now) scan.setUTCDate(scan.getUTCDate() - 1);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `SKAN ${pad(scan.getDate())}.${pad(scan.getMonth() + 1)}.${scan.getFullYear()} · ${pad(scan.getHours())}:${pad(scan.getMinutes())}`;
-}
 
 let phase = 0;            // index of the scene currently shown
 let phaseStartAt = 0;     // when that scene started (for the progress bar)
@@ -438,7 +429,6 @@ function onKeyDown(e) {
 
 function init() {
   q('#quote-text').textContent = nextIntroQuote();
-  q('#scan-label').textContent = lastScanLabel();
   buildTaglineWords();
   buildProgressSegments();
   setPhase(0);

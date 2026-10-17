@@ -10,9 +10,9 @@ Działa z linku, bez logowania. Pełna instrukcja dla użytkownika jest w aplika
 
 | | |
 |---|---|
-| **Źródło danych** | `api.sejm.gov.pl/eli` — Dziennik Ustaw (`DU`) i Monitor Polski (`MP`); `api.sejm.gov.pl/sejm` — projekty ustaw (etapy); SAOS — orzecznictwo sądów powszechnych; EUR-Lex (Cellar SPARQL `publications.europa.eu/webapi/rdf/sparql`) — akty UE i projekty Komisji po fragmencie polskiego tytułu, okno cofnięte o 60 dni. TSUE, decyzje regulatorów, listy sankcyjne i projekty w RCL/Senacie **nie są skanowane** — są wymienione w aplikacji jako źródła ręczne z częstotliwością przeglądu. |
+| **Źródło danych** | `api.sejm.gov.pl/eli` — Dziennik Ustaw (`DU`) i Monitor Polski (`MP`); `api.sejm.gov.pl/sejm` — projekty ustaw (etapy); SAOS — orzecznictwo sądów powszechnych; EUR-Lex (Cellar SPARQL `publications.europa.eu/webapi/rdf/sparql`) — akty UE i projekty Komisji po fragmencie polskiego tytułu, okno cofnięte o 180 dni. TSUE, decyzje regulatorów, listy sankcyjne i projekty w RCL/Senacie **nie są skanowane** — są wymienione w aplikacji jako źródła ręczne z częstotliwością przeglądu. |
 | **Dopasowanie** | po oficjalnym słowie kluczowym Sejmu (zamknięty słownik, `GET /eli/keywords`) i/lub po fragmencie tytułu aktu. Nigdy po treści aktu. Tytuł łapie akty nazywające dany akt (nowelizacje, teksty jednolite); nowelizacje zbiorcze „…oraz niektórych innych ustaw” łapie tylko słowo kluczowe. |
-| **Okres** | od ostatniego sprawdzenia źródła do dziś (data ogłoszenia). Pierwszy skan sięga do 1 stycznia bieżącego roku. Ręczny skan może wymusić dowolny zakres dat. |
+| **Okres** | od ostatniego sprawdzenia źródła (minus zapas: 7 dni akty i projekty, 180 dni SAOS i EUR-Lex) do dziś — dla aktów według daty ogłoszenia w dzienniku (`pubDateFrom`), nie daty podpisania. Błąd skanu nie przesuwa „ostatniego sprawdzenia”. Pierwszy skan sięga do 1 stycznia bieżącego roku. Ręczny skan może wymusić dowolny zakres dat. |
 | **Limit** | 100 aktów na zapytanie. |
 | **Dedup** | po identyfikatorze ELI; ten sam akt z kilku źródeł/skanów pojawia się raz. Każdy wpis pamięta, które zapytanie go znalazło (`via`). |
 | **Harmonogram** | Vercel Cron, codziennie `0 4 * * *` UTC, wszystkie trzy działy. |

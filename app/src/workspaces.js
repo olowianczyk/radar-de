@@ -92,7 +92,6 @@ export const WORKSPACES = [
     accent: "teal",
     label: tr("HR", "HR", "HR"),
     title: tr("Prawo pracy", "Labour law", "Arbeitsrecht"),
-    persona: tr("HR Business Partner", "HR Business Partner", "HR Business Partner"),
     kbSub: tr("Polityki, procedury i szablony HR", "HR policies, procedures and templates", "HR-Richtlinien, Verfahren und Vorlagen"),
     areas: {
       leave: tr("Urlopy", "Leave", "Urlaub"),
@@ -165,7 +164,6 @@ export const WORKSPACES = [
     accent: "plum",
     label: tr("Compliance", "Compliance", "Compliance"),
     title: tr("Zgodność regulacyjna", "Regulatory compliance", "Regulatorische Compliance"),
-    persona: tr("Compliance Officer", "Compliance Officer", "Compliance Officer"),
     kbSub: tr("Polityki, procedury i rejestry compliance", "Compliance policies, procedures and registers", "Compliance-Richtlinien, Verfahren und Register"),
     areas: {
       aml: tr("AML", "AML", "Geldwäscheprävention"),
@@ -271,7 +269,6 @@ export const WORKSPACES = [
     accent: "ocean",
     label: tr("Dział prawny", "Legal", "Rechtsabteilung"),
     title: tr("Prawo cywilne, handlowe i procesowe", "Civil, commercial and procedural law", "Zivil-, Handels- und Verfahrensrecht"),
-    persona: tr("Radca prawny", "Legal counsel", "Justiziar/in"),
     kbSub: tr("Wzory umów, opinie i procedury prawne", "Contract templates, opinions and legal procedures", "Vertragsvorlagen, Gutachten und Rechtsverfahren"),
     areas: {
       codes: tr("Kodeksy i fundament", "Codes & fundamentals", "Gesetzbücher & Grundlagen"),
@@ -426,5 +423,5 @@ export function tFor(lang, ws) {
   const base = HRBP_I18N[lang] || HRBP_I18N.pl;
   const area = {};
   Object.entries(ws.areas).forEach(([k, v]) => { area[k] = v[lang] || v.pl; });
-  return { ...base, area, app: ws.title[lang] || ws.title.pl, kbSub: ws.kbSub[lang] || ws.kbSub.pl, persona: ws.persona[lang] || ws.persona.pl, wsLabel: ws.label[lang] || ws.label.pl };
+  return { ...base, area, app: ws.title[lang] || ws.title.pl, kbSub: ws.kbSub[lang] || ws.kbSub.pl, wsLabel: ws.label[lang] || ws.label.pl };
 }

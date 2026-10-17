@@ -39,6 +39,6 @@ assert.strictEqual(out[0].kind, "eu");
 const changes = client.buildChangesFromHistory({ 7: [{ ...out[1], type: "detected" }] }, [{ id: 7, name: "UE — test", area: "other", ...src }], {});
 assert.deepStrictEqual([changes[0].kind, changes[0].eu.celex, changes[0].eu.euType], ["eu", "52026PC0200", "proposal"]);
 
-// Next incremental scan looks back 60 days.
-assert.strictEqual(client.nextScanRange({ ...src, lastChecked: "17.10.2026 04:00" }).from, "2026-08-18");
+// Next incremental scan looks back LOOKBACK_DAYS.EURLEX (180) days.
+assert.strictEqual(client.nextScanRange({ ...src, lastChecked: "17.10.2026 04:00" }).from, "2026-04-20");
 console.log("check-eurlex: OK");

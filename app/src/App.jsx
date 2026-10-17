@@ -67,7 +67,7 @@ export default function App() {
     // key= remounts the shell per workspace: all per-department state (sources,
     // history, triage, KB) is loaded fresh instead of leaking across departments.
     <AppShell key={ws.id} ws={ws} setWorkspace={setWorkspace} lang={lang} setLang={setLang} active={active} setActive={setActive}
-      onSelectChange={(id) => { setChangeId(id); setActive("feed"); }} onSelectKb={(id) => { setKbId(id); setActive("kb"); }}>
+      onSelectChange={(id) => { setChangeId(id); setActive("feed"); }}>
       {screen}
     </AppShell>
   );
