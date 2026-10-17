@@ -55,10 +55,16 @@ function LangSwitch({ lang, setLang }) {
 // (SidebarNav overflowY: auto), so short windows still reach every item.
 // The mark is decorative (aria-hidden) because the name is written under it;
 // t.product is split on its first space ("Radar" / "Legislacyjny").
+// The whole plate is a link to the home page — the intro at the site root
+// (index.html; the app itself lives under /app/). The href is relative ("../")
+// so it resolves to "/" from /app/index.html in production; under the Vite dev
+// server the app IS the root, so the link just reloads it. aria-label names
+// the destination because the visible text is the product name, not "home".
 function Wordmark({ t }) {
   const [first, ...rest] = String(t.product).split(" ");
   return (
-    <div style={{
+    <a href="../" aria-label={`${t.product} — ${t.home}`} title={t.home} style={{
+      textDecoration: "none", color: "inherit", cursor: "pointer",
       display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
       padding: "14px 6px 14px", marginBottom: 12, borderRadius: 16,
       background: "radial-gradient(120% 75% at 50% 18%, color-mix(in srgb, var(--rl-word-accent) 14%, transparent), transparent 72%)",
@@ -74,7 +80,7 @@ function Wordmark({ t }) {
       <div className="rl-tagline" style={{ marginTop: 12, gap: 7, fontSize: 10, letterSpacing: ".12em", lineHeight: 1.3, whiteSpace: "nowrap", textTransform: "uppercase", justifyContent: "center", maxWidth: 196 }}>
         <span>{t.tagline}</span>
       </div>
-    </div>
+    </a>
   );
 }
 
