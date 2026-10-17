@@ -50,13 +50,14 @@ function normalizeWorkspace(ws) {
 // concern — "scan" (per-source lastChecked/found + detected-act history, written
 // only by scans), "kb" (documents + comments), "triage" (review statuses,
 // shared by the whole team), "config" (source on/off overrides + user-added
-// sources, honoured by the cron). Splitting by concern keeps each write a
+// sources, honoured by the cron), "notify" (queue of new detections waiting for
+// the daily e-mail digest + last send outcome, see _mail.js). Splitting by concern keeps each write a
 // read-modify-write of a document that only one kind of action touches, so a
 // scan can't overwrite a status someone just set. Pre-split data lived in a
 // single hrbp-state[-ws].json; it is read through once and migrated on first
 // write (see legacy below).
 // ponytail: this exists; move to Postgres if the state shape grows relational needs.
-const DOCS = ["scan", "kb", "triage", "config"];
+const DOCS = ["scan", "kb", "triage", "config", "notify"];
 
 // Is a Vercel Blob store attached to this deployment? Every endpoint checks this
 // first and reports `storage_unavailable` instead of silently working on a state
@@ -115,6 +116,7 @@ const EMPTY = {
   kb: () => ({ docs: [] }),
   triage: () => ({ statuses: {} }),
   config: () => ({ overrides: {}, custom: [] }),
+  notify: () => ({ queue: [], lastSent: null, lastError: null }),
 };
 
 // Returns the document, or the empty shape when it does not exist yet. THROWS

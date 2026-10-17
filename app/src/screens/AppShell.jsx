@@ -334,6 +334,8 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
   const [lastScanFound, setLastScanFound] = React.useState(null);
   const [initialLoading, setInitialLoading] = React.useState(true);
   const [kbDocs, setKbDocs] = React.useState([]);
+  // E-mail digest status from /api/state (masked recipients, queue, last send).
+  const [notify, setNotify] = React.useState(null);
   React.useEffect(() => {
     fetchPersistedState(ws.id).then((state) => {
       setBackend(state.storage ? "ok" : "storage");
@@ -344,6 +346,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
       }));
       setSourceHistory(state.history || {});
       setStatusMap(state.triage || {});
+      setNotify(state.notify || null);
       // One-time migration of statuses set before they were shared: push the
       // browser-local map to the server if the server has none yet.
       try {
@@ -566,7 +569,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
         )}
         <main style={{ flex: 1, ...(isMobile ? { minHeight: 0, overflowY: "auto" } : {}), padding: isMobile ? 16 : 28 }}>
           <div key={active} className="hrbp-screen" style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, appearance, backend, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment, removeKb }) : children}
+            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, appearance, backend, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment, removeKb, notify, setNotify }) : children}
           </div>
         </main>
       </div>

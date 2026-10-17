@@ -10,6 +10,7 @@
 // load — or the next cron run — sees what was found. The response says whether
 // that persist happened (`persisted`); it never claims success it didn't have.
 const { WORKSPACES, normalizeWorkspace, DEFAULT_SOURCES, scanSources, isScannable, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES, storageAvailable, loadDoc, saveDoc, sendError, parseBody } = require("./_lib.js");
+const { queueForDigest, sendDigest } = require("./_mail.js");
 
 function dedupeKey(e) {
   return e.eli || `${e.note}|${e.url}`;
@@ -28,7 +29,9 @@ function effectiveSources(ws, config) {
     });
 }
 
-function mergeHistory(prevHistory, results) {
+// `freshOut` (optional array) collects { sourceId, e } for every entry seen for
+// the first time — exactly what the e-mail digest should report.
+function mergeHistory(prevHistory, results, freshOut) {
   const history = { ...prevHistory };
   // Dedupe existing history too — earlier scans (before this fix) already
   // wrote duplicates for overlapping periods; collapse those on next write
@@ -48,6 +51,7 @@ function mergeHistory(prevHistory, results) {
     const seen = new Set(existing.map(dedupeKey));
     const fresh = r.detected.filter((e) => !seen.has(dedupeKey(e)));
     if (fresh.length) history[r.id] = [...fresh, ...existing];
+    if (freshOut) fresh.forEach((e) => freshOut.push({ sourceId: r.id, e }));
   });
   return history;
 }
@@ -77,15 +81,19 @@ async function scanWorkspace(ws, sources, range) {
   // Keep sources this scan didn't touch (a subset scan, a paused source)
   // instead of dropping their lastChecked.
   const untouched = prev.sources.filter((p) => !results.some((r) => r.id === p.id));
+  const fresh = [];
   const next = {
     sources: [...untouched, ...results.map((r) => ({ id: r.id, lastChecked: r.lastChecked, found: r.found, ...(r.freshness ? { freshness: r.freshness } : {}) }))],
-    history: mergeHistory(prev.history, results),
+    history: mergeHistory(prev.history, results, fresh),
     lastRun,
   };
   let persisted = false;
   if (!persistError) {
     try { await saveDoc(ws, "scan", next); persisted = true; } catch (e) { persistError = e.message; }
   }
+  // Queue only what really got persisted, so a failed save cannot mail items
+  // the feed does not show. A queue failure must not fail the scan itself.
+  if (persisted) await queueForDigest(ws, fresh).catch(() => {});
   return { workspace: ws, results, lastRun, persisted, persistError };
 }
 
@@ -139,8 +147,14 @@ module.exports = async (req, res) => {
     // Cron: workspaces one after another — each already runs its sources
     // through a small pool (see _lib.js mapPool), ~130 queries in total.
     const runs = [];
-    for (const ws of WORKSPACES) runs.push(await scanWorkspace(ws, null, undefined));
-    res.status(200).json({ runs: runs.map((r) => ({ workspace: r.workspace, lastRun: r.lastRun, persisted: r.persisted, persistError: r.persistError, found: r.results.reduce((n, x) => n + (x.found || 0), 0), errors: r.results.filter((x) => x.error).length })) });
+    // After each department's scan its daily digest goes out (no-op when the
+    // queue is empty or SMTP / recipients are not configured — see _mail.js).
+    for (const ws of WORKSPACES) {
+      const run = await scanWorkspace(ws, null, undefined);
+      run.mail = await sendDigest(ws);
+      runs.push(run);
+    }
+    res.status(200).json({ runs: runs.map((r) => ({ workspace: r.workspace, lastRun: r.lastRun, persisted: r.persisted, persistError: r.persistError, found: r.results.reduce((n, x) => n + (x.found || 0), 0), errors: r.results.filter((x) => x.error).length, mail: r.mail })) });
   } catch (e) {
     sendError(res, e);
   }

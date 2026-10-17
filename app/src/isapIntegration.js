@@ -83,6 +83,13 @@ export async function saveTriage(ws, ids, status) {
   return data.triage || {};
 }
 
+// Sends a test e-mail to the department's recipients (configured in Vercel env
+// vars, see api/_mail.js). Resolves with the fresh notify status.
+export async function sendTestMail(ws) {
+  const data = await post("/api/notify", { workspace: ws });
+  return data.notify;
+}
+
 // Team source configuration (on/off overrides + user-added sources) — what the
 // cron will scan tomorrow.
 export async function saveSourceConfig(ws, config) {
