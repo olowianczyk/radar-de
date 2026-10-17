@@ -7,9 +7,10 @@
 // the acts a corporate legal/compliance function must track. Everything that
 // the Sejm/ELI API can see (Dziennik Ustaw, Monitor Polski) is an automatic
 // source; everything it cannot (EU law, case law, regulators' decisions,
-// sanctions lists, drafts in RCL/Sejm) is listed as a MANUAL source with the
+// sanctions lists, drafts in RCL) is listed as a MANUAL source with the
 // review cadence the document recommends — so the coverage gap is visible,
-// not hidden.
+// not hidden. Exceptions now scanned automatically: Sejm bills (sejm()),
+// common-court case law (saos()) and EU law + Commission proposals (eurlex()).
 //
 // Automatic source fields:
 //   keyword   — official Sejm/ELI subject keyword (closed thesaurus, GET /eli/keywords).
@@ -69,10 +70,18 @@ const noteSaosFrozen = (pl, en, de) => tr(
   `Automatyczny skan niemożliwy: SAOS nie otrzymuje już tych orzeczeń (${pl}). Przeglądaj portal sądu.`,
   `No automatic scan: SAOS no longer receives these judgments (${en}). Review the court's own portal.`,
   `Kein automatischer Scan: SAOS erhält diese Entscheidungen nicht mehr (${de}). Das Gerichtsportal prüfen.`);
+// EUR-Lex source (EU law + Commission proposals, scanned via the public
+// Cellar SPARQL endpoint — api/_lib.js scanEurlexSource). `title` = "|"-
+// separated fragments matched case-insensitively against the POLISH title:
+// a phrase ("prania pieniędzy") or a base act number ("2016/679") — amending
+// acts and corrigenda name their base act in the title, so a number catches
+// every later change of that act. Decisions (DEC) are not scanned.
+const eurlex = (id, name, area, title, scope) => ({ id, name, type: "Akt UE", register: "EURLEX", url: "https://eur-lex.europa.eu/", area, keyword: null, title, publisher: "EU", scope: scope || NOTE_EURLEX });
+const NOTE_EURLEX = tr("Dyrektywy, rozporządzenia (także wykonawcze i delegowane), sprostowania oraz projekty Komisji (COM) z EUR-Lex, których polski tytuł zawiera jeden z fragmentów. Polski tytuł pojawia się z opóźnieniem — skan cofa się o 60 dni i deduplikuje po CELEX. Decyzje UE nie są skanowane.", "Directives, regulations (incl. implementing and delegated), corrigenda and Commission proposals (COM) from EUR-Lex whose Polish title contains one of the fragments. The Polish title appears with a delay — the scan looks back 60 days and dedupes by CELEX. EU decisions are not scanned.", "Richtlinien, Verordnungen (auch Durchführungs- und delegierte), Berichtigungen und Kommissionsvorschläge (COM) aus EUR-Lex, deren polnischer Titel eines der Fragmente enthält. Der polnische Titel erscheint verzögert — der Scan geht 60 Tage zurück und dedupliziert nach CELEX. EU-Beschlüsse werden nicht gescannt.");
 // Manual (non-scannable) source.
 const man = (id, name, area, url, cadence, reason, scope) => ({ id, name, type: "Manual", kind: "manual", url, area, cadence, reason, keyword: null, title: null, scope: scope || null });
 
-const NOTE_EU_NOT_DU = tr("Rozporządzenia UE nie są publikowane w Dz.U. — ich zmiany śledź w EUR-Lex (źródło ręczne poniżej).", "EU regulations are not published in Dz.U. — track them in EUR-Lex (manual source below).", "EU-Verordnungen erscheinen nicht im Gesetzblatt — in EUR-Lex verfolgen (manuelle Quelle unten).");
+const NOTE_EU_NOT_DU = tr("Rozporządzenia UE nie są publikowane w Dz.U. — ich zmiany łapią źródła EUR-Lex poniżej.", "EU regulations are not published in Dz.U. — the EUR-Lex sources below catch their changes.", "EU-Verordnungen erscheinen nicht im Gesetzblatt — die EUR-Lex-Quellen unten erfassen ihre Änderungen.");
 const NOTE_NOT_ENACTED = tr("Ustawa może jeszcze nie istnieć (projekt). Źródło złapie ją w dniu publikacji w Dz.U.", "The act may not exist yet (draft). This source will catch it the day it appears in Dz.U.", "Das Gesetz existiert ggf. noch nicht (Entwurf). Diese Quelle erfasst es am Tag der Verkündung.");
 const NOTE_PHASE3 = tr("Faza 3 wg dokumentu wymagań — włącz, jeśli dotyczy profilu działalności.", "Phase 3 per the requirements document — switch on if relevant to the business profile.", "Phase 3 laut Anforderungsdokument — einschalten, wenn für das Geschäftsprofil relevant.");
 
@@ -135,7 +144,11 @@ export const WORKSPACES = [
       man(101, "MRPiPS — stanowiska i interpretacje", "other", "https://www.gov.pl/web/rodzina", "monthly", "guidance"),
       man(105, "TSUE — orzeczenia w sprawach pracowniczych (czas pracy, urlopy, dyskryminacja)", "caselaw", "https://curia.europa.eu/", "monthly", "caselaw"),
       man(106, "Sąd Najwyższy — Izba Pracy i Ubezpieczeń Społecznych (uchwały, wyroki)", "caselaw", "https://www.sn.pl/orzecznictwo/SitePages/Wyszukiwarka.aspx", "weekly", "caselaw", noteSaosFrozen("SN — do 06.2016", "SN — up to 06.2016", "SN — bis 06.2016")),
-      man(102, "EUR-Lex — dyrektywy 2023/970 (jawność wynagrodzeń) i 2024/2831 (praca platformowa)", "pay", "https://eur-lex.europa.eu/", "monthly", "eu"),
+      // ponytail: manual id 102 (EUR-Lex) retired — replaced by the automatic
+      // EUR-Lex sources 401–403 below; ids are not reused.
+      eurlex(401, "Prawo UE — jawność wynagrodzeń (2023/970) i praca platformowa (2024/2831)", "pay", "2023/970|przejrzystości wynagrodzeń|jednakowego wynagrodzenia|2024/2831|za pośrednictwem platform"),
+      eurlex(402, "Prawo UE — zatrudnienie, czas pracy, rynek pracy", "contracts", "pracowni|zatrudni|rynku pracy|czasu pracy"),
+      eurlex(403, "Prawo UE — koordynacja zabezpieczenia społecznego i delegowanie (883/2004, 96/71)", "social", "koordynacji systemów zabezpieczenia społecznego|883/2004|987/2009|delegowania pracowników|96/71"),
       man(103, "Rządowe Centrum Legislacji — projekty z zakresu prawa pracy", "other", "https://legislacja.gov.pl/", "weekly", "draft"),
       // ponytail: manual id 104 ("Sejm — druki") retired — replaced by the
       // automatic Sejm sources 301–305 below; ids are not reused.
@@ -225,9 +238,15 @@ export const WORKSPACES = [
       man(101, "Listy sankcyjne UE (EUR-Lex / mapa sankcji)", "sanctions", "https://www.sanctionsmap.eu/", "daily", "list"),
       man(102, "Lista sankcyjna MSWiA", "sanctions", "https://www.gov.pl/web/mswia/lista-osob-i-podmiotow-objetych-sankcjami", "daily", "list"),
       man(103, "OFAC SDN (jeśli działalność globalna)", "sanctions", "https://sanctionssearch.ofac.treas.gov/", "daily", "list"),
-      man(104, "EUR-Lex — AML (AMLR, AMLA), sankcje 833/2014, 269/2014, 765/2006, dual-use 2021/821", "aml", "https://eur-lex.europa.eu/", "daily", "eu"),
-      man(105, "EUR-Lex — AI Act, NIS2, Data Act, DSA, DORA, Digital Omnibus", "cyber", "https://eur-lex.europa.eu/", "weekly", "eu"),
-      man(106, "EUR-Lex — CSRD, Taksonomia, CSDDD, EUDR, CBAM, PPWR, GPSR, baterie", "esg", "https://eur-lex.europa.eu/", "weekly", "eu"),
+      // ponytail: manual ids 104–106 (EUR-Lex) retired — replaced by the
+      // automatic EUR-Lex sources 411–416 below; ids are not reused.
+      eurlex(411, "Prawo UE — AML (AMLR 2024/1624, AMLA 2024/1620, AMLD)", "aml", "prania pieniędzy|finansowania terroryzmu|2024/1624|2024/1620|2015/849"),
+      eurlex(412, "Prawo UE — AI Act, NIS2, DORA, Data Act, DSA", "cyber", "sztucznej inteligencji|2024/1689|cyberbezpieczeństw|2022/2555|operacyjnej odporności cyfrowej|2022/2554|2023/2854|2022/2065"),
+      eurlex(413, "Prawo UE — CSRD, Taksonomia, CSDDD, EUDR, CBAM", "esg", "zrównoważonego rozwoju|2022/2464|należytej staranności|2024/1760|2020/852|2023/1115|2023/956"),
+      eurlex(414, "Prawo UE — sankcje (833/2014, 269/2014, 765/2006) i dual-use 2021/821", "sanctions", "środków ograniczających|833/2014|269/2014|765/2006|2021/821",
+        tr("Rozporządzenia sankcyjne zmieniają się kilkanaście razy w miesiącu — tu trafiają akty zmieniające. Bieżące listy osób sprawdzaj w mapie sankcji (źródło ręczne).", "Sanctions regulations change a dozen times a month — the amending acts land here. Check current listings in the sanctions map (manual source).", "Sanktionsverordnungen ändern sich mehrmals im Monat — die Änderungsakte landen hier. Aktuelle Listungen in der Sanktionskarte prüfen (manuelle Quelle).")),
+      eurlex(415, "Prawo UE — ochrona danych osobowych (RODO 2016/679)", "data", "danych osobowych|2016/679|2018/1725"),
+      eurlex(416, "Prawo UE — dyrektywa o sygnalistach 2019/1937", "whistle", "2019/1937|zgłaszających naruszenia"),
       man(107, "UOKiK — decyzje, wytyczne, kary", "competition", "https://uokik.gov.pl/", "monthly", "regulator"),
       man(108, "UODO + EROD (EDPB) — decyzje i wytyczne", "data", "https://uodo.gov.pl/", "monthly", "regulator"),
       man(109, "KNF / UKNF — stanowiska i komunikaty", "other", "https://www.knf.gov.pl/", "monthly", "regulator"),
@@ -347,8 +366,12 @@ export const WORKSPACES = [
       man(114, "KIO — orzeczenia (zamówienia publiczne)", "procurement", "https://orzeczenia.uzp.gov.pl/", "monthly", "caselaw", noteSaosFrozen("KIO — do 09.2018", "KIO — up to 09.2018", "KIO — bis 09.2018")),
       man(104, "TSUE — wyroki i opinie rzeczników generalnych", "caselaw", "https://curia.europa.eu/", "weekly", "caselaw"),
       man(105, "UZP — opinie prawne i wytyczne", "procurement", "https://www.uzp.gov.pl/", "monthly", "guidance"),
-      man(106, "EUR-Lex — Bruksela I bis, Rzym I/II, doręczenia 2020/1784, dowody 2020/1783, upadłość 2015/848", "disputes", "https://eur-lex.europa.eu/", "monthly", "eu"),
-      man(107, "EUR-Lex — znak towarowy UE 2017/1001, wzory 6/2002, tajemnice przedsiębiorstwa 2016/943", "ip", "https://eur-lex.europa.eu/", "monthly", "eu"),
+      // ponytail: manual ids 106–107 (EUR-Lex) retired — replaced by the
+      // automatic EUR-Lex sources 421–424 below; ids are not reused.
+      eurlex(421, "Prawo UE — sprawy cywilne i handlowe (Bruksela I bis, Rzym I/II, doręczenia, dowody)", "disputes", "w sprawach cywilnych i handlowych|1215/2012|593/2008|864/2007|2020/1784|2020/1783"),
+      eurlex(422, "Prawo UE — znak towarowy UE, wzory, tajemnice przedsiębiorstwa", "ip", "znaku towarowego|znaków towarowych|2017/1001|wzorów przemysłowych|wzorów wspólnotowych|6/2002|tajemnic przedsiębiorstwa|2016/943"),
+      eurlex(423, "Prawo UE — upadłość i restrukturyzacja (2015/848, 2019/1023)", "insolvency", "upadłościow|niewypłacalności|2015/848|2019/1023"),
+      eurlex(424, "Prawo UE — prawo spółek (2017/1132)", "corporate", "prawa spółek|spółek kapitałowych|2017/1132"),
       man(108, "Legislative Observatory PE (OEIL) — projekty UE w trilogu", "other", "https://oeil.secure.europarl.europa.eu/", "monthly", "draft"),
       man(109, "Rządowe Centrum Legislacji — projekty, konsultacje, OSR", "other", "https://legislacja.gov.pl/", "weekly", "draft"),
       // ponytail: manual id 110 ("Sejm — druki") retired — replaced by the

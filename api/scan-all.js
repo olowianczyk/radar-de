@@ -118,8 +118,10 @@ module.exports = async (req, res) => {
           id: Number(s && s.id),
           keyword: typeof (s && s.keyword) === "string" ? s.keyword.slice(0, 200) : null,
           title: typeof (s && s.title) === "string" ? s.title.slice(0, 200) : null,
-          publisher: s && s.register === "SEJM" ? "SEJM" : s && s.publisher === "MP" ? "MP" : "DU",
-          register: s && (s.register === "SAOS" || s.register === "SEJM") ? s.register : "ELI",
+          // EUR-Lex sources keep publisher "EU" / register "EURLEX" so _lib.js
+          // routes them to the Cellar SPARQL scanner instead of a Dz.U. search.
+          publisher: s && s.register === "SEJM" ? "SEJM" : s && s.register === "EURLEX" ? "EU" : s && s.publisher === "MP" ? "MP" : "DU",
+          register: s && (s.register === "SAOS" || s.register === "SEJM" || s.register === "EURLEX") ? s.register : "ELI",
           courtType: s && SAOS_COURT_TYPES.includes(s.courtType) ? s.courtType : null,
           judgmentTypes: s && Array.isArray(s.judgmentTypes) ? s.judgmentTypes.filter((j) => SAOS_JUDGMENT_TYPES.includes(j)).slice(0, 5) : [],
           referencedRegulation: typeof (s && s.referencedRegulation) === "string" ? s.referencedRegulation.slice(0, 200) : null,

@@ -75,10 +75,16 @@ async function queueForDigest(ws, fresh) {
     courtName: e.courtName || null,
     caseNumbers: e.caseNumbers || undefined,
     entryIntoForce: e.entryIntoForce || null,
+    // EUR-Lex: CELEX number + act / proposal / corrigendum (api/_lib.js eurlexEntries).
+    celex: e.celex || undefined,
+    euType: e.euType || undefined,
   }));
   doc.queue = [...(doc.queue || []), ...items].slice(-MAX_QUEUE);
   await saveDoc(ws, "notify", doc);
 }
+
+// Polish labels for EUR-Lex entry types (euType from api/_lib.js eurlexEntries).
+const EU_TYPE_LABEL = { act: "akt UE", proposal: "projekt Komisji (COM)", corrigendum: "sprostowanie" };
 
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -90,12 +96,14 @@ function buildDigest(ws, items, names) {
     { title: "Nowe i zmienione akty prawne", list: items.filter((i) => i.kind === "act") },
     { title: "Projekty ustaw w Sejmie — nowy etap", list: items.filter((i) => i.kind === "bill") },
     { title: "Nowe orzeczenia sądów", list: items.filter((i) => i.kind === "judgment") },
+    { title: "Prawo UE (EUR-Lex) — akty i projekty Komisji", list: items.filter((i) => i.kind === "eu") },
   ].filter((s) => s.list.length);
   // One line of details under the title, per kind.
   const detail = (i) => [
     names[i.sourceId],
     i.kind === "bill" && i.stage ? `etap: ${i.stage}${i.passed ? " (uchwalona)" : ""}` : null,
     i.kind === "judgment" ? [i.courtName, (i.caseNumbers || []).join(", ")].filter(Boolean).join(" · ") : null,
+    i.kind === "eu" ? [EU_TYPE_LABEL[i.euType], i.celex && `CELEX ${i.celex}`].filter(Boolean).join(" · ") : null,
     i.entryIntoForce ? `wejście w życie: ${i.entryIntoForce}` : null,
     i.ts ? (i.ts || "").split(" ")[0] : null,
   ].filter(Boolean).join(" · ");

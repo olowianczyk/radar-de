@@ -28,18 +28,20 @@ const call = (h, body) => new Promise((resolve) => {
   await mail.queueForDigest("hr", [
     { sourceId: 1, e: { kind: "act", note: "Ustawa o <test>", url: "https://isap.sejm.gov.pl/x", ts: "01.10.2026 10:00" } },
     { sourceId: 2, e: { kind: "bill", note: "Projekt o jawności płac", url: "https://www.sejm.gov.pl/p", stage: "I czytanie", passed: false } },
+    { sourceId: 3, e: { kind: "eu", note: "Rozporządzenie (UE) 2026/1", url: "https://eur-lex.europa.eu/x", celex: "32026R0001", euType: "act" } },
   ]);
   failSend = true;
   let r = await mail.sendDigest("hr");
   assert.strictEqual(r.sent, false);
-  assert.strictEqual(JSON.parse(store.get("hrbp/hr/notify.json")).queue.length, 2, "failed send keeps the queue");
+  assert.strictEqual(JSON.parse(store.get("hrbp/hr/notify.json")).queue.length, 3, "failed send keeps the queue");
   failSend = false;
   r = await mail.sendDigest("hr");
-  assert.deepStrictEqual([r.sent, r.count], [true, 2]);
+  assert.deepStrictEqual([r.sent, r.count], [true, 3]);
   const m = sent[0];
   assert.strictEqual(m.to, "a@x.pl");
-  assert.ok(m.subject.includes("2 nowych pozycji"));
+  assert.ok(m.subject.includes("3 nowych pozycji"));
   assert.ok(m.html.includes("Projekty ustaw w Sejmie") && m.html.includes("etap: I czytanie"));
+  assert.ok(m.html.includes("Prawo UE (EUR-Lex)") && m.html.includes("akt UE · CELEX 32026R0001"), "EU section");
   assert.ok(m.html.includes("&lt;test&gt;") && !m.html.includes("<test>"), "titles escaped");
   assert.ok(m.text.includes("/app/#/hr/feed"));
   const doc = JSON.parse(store.get("hrbp/hr/notify.json"));

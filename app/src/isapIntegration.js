@@ -13,6 +13,38 @@ const SAOS_SEARCH_URL = "https://www.saos.org.pl/api/search/judgments";
 export const SAOS_LOOKBACK_DAYS = 60;
 // Sejm bills in progress — mirrors api/_lib.js SEJM_API (term 10).
 const SEJM_PROCESSES_URL = "https://api.sejm.gov.pl/sejm/term10/processes";
+// EUR-Lex (Cellar SPARQL) — mirrors api/_lib.js EURLEX_* constants. Kept in
+// sync by scripts/check-eurlex.mjs, which compares both query builders.
+const EURLEX_SPARQL = "https://publications.europa.eu/webapi/rdf/sparql";
+export const EURLEX_LOOKBACK_DAYS = 60;
+const EURLEX_RT = "http://publications.europa.eu/resource/authority/resource-type/";
+const EURLEX_TYPES = ["DIR", "REG", "DIR_IMPL", "REG_IMPL", "DIR_DEL", "REG_DEL", "CORRIGENDUM", "PROP_DIR", "PROP_REG"];
+
+// Same as api/_lib.js eurlexFragments: "a | b" -> ["a", "b"], quotes and
+// backslashes stripped, fragments under 3 characters dropped.
+export function eurlexFragments(title) {
+  return String(title || "").split("|").map((f) => f.replace(/["\\\r\n]/g, "").trim().toLowerCase()).filter((f) => f.length >= 3).slice(0, 10);
+}
+
+// Same SPARQL text as api/_lib.js eurlexQuery — so the "replay" link in the UI
+// runs exactly what the scanner ran.
+export function eurlexQuery(fragments, dateFrom, dateTo) {
+  const types = EURLEX_TYPES.map((t) => `<${EURLEX_RT}${t}>`).join(" ");
+  const match = fragments.map((f) => `CONTAINS(LCASE(STR(?title)), "${f}")`).join(" || ");
+  return `PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
+SELECT ?celex ?date ?type ?title WHERE {
+  { SELECT DISTINCT ?w ?celex ?date ?type WHERE {
+      VALUES ?type { ${types} }
+      ?w cdm:work_has_resource-type ?type ; cdm:work_date_document ?date .
+      FILTER(?date >= "${dateFrom}"^^xsd:date && ?date <= "${dateTo}"^^xsd:date)
+      ?w cdm:resource_legal_id_celex ?celex .
+  } }
+  ?e cdm:expression_belongs_to_work ?w ;
+     cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/POL> ;
+     cdm:expression_title ?title .
+  FILTER(${match})
+} ORDER BY DESC(?date) LIMIT 300`;
+}
 
 function parseDMYHM(s) {
   const [datePart, timePart] = (s || "").split(" ");
@@ -136,6 +168,12 @@ export function sourceQueryUrl(source, dateFrom, dateTo, mode) {
     const p = new URLSearchParams({ title: source.title || "", documentType: "projekt ustawy", sort_by: "-number", limit: "200" });
     return `${SEJM_PROCESSES_URL}?${p.toString()}`;
   }
+  // EUR-Lex: the SPARQL query itself; format=text/html makes the endpoint
+  // render the result as a table, so the link is readable in a browser.
+  if (source.register === "EURLEX") {
+    const q = eurlexQuery(eurlexFragments(source.title), dateFrom || `${new Date().getFullYear()}-01-01`, dateTo || isoToday());
+    return `${EURLEX_SPARQL}?${new URLSearchParams({ query: q, format: "text/html" }).toString()}`;
+  }
   const params = new URLSearchParams({ publisher: source.publisher === "MP" ? "MP" : "DU", limit: "100" });
   const m = mode || (source.keyword ? "keyword" : "title");
   params.set(m, m === "keyword" ? source.keyword : source.title);
@@ -154,6 +192,10 @@ export function sourceQueries(source) {
   }
   if (source.register === "SEJM") {
     if (source.title) qs.push({ mode: "title", term: source.title });
+    return qs;
+  }
+  if (source.register === "EURLEX") {
+    if (eurlexFragments(source.title).length) qs.push({ mode: "title", term: source.title });
     return qs;
   }
   if (source.keyword) qs.push({ mode: "keyword", term: source.keyword });
@@ -180,8 +222,11 @@ export function nextScanRange(source) {
   let from = d ? `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : `${new Date().getFullYear()}-01-01`;
   const first = !d;
   // SAOS sources look back behind the incremental window (publication lag).
-  if (source.register === "SAOS") {
-    const dt = new Date(`${from}T00:00:00Z`); dt.setUTCDate(dt.getUTCDate() - SAOS_LOOKBACK_DAYS); from = dt.toISOString().slice(0, 10);
+  // SAOS and EUR-Lex sources look back behind the incremental window
+  // (publication / translation lag).
+  const back = source.register === "SAOS" ? SAOS_LOOKBACK_DAYS : source.register === "EURLEX" ? EURLEX_LOOKBACK_DAYS : 0;
+  if (back) {
+    const dt = new Date(`${from}T00:00:00Z`); dt.setUTCDate(dt.getUTCDate() - back); from = dt.toISOString().slice(0, 10);
   }
   return { from, to: isoToday(), first };
 }
@@ -209,13 +254,16 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
       const iso = dd && mm && yy ? `${yy}-${mm}-${dd}` : undefined;
       const isJudgment = e.kind === "judgment";
       const isBill = e.kind === "bill";
+      const isEu = e.kind === "eu";
       changes.push({
         id,
         eli: e.eli,
-        kind: isJudgment ? "judgment" : isBill ? "bill" : "act",
+        kind: isJudgment ? "judgment" : isBill ? "bill" : isEu ? "eu" : "act",
         judgment: isJudgment ? { courtType: e.courtType, courtName: e.courtName, caseNumbers: e.caseNumbers || [], judgmentType: e.judgmentType, judgmentDate: e.judgmentDate, excerpt: e.excerpt || "", keywords: e.keywords || [] } : null,
         // Sejm bill at one legislative stage (see api/_lib.js scanSejmSource).
         bill: isBill ? { number: e.billNumber, stage: e.stage, stageType: e.stageType, stageDate: e.stageDate, processStartDate: e.processStartDate, passed: !!e.passed, euLaw: !!e.euLaw, urgent: !!e.urgent, actEli: e.actEli || null, isapUrl: e.isapUrl || null } : null,
+        // EUR-Lex act / Commission proposal / corrigendum (see api/_lib.js eurlexEntries).
+        eu: isEu ? { celex: e.celex, euType: e.euType || "act", docTypes: e.euDocTypes || [], documentDate: e.documentDate || null } : null,
         act: source.name,
         area: source.area,
         actType: e.actType,

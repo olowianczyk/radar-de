@@ -80,6 +80,7 @@ function ScopeRow({ label, children }) {
 function registerLabel(source, t) {
   if (source.register === "SAOS") return t.saos.register;
   if (source.register === "SEJM") return t.sejm.register;
+  if (source.register === "EURLEX") return t.eu.register;
   return source.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue;
 }
 
@@ -124,6 +125,7 @@ function ScopePanel({ source, lang, t, thesaurus }) {
           {range.first ? t.scopeSinceYearStart.replace("{y}", range.from.slice(0, 4)) : t.scopeSinceLast.replace("{d}", fmtIso(range.from, lang))}
           {source.register === "SAOS" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.saos.lookback.replace("{n}", "60")}</div>}
           {source.register === "SEJM" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.sejm.lookback}</div>}
+          {source.register === "EURLEX" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.eu.lookback}</div>}
         </ScopeRow>
         {source.register === "SAOS" && (
           <ScopeRow label={t.saos.freshness}>
@@ -133,7 +135,7 @@ function ScopePanel({ source, lang, t, thesaurus }) {
             <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.saos.freshnessWarn}</div>
           </ScopeRow>
         )}
-        <ScopeRow label={t.scopeLimit}>{t.scopeLimitValue}</ScopeRow>
+        <ScopeRow label={t.scopeLimit}>{source.register === "EURLEX" ? t.eu.limit : t.scopeLimitValue}</ScopeRow>
       </div>
       {note && (
         <div style={{ fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.55 }}>
@@ -143,12 +145,12 @@ function ScopePanel({ source, lang, t, thesaurus }) {
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
         {queries.map((q) => (
           <a key={q.mode} href={sourceQueryUrl(source, range.from, range.to, q.mode)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <Icon name="external-link" size={12} />{source.register === "SAOS" ? t.scopeOpenQuery.replace("API Sejmu", "SAOS").replace("Sejm API", "SAOS").replace("Sejm-API", "SAOS") : t.scopeOpenQuery}{queries.length > 1 ? ` (${modeLabel(q.mode, t)})` : ""}
+            <Icon name="external-link" size={12} />{source.register === "EURLEX" ? t.eu.openQuery : source.register === "SAOS" ? t.scopeOpenQuery.replace("API Sejmu", "SAOS").replace("Sejm API", "SAOS").replace("Sejm-API", "SAOS") : t.scopeOpenQuery}{queries.length > 1 ? ` (${modeLabel(q.mode, t)})` : ""}
           </a>
         ))}
         {source.url && (
           <a href={source.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <Icon name="external-link" size={12} />{source.register === "SAOS" ? "SAOS" : source.register === "SEJM" ? "Sejm" : "ISAP"}
+            <Icon name="external-link" size={12} />{source.register === "SAOS" ? "SAOS" : source.register === "SEJM" ? "Sejm" : source.register === "EURLEX" ? "EUR-Lex" : "ISAP"}
           </a>
         )}
       </div>
@@ -202,7 +204,7 @@ function AddSourceForm({ t, ws, onAdd, onCancel, thesaurus }) {
         <Input label={<>{t.srcName}<Hint text={t.hints.srcName} /></>} value={name} onChange={(e) => setName(e.target.value)} />
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <div style={{ width: 220 }}>
-            <Select label={<>{t.scopeRegister}<Hint text={t.hints.register} /></>} value={publisher} onChange={(e) => { const v = e.target.value; setPublisher(v); setMode(v === "SAOS" ? "referencedRegulation" : "title"); }} options={[{ value: "DU", label: t.scopeRegisterValue }, { value: "MP", label: t.scopeRegisterMP }, { value: "SEJM", label: t.sejm.register }, { value: "SAOS", label: t.saos.register }]} />
+            <Select label={<>{t.scopeRegister}<Hint text={t.hints.register} /></>} value={publisher} onChange={(e) => { const v = e.target.value; setPublisher(v); setMode(v === "SAOS" ? "referencedRegulation" : "title"); }} options={[{ value: "DU", label: t.scopeRegisterValue }, { value: "MP", label: t.scopeRegisterMP }, { value: "SEJM", label: t.sejm.register }, { value: "EURLEX", label: t.eu.register }, { value: "SAOS", label: t.saos.register }]} />
           </div>
           {isSaos && (
             <>
@@ -211,10 +213,10 @@ function AddSourceForm({ t, ws, onAdd, onCancel, thesaurus }) {
             </>
           )}
           <div style={{ width: 220 }}>
-            <Select label={<>{t.srcMode}<Hint text={t.hints.mode} /></>} value={mode} onChange={(e) => setMode(e.target.value)} options={isSaos ? [{ value: "referencedRegulation", label: t.saos.matchReferenced }, { value: "phrase", label: t.saos.matchPhrase }] : publisher === "SEJM" ? [{ value: "title", label: t.scopeMatchTitle }] : [{ value: "title", label: t.scopeMatchTitle }, { value: "keyword", label: t.scopeMatchKeyword }]} />
+            <Select label={<>{t.srcMode}<Hint text={t.hints.mode} /></>} value={mode} onChange={(e) => setMode(e.target.value)} options={isSaos ? [{ value: "referencedRegulation", label: t.saos.matchReferenced }, { value: "phrase", label: t.saos.matchPhrase }] : publisher === "SEJM" || publisher === "EURLEX" ? [{ value: "title", label: t.scopeMatchTitle }] : [{ value: "title", label: t.scopeMatchTitle }, { value: "keyword", label: t.scopeMatchKeyword }]} />
           </div>
           <div style={{ flex: 1, minWidth: 220 }}>
-            <Input label={<>{isSaos ? modeLabel(mode, t) : mode === "keyword" ? t.srcTerm : t.srcTermTitle}<Hint text={isSaos ? (mode === "phrase" ? t.hints.termSaosPhrase : t.hints.termSaosRef) : publisher === "SEJM" ? t.hints.termSejm : mode === "keyword" ? t.hints.termKeyword : t.hints.termTitle} /></>} value={term} onChange={(e) => setTerm(e.target.value)} />
+            <Input label={<>{isSaos ? modeLabel(mode, t) : mode === "keyword" ? t.srcTerm : t.srcTermTitle}<Hint text={isSaos ? (mode === "phrase" ? t.hints.termSaosPhrase : t.hints.termSaosRef) : publisher === "SEJM" ? t.hints.termSejm : publisher === "EURLEX" ? t.eu.termHint : mode === "keyword" ? t.hints.termKeyword : t.hints.termTitle} /></>} value={term} onChange={(e) => setTerm(e.target.value)} />
             {kwMode && needle.length >= 2 && (
               <div style={{ marginTop: 6, fontSize: 12 }}>
                 {kwSet === undefined && <span style={{ color: "var(--text-muted)" }}>{t.kwChecking}</span>}
@@ -287,7 +289,8 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
   const [search, setSearch] = React.useState("");
   const needle = search.trim().toLowerCase();
   const auto = allAuto.filter((s) => {
-    if (filter === "DU" && (s.register === "SAOS" || s.register === "SEJM" || s.publisher === "MP")) return false;
+    if (filter === "DU" && (s.register === "SAOS" || s.register === "SEJM" || s.register === "EURLEX" || s.publisher === "MP")) return false;
+    if (filter === "EURLEX" && s.register !== "EURLEX") return false;
     if (filter === "SEJM" && s.register !== "SEJM") return false;
     if (filter === "MP" && s.publisher !== "MP") return false;
     if (filter === "SAOS" && s.register !== "SAOS") return false;
@@ -298,16 +301,17 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
   });
   const areaOrder = Object.keys(ws.areas);
   auto.sort((a, b) => areaOrder.indexOf(a.area) - areaOrder.indexOf(b.area));
-  const counts = { all: allAuto.length, DU: allAuto.filter((s) => s.register !== "SAOS" && s.register !== "SEJM" && s.publisher !== "MP").length, SEJM: allAuto.filter((s) => s.register === "SEJM").length, MP: allAuto.filter((s) => s.publisher === "MP").length, SAOS: allAuto.filter((s) => s.register === "SAOS").length, off: allAuto.filter((s) => !s.active).length, errors: allAuto.filter((s) => s.error).length };
-  const stripeFor = (s) => (s.register === "SAOS" ? "var(--info-600)" : s.register === "SEJM" ? "var(--amber-600)" : s.publisher === "MP" ? "var(--warning-500)" : "var(--brand)");
+  const counts = { all: allAuto.length, DU: allAuto.filter((s) => s.register !== "SAOS" && s.register !== "SEJM" && s.register !== "EURLEX" && s.publisher !== "MP").length, EURLEX: allAuto.filter((s) => s.register === "EURLEX").length, SEJM: allAuto.filter((s) => s.register === "SEJM").length, MP: allAuto.filter((s) => s.publisher === "MP").length, SAOS: allAuto.filter((s) => s.register === "SAOS").length, off: allAuto.filter((s) => !s.active).length, errors: allAuto.filter((s) => s.error).length };
+  const stripeFor = (s) => (s.register === "SAOS" ? "var(--info-600)" : s.register === "SEJM" ? "var(--amber-600)" : s.register === "EURLEX" ? "var(--green-700)" : s.publisher === "MP" ? "var(--warning-500)" : "var(--brand)");
 
   const addSource = ({ name, mode, term, publisher, courtType, judgmentType, area }) => {
     const id = Math.max(1000, ...auto.map((s) => s.id)) + 1;
     const saos = publisher === "SAOS";
     const sejm = publisher === "SEJM";
+    const eu = publisher === "EURLEX"; // same shape as eurlex() in workspaces.js
     setSources((prev) => [...prev, {
-      id, name, type: saos ? "Orzecznictwo" : sejm ? "Projekt ustawy" : "Ustawa", url: saos ? "https://www.saos.org.pl/search" : sejm ? "https://www.sejm.gov.pl/" : "https://isap.sejm.gov.pl", area,
-      publisher: saos ? "SAOS" : publisher, register: saos ? "SAOS" : sejm ? "SEJM" : "ELI",
+      id, name, type: saos ? "Orzecznictwo" : sejm ? "Projekt ustawy" : eu ? "Akt UE" : "Ustawa", url: saos ? "https://www.saos.org.pl/search" : sejm ? "https://www.sejm.gov.pl/" : eu ? "https://eur-lex.europa.eu/" : "https://isap.sejm.gov.pl", area,
+      publisher: saos ? "SAOS" : eu ? "EU" : publisher, register: saos ? "SAOS" : sejm ? "SEJM" : eu ? "EURLEX" : "ELI",
       courtType: saos ? courtType : null, judgmentTypes: saos && judgmentType ? [judgmentType] : [],
       referencedRegulation: saos && mode === "referencedRegulation" ? term : null, phrase: saos && mode === "phrase" ? term : null,
       keyword: !saos && mode === "keyword" ? term : null, title: !saos && mode === "title" ? term : null,
@@ -338,7 +342,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.srcFilter.search} value={search} onChange={(e) => setSearch(e.target.value)} iconLeft={<Icon name="search" size={15} />} /></div>
         <div role="group" aria-label={t.srcFilter.all} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {[["all", t.srcFilter.all], ["DU", t.scopeRegisterValue.replace(/ \(.*\)$/, "")], ["MP", t.scopeRegisterMP.replace(/ \(.*\)$/, "")], ["SEJM", t.sejm.registerShort], ["SAOS", t.saos.registerShort], ["off", t.srcFilter.off], ["errors", t.srcFilter.errors]].map(([id, label]) => (
+          {[["all", t.srcFilter.all], ["DU", t.scopeRegisterValue.replace(/ \(.*\)$/, "")], ["MP", t.scopeRegisterMP.replace(/ \(.*\)$/, "")], ["SEJM", t.sejm.registerShort], ["EURLEX", t.eu.registerShort], ["SAOS", t.saos.registerShort], ["off", t.srcFilter.off], ["errors", t.srcFilter.errors]].map(([id, label]) => (
             (id !== "errors" || counts.errors > 0) && <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)} className={`ui-chip${filter === id ? " ui-chip--on" : ""}`}>{label} <span style={{ opacity: .7 }}>{counts[id]}</span></button>
           ))}
         </div>
@@ -374,6 +378,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
                     {s.publisher === "MP" && <Badge tone="amber">M.P.</Badge>}
                     {s.register === "SAOS" && <Badge tone="blue">{t.saos.registerShort} · {t.saos.courts[s.courtType] || s.courtType}</Badge>}
                     {s.register === "SEJM" && <Badge tone="amber">{t.sejm.registerShort}</Badge>}
+                    {s.register === "EURLEX" && <Badge tone="green">{t.eu.registerShort}</Badge>}
                     <span>· {t.lastChecked}: {s.lastChecked || "—"}</span>
                   </div>
                   {s.error && <div style={{ fontSize: 11.5, color: "var(--danger-600)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{s.error}</div>}

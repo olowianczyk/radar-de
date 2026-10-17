@@ -463,6 +463,155 @@ async function scanSejmSource(s, dateFrom, dateTo, nowStr) {
   return result;
 }
 
+// ---- EUR-Lex (EU law + Commission proposals) ----------------------------------
+// Source: the Publications Office's Cellar SPARQL endpoint — public, no account,
+// no key (the EUR-Lex SOAP webservice needs registration; this does not).
+// Source fields: register "EURLEX", title = one or more fragments separated by
+// "|", matched case-insensitively against the act's POLISH title. A fragment can
+// be a phrase ("danych osobowych") or a base act's number ("2016/679") — every
+// amendment, implementing/delegated act and corrigendum names its base act in
+// the title, so the number catches the whole family.
+// What it finds (resource types of the EU "resource-type" authority table):
+//   acts      — directives and regulations (also implementing/delegated) + corrigenda
+//   proposals — Commission proposals for a regulation/directive (COM … PC) =
+//               EU law "w fazie projektu", months or years before it is adopted.
+// Dated by cdm:work_date_document (adoption / COM date). The Polish title only
+// appears once the act is published in the OJ or the proposal is translated —
+// days to weeks later — so like SAOS every scan looks back EURLEX_LOOKBACK_DAYS
+// and relies on dedupe by CELEX number.
+// The endpoint occasionally answers 502 for a single request — one retry.
+// ponytail: substring match on titles only (no EUROVOC descriptors, no
+// full text); switch to cdm:work_is_about_concept_eurovoc if titles prove too
+// noisy or too narrow. Decisions (DEC, incl. CFSP sanctions decisions) are left
+// out — mostly appointments and international agreements.
+const EURLEX_SPARQL = "https://publications.europa.eu/webapi/rdf/sparql";
+const EURLEX_LOOKBACK_DAYS = 60;
+const EURLEX_RT = "http://publications.europa.eu/resource/authority/resource-type/";
+const EURLEX_ACT_TYPES = ["DIR", "REG", "DIR_IMPL", "REG_IMPL", "DIR_DEL", "REG_DEL", "CORRIGENDUM"];
+const EURLEX_PROPOSAL_TYPES = ["PROP_DIR", "PROP_REG"];
+
+// "danych osobowych | 2016/679" -> ["danych osobowych", "2016/679"]. The
+// fragments go into a SPARQL string literal and custom sources come from the
+// (login-less) app, so quotes, backslashes and line breaks are removed here —
+// nothing a user types can break out of the literal. Fragments under 3
+// characters are dropped (they would match almost every title).
+function eurlexFragments(title) {
+  return String(title || "").split("|").map((f) => f.replace(/["\\\r\n]/g, "").trim().toLowerCase()).filter((f) => f.length >= 3).slice(0, 10);
+}
+
+function isEurlexSource(s) {
+  return !!(s && s.register === "EURLEX" && eurlexFragments(s.title).length);
+}
+
+// The date/type filter runs first in a subquery (fast: a few hundred works per
+// two months), titles are joined afterwards. Written the other way round
+// (title filter over every Polish title ever) the same query took 5-20 s.
+function eurlexQuery(fragments, dateFrom, dateTo) {
+  const types = [...EURLEX_ACT_TYPES, ...EURLEX_PROPOSAL_TYPES].map((t) => `<${EURLEX_RT}${t}>`).join(" ");
+  const match = fragments.map((f) => `CONTAINS(LCASE(STR(?title)), "${f}")`).join(" || ");
+  return `PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
+SELECT ?celex ?date ?type ?title WHERE {
+  { SELECT DISTINCT ?w ?celex ?date ?type WHERE {
+      VALUES ?type { ${types} }
+      ?w cdm:work_has_resource-type ?type ; cdm:work_date_document ?date .
+      FILTER(?date >= "${dateFrom}"^^xsd:date && ?date <= "${dateTo}"^^xsd:date)
+      ?w cdm:resource_legal_id_celex ?celex .
+  } }
+  ?e cdm:expression_belongs_to_work ?w ;
+     cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/POL> ;
+     cdm:expression_title ?title .
+  FILTER(${match})
+} ORDER BY DESC(?date) LIMIT 300`;
+}
+
+// Human page of the act / proposal in Polish.
+function eurlexUrl(celex) {
+  return `https://eur-lex.europa.eu/legal-content/PL/TXT/?uri=CELEX:${encodeURIComponent(celex)}`;
+}
+
+// POST (not GET): the query is ~1 kB and grows with every fragment.
+// Measured 10.2026: a good answer takes 0.3-1.5 s, but roughly every second
+// request hangs (one bad backend behind the load balancer?) or gets a 502 — so
+// a short timeout and up to EURLEX_ATTEMPTS tries instead of one long wait.
+const EURLEX_TIMEOUT_MS = 8000;
+const EURLEX_ATTEMPTS = 3;
+async function eurlexSparql(query) {
+  let lastError;
+  for (let attempt = 0; attempt < EURLEX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(EURLEX_SPARQL, {
+        method: "POST",
+        signal: AbortSignal.timeout(EURLEX_TIMEOUT_MS),
+        headers: { accept: "application/sparql-results+json", "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ query }).toString(),
+      });
+      if (!res.ok) {
+        lastError = new Error(`EUR-Lex SPARQL error ${res.status}`);
+        if (res.status < 500) break; // our query is wrong — retrying will not help
+        continue;
+      }
+      const data = await res.json();
+      if (!data || !data.results || !Array.isArray(data.results.bindings)) throw new Error("EUR-Lex SPARQL: unexpected response shape");
+      return data.results.bindings;
+    } catch (e) {
+      lastError = e.name === "TimeoutError" ? new Error(`EUR-Lex SPARQL: no answer in ${EURLEX_TIMEOUT_MS / 1000} s`) : e;
+      if (/unexpected response shape/.test(e.message)) break;
+    }
+  }
+  throw lastError;
+}
+
+// One SPARQL row per (work, type) — a work can carry two types (e.g. REG and
+// CORRIGENDUM), so rows are merged by CELEX. Pure, exported for the self-check.
+function eurlexEntries(bindings, todayIso) {
+  const byCelex = new Map();
+  bindings.forEach((b) => {
+    const celex = b.celex && b.celex.value;
+    if (!celex) return;
+    const type = ((b.type && b.type.value) || "").replace(EURLEX_RT, "");
+    const cur = byCelex.get(celex) || { celex, date: b.date && b.date.value, title: b.title && b.title.value, types: [] };
+    if (!cur.types.includes(type)) cur.types.push(type);
+    byCelex.set(celex, cur);
+  });
+  // CELEX sector 3 = legislation. A corrigendum outside it corrects a notice,
+  // a communication or a CFSP decision — not an act this source tracks.
+  const works = [...byCelex.values()].filter((w) => w.types.some((t) => t !== "CORRIGENDUM") || w.celex.startsWith("3"));
+  return works.map((w) => {
+    // "R(nn)" CELEX suffix = corrigendum ("Sprostowanie do …").
+    const euType = w.types.some((t) => EURLEX_PROPOSAL_TYPES.includes(t)) ? "proposal"
+      : w.types.includes("CORRIGENDUM") || /R\(\d+\)$/.test(w.celex) ? "corrigendum" : "act";
+    return {
+      ts: formatDetectedTs(w.date),
+      type: "detected",
+      kind: "eu",
+      note: w.title,
+      url: eurlexUrl(w.celex),
+      eli: `EU/${w.celex}`.slice(0, 120),
+      via: "title",
+      publisher: "EU",
+      celex: w.celex,
+      euType,
+      euDocTypes: w.types,
+      documentDate: w.date || null,
+      detectedOn: todayIso,
+    };
+  });
+}
+
+async function scanEurlexSource(s, dateFrom, dateTo, nowStr, forcedRange) {
+  const from = forcedRange ? dateFrom : shiftIsoDays(dateFrom, -EURLEX_LOOKBACK_DAYS);
+  const sparql = eurlexQuery(eurlexFragments(s.title), from, dateTo);
+  // Replayable in a browser: the endpoint renders an HTML table for format=text/html.
+  const url = `${EURLEX_SPARQL}?${new URLSearchParams({ query: sparql, format: "text/html" }).toString()}`;
+  const query = { mode: "title", term: s.title, register: "EURLEX", dateFrom: from, dateTo, lookbackDays: forcedRange ? 0 : EURLEX_LOOKBACK_DAYS, url };
+  try {
+    const detected = eurlexEntries(await eurlexSparql(sparql), isoToday());
+    return { id: s.id, lastChecked: nowStr, found: detected.length, detected, queries: [query], query };
+  } catch (e) {
+    return { id: s.id, lastChecked: nowStr, found: 0, detected: [], error: e.message, queries: [query], query };
+  }
+}
+
 // The official keyword thesaurus. Cached per function instance — it changes
 // rarely and is ~3k strings; the endpoint also sets a day-long CDN cache.
 let keywordsCache = null;
@@ -547,13 +696,17 @@ function sourceQueries(s) {
     if (isSejmSource(s)) qs.push({ mode: "title", term: s.title });
     return qs;
   }
+  if (s.register === "EURLEX") {
+    if (isEurlexSource(s)) qs.push({ mode: "title", term: s.title });
+    return qs;
+  }
   if (s.keyword) qs.push({ mode: "keyword", term: s.keyword });
   if (s.title) qs.push({ mode: "title", term: s.title });
   return qs;
 }
 
-// Anything the engine can actually scan (Sejm/ELI acts, SAOS judgments or
-// Sejm bills in progress).
+// Anything the engine can actually scan (Sejm/ELI acts, SAOS judgments, Sejm
+// bills in progress or EUR-Lex acts and proposals).
 function isScannable(s) {
   return sourceQueries(s).length > 0;
 }
@@ -580,6 +733,7 @@ async function scanSources(sources, range) {
     const dateTo = rangeFrom ? rangeTo : todayIso;
     if (s.register === "SAOS") return scanSaosSource(s, dateFrom, dateTo, nowStr, !!rangeFrom);
     if (s.register === "SEJM") return scanSejmSource(s, dateFrom, dateTo, nowStr);
+    if (s.register === "EURLEX") return scanEurlexSource(s, dateFrom, dateTo, nowStr, !!rangeFrom);
     const publisher = normalizePublisher(s.publisher);
     const queries = qs.map((q) => {
       const opts = { [q.mode]: q.term, publisher, dateFrom, dateTo };
@@ -629,4 +783,4 @@ function parseBody(req) {
   return typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
 }
 
-module.exports = { WORKSPACES, normalizeWorkspace, normalizePublisher, sourceQueries, isScannable, isSaosSource, isSejmSource, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES, searchActs, searchJudgments, searchJudgmentsPage, searchJudgmentsCached, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, storageAvailable, loadDoc, saveDoc, sendError, parseBody };
+module.exports = { WORKSPACES, normalizeWorkspace, normalizePublisher, sourceQueries, isScannable, isSaosSource, isSejmSource, isEurlexSource, eurlexFragments, eurlexQuery, eurlexEntries, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES, searchActs, searchJudgments, searchJudgmentsPage, searchJudgmentsCached, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, storageAvailable, loadDoc, saveDoc, sendError, parseBody };
