@@ -1,6 +1,12 @@
 // POST /api/scan-all  { workspace, sources: [{ id, keyword|title, publisher, lastChecked }], dateFrom?, dateTo? }
 //   — called by the frontend's "Sprawdź teraz" button with its real per-source
 //     state, so each source is checked since its own actual last-checked time.
+// POST /api/scan-all  { workspace, action: "reset" }
+//   — "Wyczyść wykrycia": empties the workspace's scan doc (detected-act history,
+//     per-source lastChecked/found/error, lastRun) so the next scan for a picked
+//     period (e.g. "Bieżący kwartał") reports everything in it as new again.
+//     Review statuses (triage doc), KB, source config and the digest queue are
+//     NOT touched — a re-detected act keeps the status the team gave it.
 // GET  /api/scan-all
 //   — called by the daily Vercel Cron (see vercel.json). Scans every workspace:
 //     the generated catalogue (api/_sources.js) plus user-added sources, with
@@ -115,6 +121,15 @@ module.exports = async (req, res) => {
     if (req.method === "POST") {
       const body = parseBody(req);
       const ws = normalizeWorkspace(body.workspace);
+      if (body.action === "reset") {
+        // Same empty shape loadDoc returns for a missing doc. Saved (not deleted)
+        // so loadDoc never falls back to the legacy single-file state.
+        // ponytail: no login (open link, by design) — anyone with the link can
+        // reset; gate it with APP_WRITE_KEY / Basic Auth once access is restricted.
+        await saveDoc(ws, "scan", { sources: [], history: {}, lastRun: null });
+        res.status(200).json({ workspace: ws, reset: true });
+        return;
+      }
       // Untrusted input merges straight into the shared scan doc (no login by
       // design) — cap the fan-out and coerce shapes so a malformed POST can't
       // corrupt real sources' lastChecked or spin up unbounded Sejm API calls.

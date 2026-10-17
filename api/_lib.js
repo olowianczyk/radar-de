@@ -99,7 +99,11 @@ async function readBlobJson(pathname) {
   // URL, which 403s — private blobs need a signed request, not a bearer header).
   let result;
   try {
-    result = await get(pathname, { access: "private" });
+    // useCache: false = read from origin, not the CDN. With the cache a read
+    // right after a write could return the previous version — e.g. a scan
+    // started just after "Wyczyść wykrycia" would load the old history and
+    // merge it back, silently undoing the reset (same for triage/KB writes).
+    result = await get(pathname, { access: "private", useCache: false });
   } catch (e) {
     if (/not.?found/i.test(`${e && e.name} ${e && e.message}`)) return null; // SDK versions differ: some throw on a missing blob
     throw e;

@@ -28,7 +28,7 @@ function periodRange(period, customDate) {
   return [null, null];
 }
 
-function ScanBanner({ t, backend, sources, scanning, runScan, scanFrom, setScanFrom, scanTo, setScanTo, lastScanFound }) {
+function ScanBanner({ t, backend, sources, scanning, runScan, resetScans, scanFrom, setScanFrom, scanTo, setScanTo, lastScanFound }) {
   return (
     <div className="ui-card" style={{ display: "flex", alignItems: "flex-end", gap: 12, padding: "10px 16px", fontSize: 13, flexWrap: "wrap", borderRadius: "var(--radius-md)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingBottom: 10, color: "var(--text-body)", flex: "1 1 320px", minWidth: 0 }}>
@@ -48,11 +48,21 @@ function ScanBanner({ t, backend, sources, scanning, runScan, scanFrom, setScanF
           {scanning ? t.scanning : t.checkNow}
         </Button>
       </div>
+      {/* Banner footer: reset the detections, then pick a period (e.g. "Bieżący
+          kwartał") and "Sprawdź teraz" to detect exactly that period from scratch.
+          Ghost + small and separated from the scan button — it is destructive
+          for the whole department (asks for a confirm first, see AppShell). */}
+      {typeof resetScans === "function" && (
+        <div style={{ flex: "1 0 100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", borderTop: "1px solid var(--border-subtle)", paddingTop: 8, color: "var(--text-muted)", fontSize: 12 }}>
+          <span>{t.resetScansHint}</span>
+          <Button variant="ghost" size="sm" disabled={scanning || backend !== "ok"} onClick={resetScans} iconLeft={<Icon name="rotate-ccw" size={14} />}>{t.resetScans}</Button>
+        </div>
+      )}
     </div>
   );
 }
 
-export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, backend, sources, scanning, runScan, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb }) {
+export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, backend, sources, scanning, runScan, resetScans, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb }) {
   const t = tFor(lang, ws);
   const [period, setPeriod] = React.useState("all");
   const [customDate, setCustomDate] = React.useState("");
@@ -147,7 +157,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
       </div>
       <FirstSteps t={t} ws={ws} changes={changes} backend={backend} runScan={runScan} />
       <CoverageCard t={t} ws={ws} sources={sources} variant="compact" />
-      <ScanBanner t={t} backend={backend} sources={sources} scanning={scanning} runScan={runScan} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} lastScanFound={lastScanFound} />
+      <ScanBanner t={t} backend={backend} sources={sources} scanning={scanning} runScan={runScan} resetScans={resetScans} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} lastScanFound={lastScanFound} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
         <StatCard label={t.kpi.new} value={String(newCount)} accent={newCount ? "danger" : "petrol"} icon={<Icon name="sparkles" size={18} />} />
         <StatCard label={t.kpi.pending} value={String(pendingCount)} accent="warning" icon={<Icon name="clock" size={18} />} />

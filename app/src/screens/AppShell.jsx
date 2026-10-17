@@ -5,7 +5,7 @@ import { SidebarNav, IconButton, Icon, Badge } from "../components/index.js";
 import { LoadingState } from "../components/Loading.jsx";
 import { RadarMark } from "../components/RadarMark.jsx";
 import { WORKSPACES, ACCENTS, ACCENT_SWATCH, THEMES, THEME_ICON, initialSources, isManualSource, tFor } from "../workspaces.js";
-import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc, addKbComment, deleteKbDoc, saveTriage, saveSourceConfig } from "../isapIntegration.js";
+import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc, addKbComment, deleteKbDoc, saveTriage, saveSourceConfig, resetScans as resetScansApi } from "../isapIntegration.js";
 
 function useSources(ws) {
   return React.useState(() => initialSources(ws));
@@ -421,6 +421,19 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
       setScanning(false);
     });
   }, [ws.id, scanning, sources, scanFrom, scanTo, t, reportError]);
+  // "Wyczyść wykrycia" (feed scan banner): after a confirm, empties the scan
+  // history on the server, then mirrors that locally — only once the server
+  // confirmed, so the feed never shows a reset that did not happen.
+  const resetScans = React.useCallback(() => {
+    if (scanning || !window.confirm(t.resetScansConfirm)) return;
+    setNotice(null);
+    resetScansApi(ws.id).then(() => {
+      setSourceHistory({});
+      setSourcesRaw((prev) => prev.map((s) => ({ ...s, lastChecked: null, found: 0, error: null, truncated: false, freshness: null })));
+      setLastScanFound(null);
+      setNotice({ tone: "ok", text: t.notice.resetOk });
+    }).catch((e) => reportError(t.notice.resetFailed, e));
+  }, [ws.id, scanning, t, reportError]);
   const [notifOpen, setNotifOpen] = React.useState(false);
   const notifRef = React.useRef(null);
   React.useEffect(() => {
@@ -566,7 +579,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
         )}
         <main style={{ flex: 1, ...(isMobile ? { minHeight: 0, overflowY: "auto" } : {}), padding: isMobile ? 16 : 28 }}>
           <div key={active} className="hrbp-screen" style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, appearance, backend, sources, setSources, sourceHistory, scanning, runScan, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment, removeKb, notify, setNotify }) : children}
+            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, appearance, backend, sources, setSources, sourceHistory, scanning, runScan, resetScans, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment, removeKb, notify, setNotify }) : children}
           </div>
         </main>
       </div>

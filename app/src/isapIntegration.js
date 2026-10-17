@@ -110,6 +110,12 @@ export async function deleteKbDoc(ws, docId) {
   await post("/api/kb", { workspace: ws, action: "delete", docId });
 }
 
+// "Wyczyść wykrycia": empties the department's scan history and per-source
+// last-check state on the server (review statuses are kept — api/scan-all.js).
+export async function resetScans(ws) {
+  await post("/api/scan-all", { workspace: ws, action: "reset" });
+}
+
 // Shared review statuses — returns the whole map after the write.
 export async function saveTriage(ws, ids, status) {
   const data = await post("/api/triage", { workspace: ws, ids, status });
