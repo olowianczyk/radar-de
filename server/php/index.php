@@ -1,0 +1,666 @@
+<?php
+// PHP port of api/*.js for SEOHOST shared hosting (PHP 8.3 + LiteSpeed) — the
+// same URLs and JSON shapes, so the built frontend runs unchanged. Deployed as
+// public_html/api/index.php; ../.htaccess routes /api/<name> here (?r=<name>).
+// Comments mirror api/_lib.js — read that for the why of each rule.
+//
+// Persistence: one JSON file per workspace and per doc instead of Vercel Blob,
+// outside the docroot: ~/private/hrbp/<ws>/<doc>.json (same doc split as Blob:
+// scan, kb, triage, config) plus ~/private/hrbp/cache/ (SAOS search pages,
+// keyword thesaurus). Writes are tmp+rename (readers never see half a file);
+// every read-modify-write holds a per-doc flock.
+// ponytail: flat files + flock; move to MariaDB if the state shape grows relational needs.
+//
+// CLI (cron + data import):
+//   php index.php scan-all                  — the daily scan of every workspace
+//   php index.php import https://<host>     — copy state from a live deployment's GET API
+// HTTP GET /api/scan-all needs Authorization: Bearer <cron_secret> from
+// ~/private/hrbp-config.php (<?php return ['cron_secret' => '...'];) — without
+// that file it always answers 401.
+date_default_timezone_set('UTC'); // Vercel functions run in UTC; lastChecked strings are UTC
+
+define('HOME_DIR', posix_getpwuid(posix_geteuid())['dir']); // HOME is unset under LiteSpeed
+define('DATA_DIR', HOME_DIR . '/private/hrbp');
+const WORKSPACES = ['hr', 'compliance', 'legal'];
+const DOCS = ['scan', 'kb', 'triage', 'config'];
+const SEARCH_URL = 'https://api.sejm.gov.pl/eli/acts/search';
+const KEYWORDS_URL = 'https://api.sejm.gov.pl/eli/keywords';
+const SAOS_SEARCH_URL = 'https://www.saos.org.pl/api/search/judgments';
+const SAOS_JUDGMENT_URL = 'https://www.saos.org.pl/judgments/';
+const SAOS_LOOKBACK_DAYS = 60;
+const SAOS_COURT_TYPES = ['COMMON', 'SUPREME', 'ADMINISTRATIVE', 'CONSTITUTIONAL_TRIBUNAL', 'NATIONAL_APPEAL_CHAMBER'];
+const SAOS_JUDGMENT_TYPES = ['SENTENCE', 'DECISION', 'RESOLUTION', 'REGULATION', 'REASONS'];
+const SAOS_FROZEN_COURTS = ['SUPREME', 'CONSTITUTIONAL_TRIBUNAL', 'NATIONAL_APPEAL_CHAMBER', 'ADMINISTRATIVE'];
+const SAOS_CACHE_TTL = 24 * 3600;
+const SEJM_TERM = 10; // ponytail: bump when the next Sejm convenes (autumn 2027), as in _lib.js
+const SEJM_API = 'https://api.sejm.gov.pl/sejm/term' . SEJM_TERM;
+const FETCH_TIMEOUT = 20;
+const JSON_FLAGS = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+
+function out($code, $data, $cache = 'no-store') {
+  http_response_code($code);
+  header('Content-Type: application/json; charset=utf-8');
+  header('Cache-Control: ' . $cache);
+  echo json_encode($data, JSON_FLAGS);
+  exit;
+}
+
+function send_error($e) {
+  if ($e->getMessage() === 'storage_unavailable') out(503, ['error' => 'storage_unavailable', 'message' => 'Storage directory ~/private/hrbp is missing or not writable — nothing can be saved or read.']);
+  out(502, ['error' => 'backend_error', 'message' => $e->getMessage()]);
+}
+
+// ---- storage ---------------------------------------------------------------
+function normalize_ws($ws) { return in_array($ws, WORKSPACES, true) ? $ws : 'hr'; }
+function storage_available() { return is_dir(DATA_DIR) && is_writable(DATA_DIR); }
+function doc_path($ws, $doc) {
+  if (!in_array($doc, DOCS, true)) throw new Exception("unknown doc $doc");
+  return DATA_DIR . '/' . normalize_ws($ws) . "/$doc.json";
+}
+function empty_doc($doc) {
+  return ['scan' => ['sources' => [], 'history' => [], 'lastRun' => null], 'kb' => ['docs' => []], 'triage' => ['statuses' => []], 'config' => ['overrides' => [], 'custom' => []]][$doc];
+}
+function read_json_file($path) {
+  if (!is_file($path)) return null;
+  $data = json_decode(file_get_contents($path), true);
+  if (!is_array($data)) throw new Exception("corrupt $path");
+  return $data;
+}
+function write_json_file($path, $data) {
+  if (!is_dir(dirname($path))) mkdir(dirname($path), 0700, true);
+  $tmp = $path . '.' . getmypid() . '.tmp';
+  if (file_put_contents($tmp, json_encode($data, JSON_FLAGS)) === false || !rename($tmp, $path)) throw new Exception("write failed: $path");
+}
+function load_doc($ws, $doc) {
+  if (!storage_available()) throw new Exception('storage_unavailable');
+  return read_json_file(doc_path($ws, $doc)) ?? empty_doc($doc);
+}
+function save_doc($ws, $doc, $data) {
+  if (!storage_available()) throw new Exception('storage_unavailable');
+  write_json_file(doc_path($ws, $doc), $data);
+}
+// Locked read-modify-write: $fn gets the doc, returns the new doc (saved) or null (not saved).
+function update_doc($ws, $doc, $fn) {
+  if (!storage_available()) throw new Exception('storage_unavailable');
+  $path = doc_path($ws, $doc);
+  if (!is_dir(dirname($path))) mkdir(dirname($path), 0700, true);
+  $lock = fopen("$path.lock", 'c');
+  flock($lock, LOCK_EX);
+  try {
+    $next = $fn(load_doc($ws, $doc));
+    if ($next !== null) save_doc($ws, $doc, $next);
+    return $next;
+  } finally {
+    flock($lock, LOCK_UN);
+    fclose($lock);
+  }
+}
+// PHP arrays lose {} vs [] — force the map-shaped fields back to JSON objects.
+function obj($a) { return (object)($a ?: []); }
+function config_out($c) { return ['overrides' => obj($c['overrides'] ?? []), 'custom' => $c['custom'] ?? []]; }
+
+// ---- upstream HTTP ---------------------------------------------------------
+function qs($pairs) {
+  return implode('&', array_map(fn($p) => urlencode($p[0]) . '=' . urlencode((string)$p[1]), $pairs));
+}
+function fetch_json($url, $label, $assoc = true) {
+  $c = curl_init($url);
+  curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => FETCH_TIMEOUT, CURLOPT_FOLLOWLOCATION => true, CURLOPT_HTTPHEADER => ['Accept: application/json']]);
+  $body = curl_exec($c);
+  $status = curl_getinfo($c, CURLINFO_HTTP_CODE);
+  $err = curl_error($c);
+  if ($body === false) throw new Exception($err ?: 'fetch failed');
+  if ($status < 200 || $status >= 300) throw new Exception("$label API error $status");
+  $data = json_decode($body, $assoc);
+  if ($data === null && trim($body) !== 'null') throw new Exception("$label API: invalid JSON");
+  return $data;
+}
+
+// ---- dates (UTC, as on Vercel) ----------------------------------------------
+function iso_today() { return date('Y-m-d'); }
+function iso_now() { $t = microtime(true); return gmdate('Y-m-d\TH:i:s', (int)$t) . sprintf('.%03dZ', (int)(($t - floor($t)) * 1000)); }
+function now_ms() { return (int)floor(microtime(true) * 1000); }
+function format_now() { return date('d.m.Y H:i'); }
+function format_detected_ts($ymd) { $p = explode('-', (string)$ymd); return ($p[2] ?? '') . '.' . ($p[1] ?? '') . '.' . $p[0] . ' ' . date('H:i'); }
+function to_iso_date($dmyhm) {
+  $p = array_map('intval', explode('.', explode(' ', (string)$dmyhm)[0]));
+  if (!$p[0]) return null;
+  return sprintf('%s-%02d-%02d', $p[2] ?? 0, $p[1] ?? 0, $p[0]);
+}
+function is_iso_date($s) { return is_string($s) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $s); }
+function shift_iso_days($iso, $days) { return gmdate('Y-m-d', strtotime("$iso 00:00:00 UTC") + $days * 86400); }
+function str_or_null($v, $n = 200) { return is_string($v) ? mb_substr($v, 0, $n) : null; }
+function trimmed_or_null($v, $n = 200) { return is_string($v) && trim($v) !== '' ? mb_substr(trim($v), 0, $n) : null; }
+
+// ---- Sejm/ELI acts -----------------------------------------------------------
+function normalize_publisher($p) { return in_array($p, ['DU', 'MP'], true) ? $p : 'DU'; }
+function search_params($o) {
+  $p = [['publisher', normalize_publisher($o['publisher'] ?? 'DU')], ['limit', $o['limit'] ?? 100]];
+  foreach (['keyword', 'title', 'dateFrom', 'dateTo'] as $k) if (!empty($o[$k])) $p[] = [$k, $o[$k]];
+  return qs($p);
+}
+function search_acts($o) {
+  $data = fetch_json(SEARCH_URL . '?' . search_params($o), 'Sejm');
+  return $data['items'] ?? [];
+}
+function isap_doc_url($address) { return "https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=$address"; }
+
+function fetch_keywords() {
+  // Day-long file cache (the JS version cached per function instance + CDN);
+  // a stale copy beats an error when the Sejm API is down.
+  $path = DATA_DIR . '/cache/keywords.json';
+  $hit = is_file($path) ? json_decode(file_get_contents($path), true) : null;
+  if (is_array($hit) && time() - filemtime($path) < 86400) return $hit;
+  try {
+    $data = fetch_json(KEYWORDS_URL, 'Sejm');
+  } catch (Exception $e) {
+    if (is_array($hit)) return $hit;
+    throw $e;
+  }
+  $data = is_array($data) ? $data : [];
+  if (storage_available()) try { write_json_file($path, $data); } catch (Exception $e) { /* cache only */ }
+  return $data;
+}
+
+// ---- SAOS (case law) ---------------------------------------------------------
+function is_saos_source($s) {
+  return ($s['register'] ?? null) === 'SAOS' && in_array($s['courtType'] ?? null, SAOS_COURT_TYPES, true) && (!empty($s['referencedRegulation']) || !empty($s['phrase']));
+}
+function saos_params($o) {
+  $p = [['pageSize', $o['pageSize'] ?? 100], ['pageNumber', $o['pageNumber'] ?? 0], ['sortingField', 'JUDGMENT_DATE'], ['sortingDirection', 'DESC']];
+  if (!empty($o['courtType'])) $p[] = ['courtType', $o['courtType']];
+  foreach (is_array($o['judgmentTypes'] ?? null) ? $o['judgmentTypes'] : [] as $j) if (in_array($j, SAOS_JUDGMENT_TYPES, true)) $p[] = ['judgmentTypes', $j];
+  foreach (['referencedRegulation' => 'referencedRegulation', 'phrase' => 'all', 'caseNumber' => 'caseNumber', 'dateFrom' => 'judgmentDateFrom', 'dateTo' => 'judgmentDateTo'] as $k => $q) if (!empty($o[$k])) $p[] = [$q, $o[$k]];
+  return qs($p);
+}
+function strip_html($s) {
+  $s = preg_replace('/<[^>]+>/', ' ', (string)$s);
+  $s = str_replace(['&nbsp;', '&amp;', '&lt;', '&gt;'], [' ', '&', '<', '>'], $s);
+  return trim(preg_replace('/\s+/u', ' ', $s));
+}
+function search_judgments_page($o) {
+  $data = fetch_json(SAOS_SEARCH_URL . '?' . saos_params($o), 'SAOS');
+  if (!is_array($data) || !isset($data['items']) || !is_array($data['items'])) throw new Exception('SAOS API: unexpected response shape (no items[])');
+  $total = isset($data['info']['totalResults']) && is_numeric($data['info']['totalResults']) ? $data['info']['totalResults'] : null;
+  $items = array_map(fn($j) => [
+    'id' => $j['id'] ?? null,
+    'href' => SAOS_JUDGMENT_URL . ($j['id'] ?? ''),
+    'courtType' => ($j['courtType'] ?? null) ?: (($o['courtType'] ?? null) ?: null),
+    'courtName' => ($j['division']['court']['name'] ?? null) ?: (($j['court']['name'] ?? null) ?: null),
+    'caseNumbers' => is_array($j['courtCases'] ?? null) ? array_values(array_filter(array_map(fn($c) => $c['caseNumber'] ?? null, $j['courtCases']))) : [],
+    'judgmentType' => ($j['judgmentType'] ?? null) ?: null,
+    'judgmentDate' => ($j['judgmentDate'] ?? null) ?: null,
+    'excerpt' => mb_substr(strip_html($j['textContent'] ?? ''), 0, 400),
+    'keywords' => is_array($j['keywords'] ?? null) ? array_slice($j['keywords'], 0, 10) : [],
+  ], $data['items']);
+  return ['total' => $total, 'items' => $items];
+}
+function search_judgments($o) { return search_judgments_page($o)['items']; }
+
+// Shared cache of the ad-hoc "Orzecznictwo" search (see searchJudgmentsCached
+// in _lib.js): frozen courts never expire, the rest after a day, an expired
+// entry is served `stale` when SAOS fails. Not used by the scanner.
+// ponytail: no eviction (~15 KB per query); prune cache/saos/ if it grows large.
+function search_judgments_cached($o, $key) {
+  if (!storage_available()) return search_judgments_page($o) + ['cachedAt' => null, 'stale' => false];
+  $key['phrase'] = mb_strtolower(trim((string)($key['phrase'] ?? '')));
+  $key['referencedRegulation'] = mb_strtolower(trim((string)($key['referencedRegulation'] ?? '')));
+  $key['caseNumber'] = trim((string)($key['caseNumber'] ?? ''));
+  $path = DATA_DIR . '/cache/saos/' . sha1(json_encode($key, JSON_FLAGS)) . '.json';
+  $hit = null;
+  try { $hit = read_json_file($path); } catch (Exception $e) { $hit = null; }
+  $frozen = in_array($o['courtType'] ?? null, SAOS_FROZEN_COURTS, true);
+  if ($hit && ($frozen || time() - strtotime($hit['savedAt']) < SAOS_CACHE_TTL)) return $hit['data'] + ['cachedAt' => $hit['savedAt'], 'stale' => false];
+  try {
+    $data = search_judgments_page($o);
+  } catch (Exception $e) {
+    if ($hit) return $hit['data'] + ['cachedAt' => $hit['savedAt'], 'stale' => true];
+    throw $e;
+  }
+  try { write_json_file($path, ['savedAt' => iso_now(), 'data' => $data]); } catch (Exception $e) { /* costs the next user a live search, nothing more */ }
+  return $data + ['cachedAt' => null, 'stale' => false];
+}
+
+// Newest judgment SAOS holds for a court type — cached per process (one cron run).
+function saos_latest_for($courtType) {
+  static $cache = [];
+  if (!array_key_exists($courtType, $cache)) {
+    try {
+      $items = search_judgments(['courtType' => $courtType, 'dateTo' => iso_today(), 'pageSize' => 1]);
+      $cache[$courtType] = ($items[0]['judgmentDate'] ?? null) ?: null;
+    } catch (Exception $e) {
+      $cache[$courtType] = null;
+    }
+  }
+  return $cache[$courtType];
+}
+
+function scan_saos_source($s, $dateFrom, $dateTo, $nowStr, $forced) {
+  $from = $forced ? $dateFrom : shift_iso_days($dateFrom, -SAOS_LOOKBACK_DAYS);
+  $o = ['courtType' => $s['courtType'], 'judgmentTypes' => $s['judgmentTypes'] ?? [], 'referencedRegulation' => ($s['referencedRegulation'] ?? null) ?: null, 'phrase' => ($s['phrase'] ?? null) ?: null, 'dateFrom' => $from, 'dateTo' => $dateTo];
+  $query = ['mode' => !empty($s['referencedRegulation']) ? 'referencedRegulation' : 'phrase', 'term' => ($s['referencedRegulation'] ?? null) ?: $s['phrase'], 'register' => 'SAOS', 'courtType' => $s['courtType'], 'judgmentTypes' => $s['judgmentTypes'] ?? [], 'dateFrom' => $from, 'dateTo' => $dateTo, 'lookbackDays' => $forced ? 0 : SAOS_LOOKBACK_DAYS, 'url' => SAOS_SEARCH_URL . '?' . saos_params($o)];
+  $latest = saos_latest_for($s['courtType']);
+  $freshness = ['courtType' => $s['courtType'], 'latestJudgmentDate' => $latest, 'checkedOn' => iso_today()];
+  try {
+    $items = search_judgments($o);
+  } catch (Exception $e) {
+    return ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => 0, 'detected' => [], 'error' => $e->getMessage(), 'queries' => [$query], 'query' => $query, 'freshness' => $freshness];
+  }
+  $detected = array_map(fn($j) => [
+    'ts' => format_detected_ts($j['judgmentDate']),
+    'type' => 'detected',
+    'kind' => 'judgment',
+    'note' => implode(' · ', array_filter([$j['courtName'] ?: $j['courtType'], implode(', ', $j['caseNumbers']), $j['judgmentType']])),
+    'url' => $j['href'],
+    'eli' => 'SAOS/' . $j['id'],
+    'via' => $query['mode'],
+    'publisher' => 'SAOS',
+    'courtType' => $j['courtType'],
+    'courtName' => $j['courtName'],
+    'caseNumbers' => $j['caseNumbers'],
+    'judgmentType' => $j['judgmentType'],
+    'judgmentDate' => $j['judgmentDate'],
+    'excerpt' => $j['excerpt'],
+    'keywords' => $j['keywords'],
+    'detectedOn' => iso_today(),
+  ], $items);
+  return ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'queries' => [$query], 'query' => $query, 'freshness' => $freshness];
+}
+
+// ---- Sejm bills in progress ("Projekty w Sejmie") ------------------------------
+function is_sejm_source($s) { return ($s['register'] ?? null) === 'SEJM' && !empty($s['title']); }
+function sejm_list_url($title) { return SEJM_API . '/processes?' . qs([['title', $title], ['documentType', 'projekt ustawy'], ['sort_by', '-number'], ['limit', '200']]); }
+function sejm_process_url($number) { return 'https://www.sejm.gov.pl/Sejm' . SEJM_TERM . '.nsf/PrzebiegProc.xsp?nr=' . rawurlencode($number); }
+// Last top-level stage dated on/before $dateTo; the undated closing stage inherits the previous date.
+function sejm_current_stage($stages, $dateTo) {
+  $cur = null;
+  foreach (is_array($stages) ? $stages : [] as $st) {
+    $date = $st['date'] ?? null;
+    if ($date && $date > $dateTo) continue;
+    if ($date || $cur) $cur = ['name' => ($st['stageName'] ?? null) ?: (($st['stageType'] ?? null) ?: ''), 'type' => ($st['stageType'] ?? null) ?: '', 'date' => $date ?: ($cur['date'] ?? null)];
+  }
+  return $cur;
+}
+function scan_sejm_source($s, $dateFrom, $dateTo, $nowStr) {
+  $url = sejm_list_url($s['title']);
+  $query = ['mode' => 'title', 'term' => $s['title'], 'register' => 'SEJM', 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'url' => $url];
+  try {
+    $list = fetch_json($url, 'Sejm');
+  } catch (Exception $e) {
+    return ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => 0, 'detected' => [], 'error' => $e->getMessage(), 'queries' => [$query], 'query' => $query];
+  }
+  $candidates = array_values(array_filter(is_array($list) ? $list : [], fn($p) => substr((string)($p['changeDate'] ?? ''), 0, 10) >= $dateFrom));
+  $detected = [];
+  $errors = [];
+  foreach ($candidates as $p) {
+    try { $d = fetch_json(SEJM_API . '/processes/' . rawurlencode($p['number']), 'Sejm'); } catch (Exception $e) { $d = null; }
+    if (!$d) { $errors[] = "process {$p['number']}: detail unavailable"; continue; }
+    $stage = sejm_current_stage($d['stages'] ?? null, $dateTo);
+    if (!$stage || !$stage['date'] || $stage['date'] < $dateFrom) continue;
+    $isap = null;
+    foreach ($d['links'] ?? [] as $l) if (($l['rel'] ?? null) === 'isap') { $isap = $l; break; }
+    $detected[] = [
+      'ts' => format_detected_ts($stage['date']),
+      'type' => 'detected',
+      'kind' => 'bill',
+      'note' => $d['title'] ?? null,
+      'url' => sejm_process_url($d['number']),
+      'eli' => mb_substr('SEJM/' . SEJM_TERM . "/{$d['number']}/{$stage['name']}", 0, 120),
+      'via' => 'title',
+      'publisher' => 'SEJM',
+      'billNumber' => $d['number'],
+      'stage' => $stage['name'],
+      'stageType' => $stage['type'],
+      'stageDate' => $stage['date'],
+      'processStartDate' => ($d['processStartDate'] ?? null) ?: null,
+      'passed' => !empty($d['passed']),
+      'euLaw' => ($d['UE'] ?? null) === 'ENFORCEMENT',
+      'urgent' => !empty($d['urgencyStatus']) && $d['urgencyStatus'] !== 'NORMAL',
+      'description' => is_string($d['description'] ?? null) ? mb_substr($d['description'], 0, 2000) : '',
+      'actEli' => ($d['ELI'] ?? null) ?: null,
+      'isapUrl' => $isap['href'] ?? null,
+      'detectedOn' => iso_today(),
+    ];
+  }
+  $r = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'queries' => [$query], 'query' => $query];
+  if ($errors) $r['error'] = implode('; ', $errors);
+  return $r;
+}
+
+// ---- scan engine ---------------------------------------------------------------
+function source_queries($s) {
+  $reg = $s['register'] ?? null;
+  if ($reg === 'SAOS') return is_saos_source($s) ? [['mode' => !empty($s['referencedRegulation']) ? 'referencedRegulation' : 'phrase', 'term' => ($s['referencedRegulation'] ?? null) ?: $s['phrase']]] : [];
+  if ($reg === 'SEJM') return is_sejm_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
+  $qs = [];
+  if (!empty($s['keyword'])) $qs[] = ['mode' => 'keyword', 'term' => $s['keyword']];
+  if (!empty($s['title'])) $qs[] = ['mode' => 'title', 'term' => $s['title']];
+  return $qs;
+}
+function is_scannable($s) { return count(source_queries($s)) > 0; }
+
+// Same as scanSources in _lib.js, but sequential — no parallel pool: gentler
+// on the public APIs, same request count, a slower manual scan.
+// ponytail: curl_multi if "Sprawdź teraz" ever becomes too slow.
+function scan_sources($sources, $range) {
+  $today = iso_today();
+  $nowStr = format_now();
+  $rangeFrom = $range && is_iso_date($range['from'] ?? null) ? $range['from'] : null;
+  $rangeTo = $range && is_iso_date($range['to'] ?? null) ? $range['to'] : $today;
+  $out = [];
+  foreach ($sources as $s) {
+    $qs = source_queries($s);
+    if (!$qs) { $out[] = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => 0, 'detected' => []]; continue; }
+    $dateFrom = $rangeFrom ?: (to_iso_date($s['lastChecked'] ?? null) ?: date('Y') . '-01-01');
+    $dateTo = $rangeFrom ? $rangeTo : $today;
+    if (($s['register'] ?? null) === 'SAOS') { $out[] = scan_saos_source($s, $dateFrom, $dateTo, $nowStr, (bool)$rangeFrom); continue; }
+    if (($s['register'] ?? null) === 'SEJM') { $out[] = scan_sejm_source($s, $dateFrom, $dateTo, $nowStr); continue; }
+    $publisher = normalize_publisher($s['publisher'] ?? null);
+    $queries = array_map(fn($q) => $q + ['publisher' => $publisher, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'url' => SEARCH_URL . '?' . search_params([$q['mode'] => $q['term'], 'publisher' => $publisher, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo])], $qs);
+    $detected = [];
+    $seen = [];
+    $errors = [];
+    foreach ($queries as $q) {
+      try {
+        foreach (search_acts([$q['mode'] => $q['term'], 'publisher' => $publisher, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo]) as $item) {
+          $key = ($item['ELI'] ?? null) ?: (($item['title'] ?? '') . '|' . ($item['address'] ?? ''));
+          if (isset($seen[$key])) continue;
+          $seen[$key] = true;
+          $e = ['ts' => format_detected_ts($item['announcementDate'] ?? null), 'type' => 'detected', 'note' => $item['title'] ?? null, 'url' => isap_doc_url($item['address'] ?? '')];
+          if (isset($item['ELI'])) $e['eli'] = $item['ELI'];
+          if (isset($item['type'])) $e['actType'] = $item['type'];
+          $detected[] = $e + [
+            'via' => $q['mode'],
+            'publisher' => $publisher,
+            'legalStatus' => ($item['status'] ?? null) ?: null,
+            'inForce' => ($item['inForce'] ?? null) ?: null,
+            'entryIntoForce' => ($item['entryIntoForce'] ?? null) ?: null,
+            'changeDate' => ($item['changeDate'] ?? null) ?: null,
+            'displayAddress' => ($item['displayAddress'] ?? null) ?: null,
+            'detectedOn' => $today,
+          ];
+        }
+      } catch (Exception $e) {
+        $errors[] = $e->getMessage();
+      }
+    }
+    $r = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'queries' => $queries, 'query' => $queries[0]];
+    if ($errors) $r['error'] = implode('; ', $errors);
+    $out[] = $r;
+  }
+  return $out;
+}
+
+function default_sources() {
+  static $s;
+  return $s ??= json_decode(file_get_contents(__DIR__ . '/sources.json'), true);
+}
+function effective_sources($ws, $config) {
+  $overrides = $config['overrides'] ?? [];
+  $custom = is_array($config['custom'] ?? null) ? $config['custom'] : [];
+  return array_values(array_filter(array_merge(default_sources()[$ws], $custom), function ($s) use ($overrides) {
+    $o = $overrides[(string)$s['id']] ?? null;
+    $active = is_array($o) && is_bool($o['active'] ?? null) ? $o['active'] : (($s['active'] ?? true) !== false);
+    return $active && is_scannable($s);
+  }));
+}
+function dedupe_key($e) { return ($e['eli'] ?? null) ?: (($e['note'] ?? '') . '|' . ($e['url'] ?? '')); }
+function merge_history($prev, $results) {
+  $history = [];
+  foreach ($prev as $id => $list) {
+    $seen = [];
+    $history[$id] = array_values(array_filter($list ?: [], function ($e) use (&$seen) {
+      $k = dedupe_key($e);
+      if (isset($seen[$k])) return false;
+      return $seen[$k] = true;
+    }));
+  }
+  foreach ($results as $r) {
+    if (empty($r['detected'])) continue;
+    $existing = $history[$r['id']] ?? [];
+    $seen = array_flip(array_map('dedupe_key', $existing));
+    $fresh = array_values(array_filter($r['detected'], fn($e) => !isset($seen[dedupe_key($e)])));
+    if ($fresh) $history[$r['id']] = array_merge($fresh, $existing);
+  }
+  return $history;
+}
+
+// Scan + persist one workspace. The merge re-reads the scan doc under its lock,
+// so two overlapping scans (cron + "Sprawdź teraz") both land.
+function scan_workspace($ws, $sources, $range) {
+  $persistError = null;
+  try { $prev = load_doc($ws, 'scan'); } catch (Exception $e) { $persistError = $e->getMessage(); $prev = empty_doc('scan'); }
+  if ($sources === null) {
+    $config = empty_doc('config');
+    try { $config = load_doc($ws, 'config'); } catch (Exception $e) { /* reported via persistError above */ }
+    $last = array_column($prev['sources'], 'lastChecked', 'id');
+    $sources = array_map(fn($s) => !empty($last[$s['id']]) ? ['lastChecked' => $last[$s['id']]] + $s : $s, effective_sources($ws, $config));
+  }
+  $results = scan_sources($sources, $range);
+  $lastRun = iso_now();
+  $persisted = false;
+  if (!$persistError) {
+    try {
+      update_doc($ws, 'scan', function ($prev) use ($results, $lastRun) {
+        $ids = array_column($results, 'id');
+        $untouched = array_values(array_filter($prev['sources'], fn($p) => !in_array($p['id'], $ids)));
+        return [
+          'sources' => array_merge($untouched, array_map(fn($r) => ['id' => $r['id'], 'lastChecked' => $r['lastChecked'], 'found' => $r['found']] + (isset($r['freshness']) ? ['freshness' => $r['freshness']] : []), $results)),
+          'history' => obj(merge_history($prev['history'] ?? [], $results)),
+          'lastRun' => $lastRun,
+        ];
+      });
+      $persisted = true;
+    } catch (Exception $e) {
+      $persistError = $e->getMessage();
+    }
+  }
+  return ['workspace' => $ws, 'results' => $results, 'lastRun' => $lastRun, 'persisted' => $persisted, 'persistError' => $persistError];
+}
+
+function scan_all() {
+  $runs = [];
+  foreach (WORKSPACES as $ws) {
+    $r = scan_workspace($ws, null, null);
+    $runs[] = ['workspace' => $ws, 'lastRun' => $r['lastRun'], 'persisted' => $r['persisted'], 'persistError' => $r['persistError'], 'found' => array_sum(array_column($r['results'], 'found')), 'errors' => count(array_filter($r['results'], fn($x) => isset($x['error'])))];
+  }
+  return ['runs' => $runs];
+}
+
+// Sanitises one incoming source (POST scan-all / sources): untrusted input
+// that ends up in shared docs and upstream URLs.
+function clean_source($s, $trim) {
+  $s = is_array($s) ? $s : [];
+  $str = $trim ? 'trimmed_or_null' : 'str_or_null';
+  $reg = in_array($s['register'] ?? null, ['SAOS', 'SEJM'], true) ? $s['register'] : 'ELI';
+  return [
+    'id' => is_numeric($s['id'] ?? null) ? +$s['id'] : null,
+    'keyword' => $str($s['keyword'] ?? null),
+    'title' => $str($s['title'] ?? null),
+    'publisher' => $reg === 'SEJM' ? 'SEJM' : (($s['publisher'] ?? null) === 'MP' ? 'MP' : 'DU'),
+    'register' => $reg,
+    'courtType' => in_array($s['courtType'] ?? null, SAOS_COURT_TYPES, true) ? $s['courtType'] : null,
+    'judgmentTypes' => is_array($s['judgmentTypes'] ?? null) ? array_slice(array_values(array_filter($s['judgmentTypes'], fn($j) => in_array($j, SAOS_JUDGMENT_TYPES, true))), 0, 5) : [],
+    'referencedRegulation' => $str($s['referencedRegulation'] ?? null),
+    'phrase' => $str($s['phrase'] ?? null),
+  ];
+}
+
+// ---- CLI ---------------------------------------------------------------------
+if (PHP_SAPI === 'cli') {
+  $cmd = $argv[1] ?? '';
+  if ($cmd === 'scan-all') {
+    if (!storage_available()) { fwrite(STDERR, "storage_unavailable: " . DATA_DIR . "\n"); exit(1); }
+    echo json_encode(scan_all(), JSON_FLAGS), "\n";
+    exit(0);
+  }
+  if ($cmd === 'import' && !empty($argv[2])) {
+    // Copies the whole state of a running deployment through its public GET API
+    // (/api/state + /api/kb per workspace) — overwrites the local docs.
+    if (!is_dir(DATA_DIR)) mkdir(DATA_DIR, 0700, true);
+    $base = rtrim($argv[2], '/');
+    foreach (WORKSPACES as $ws) {
+      $st = fetch_json("$base/api/state?ws=$ws", 'state');
+      $kb = fetch_json("$base/api/kb?ws=$ws", 'kb');
+      save_doc($ws, 'scan', ['sources' => $st['sources'], 'history' => obj($st['history']), 'lastRun' => $st['lastRun']]);
+      save_doc($ws, 'triage', ['statuses' => obj($st['triage'])]);
+      save_doc($ws, 'config', config_out($st['config']));
+      save_doc($ws, 'kb', ['docs' => $kb['docs']]);
+      printf("%s: sources %d, history %d acts in %d sources, triage %d, overrides %d, custom %d, kb %d docs\n", $ws, count($st['sources']), array_sum(array_map('count', $st['history'])), count($st['history']), count($st['triage']), count($st['config']['overrides']), count($st['config']['custom']), count($kb['docs']));
+    }
+    exit(0);
+  }
+  fwrite(STDERR, "usage: php index.php scan-all | import https://<host>\n");
+  exit(2);
+}
+
+// ---- HTTP routes ---------------------------------------------------------------
+$route = $_GET['r'] ?? '';
+$method = $_SERVER['REQUEST_METHOD'];
+$body = [];
+if ($method === 'POST') {
+  $body = json_decode(file_get_contents('php://input'), true);
+  if (!is_array($body)) $body = [];
+}
+
+try {
+  switch ($route) {
+    case 'state':
+      // Everything the frontend needs on load for one workspace.
+      $ws = normalize_ws($_GET['ws'] ?? null);
+      $scan = load_doc($ws, 'scan');
+      out(200, ['workspace' => $ws, 'storage' => storage_available(), 'sources' => $scan['sources'], 'history' => obj($scan['history']), 'lastRun' => $scan['lastRun'], 'triage' => obj(load_doc($ws, 'triage')['statuses']), 'config' => config_out(load_doc($ws, 'config'))], 'public, max-age=0, must-revalidate');
+
+    case 'keywords':
+      $kw = fetch_keywords();
+      out(200, ['keywords' => $kw, 'count' => count($kw)], 'public, max-age=86400');
+
+    case 'scan':
+      // One ad-hoc query: acts (keyword|title) or judgments (register=SAOS, the "Orzecznictwo" screen).
+      $q = $_GET;
+      $limit = !empty($q['limit']) ? (int)min(((float)$q['limit']) ?: 10, 100) : 10;
+      if (($q['register'] ?? null) === 'SAOS') {
+        if (!empty($q['courtType']) && !in_array($q['courtType'], SAOS_COURT_TYPES, true)) out(400, ['error' => 'bad_request', 'message' => 'courtType must be empty or one of ' . implode(', ', SAOS_COURT_TYPES)]);
+        $judgmentTypes = array_values(array_filter(explode(',', (string)($q['judgmentTypes'] ?? '')), fn($j) => in_array($j, SAOS_JUDGMENT_TYPES, true)));
+        $page = min(max((int)floor((float)($q['page'] ?? 0)), 0), 999);
+        $o = ['courtType' => ($q['courtType'] ?? '') ?: null, 'judgmentTypes' => $judgmentTypes, 'referencedRegulation' => $q['referencedRegulation'] ?? null, 'phrase' => $q['phrase'] ?? null, 'caseNumber' => $q['caseNumber'] ?? null, 'dateFrom' => $q['dateFrom'] ?? null, 'dateTo' => ($q['dateTo'] ?? '') ?: iso_today(), 'pageSize' => $limit, 'pageNumber' => $page];
+        $r = search_judgments_cached($o, ['dateTo' => $q['dateTo'] ?? ''] + $o);
+        out(200, ['register' => 'SAOS', 'items' => $r['items'], 'count' => count($r['items']), 'total' => $r['total'], 'page' => $page, 'cachedAt' => $r['cachedAt'], 'stale' => $r['stale']], 'public, max-age=0, must-revalidate');
+      }
+      $pub = normalize_publisher($q['publisher'] ?? null);
+      // Raw Sejm items passed through: decode as objects so {} stays {}.
+      $raw = fetch_json(SEARCH_URL . '?' . search_params(['keyword' => $q['keyword'] ?? null, 'title' => $q['title'] ?? null, 'publisher' => $pub, 'dateFrom' => $q['dateFrom'] ?? null, 'dateTo' => $q['dateTo'] ?? null, 'limit' => $limit]), 'Sejm', false);
+      $items = $raw->items ?? [];
+      out(200, ['register' => $pub, 'items' => $items, 'count' => count($items)], 'public, max-age=0, must-revalidate');
+
+    case 'scan-all':
+      if ($method === 'POST') {
+        // "Sprawdź teraz": the frontend's real per-source state; open by design (no login).
+        $ws = normalize_ws($body['workspace'] ?? null);
+        $sources = [];
+        foreach (array_slice(is_array($body['sources'] ?? null) ? $body['sources'] : [], 0, 150) as $s) {
+          $c = clean_source($s, false);
+          if ($c['id'] === null) continue;
+          $c['lastChecked'] = str_or_null(is_array($s) ? ($s['lastChecked'] ?? null) : null, 20);
+          $sources[] = $c;
+        }
+        if (!$sources) out(400, ['error' => 'no_sources', 'message' => 'sources[] is empty']);
+        $range = null;
+        if (is_string($body['dateFrom'] ?? null) || is_string($body['dateTo'] ?? null)) {
+          $range = ['from' => is_string($body['dateFrom'] ?? null) ? substr($body['dateFrom'], 0, 10) : null, 'to' => is_string($body['dateTo'] ?? null) ? substr($body['dateTo'], 0, 10) : null];
+        }
+        ignore_user_abort(true); // a scan the browser gave up on still gets saved
+        set_time_limit(600);
+        $r = scan_workspace($ws, $sources, $range);
+        out(200, ['workspace' => $ws, 'results' => $r['results'], 'lastRun' => $r['lastRun'], 'persisted' => $r['persisted'], 'persistError' => $r['persistError'], 'storage' => storage_available()]);
+      }
+      // GET = cron over HTTP. Fails closed: no config file / no secret = 401.
+      $cfgFile = HOME_DIR . '/private/hrbp-config.php';
+      $secret = is_file($cfgFile) ? ((require $cfgFile)['cron_secret'] ?? '') : '';
+      $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+      if (!is_string($secret) || strlen($secret) < 16 || !hash_equals("Bearer $secret", $auth)) out(401, ['error' => 'unauthorized']);
+      if (!storage_available()) out(503, ['error' => 'storage_unavailable']);
+      ignore_user_abort(true);
+      set_time_limit(900);
+      out(200, scan_all());
+
+    case 'kb':
+      if ($method === 'GET') {
+        $ws = normalize_ws($_GET['ws'] ?? null);
+        out(200, ['workspace' => $ws, 'docs' => load_doc($ws, 'kb')['docs']], 'public, max-age=0, must-revalidate');
+      }
+      if ($method !== 'POST') out(405, ['error' => 'method_not_allowed']);
+      $ws = normalize_ws($body['workspace'] ?? null);
+      $action = $body['action'] ?? null;
+      $docId = is_numeric($body['docId'] ?? null) ? +$body['docId'] : null;
+      $result = null;
+      update_doc($ws, 'kb', function ($kb) use ($body, $action, $docId, &$result) {
+        if ($action === 'comment') {
+          $text = is_string($body['text'] ?? null) ? mb_substr(trim($body['text']), 0, 2000) : '';
+          $i = array_search($docId, array_column($kb['docs'], 'id'));
+          if ($docId === null || $i === false) out(404, ['error' => 'not_found', 'message' => 'document not found']);
+          if ($text === '') out(400, ['error' => 'bad_request', 'message' => 'text is required']);
+          $kb['docs'][$i]['comments'] = array_merge(array_slice($kb['docs'][$i]['comments'] ?? [], -199), [['id' => now_ms(), 'text' => $text, 'ts' => iso_now()]]);
+          $result = ['doc' => $kb['docs'][$i]];
+          return $kb;
+        }
+        // ponytail: hard delete, no trash/undo (as in kb.js).
+        if ($action === 'delete') {
+          if ($docId === null || !in_array($docId, array_column($kb['docs'], 'id'))) out(404, ['error' => 'not_found', 'message' => 'document not found']);
+          $kb['docs'] = array_values(array_filter($kb['docs'], fn($d) => $d['id'] != $docId));
+          $result = ['deleted' => $docId];
+          return $kb;
+        }
+        $title = is_string($body['title'] ?? null) ? mb_substr(trim($body['title']), 0, 200) : '';
+        $text = is_string($body['body'] ?? null) ? mb_substr(trim($body['body']), 0, 5000) : '';
+        $area = is_string($body['area'] ?? null) && preg_match('/^[a-z][a-z_]{0,29}$/', $body['area']) ? $body['area'] : 'other';
+        if ($title === '' || $text === '') out(400, ['error' => 'bad_request', 'message' => 'title and body are required']);
+        $doc = ['id' => now_ms(), 'title' => $title, 'body' => $text, 'area' => $area, 'ts' => iso_now(), 'comments' => []];
+        $kb['docs'] = array_merge(array_slice($kb['docs'], -299), [$doc]);
+        $result = ['doc' => $doc];
+        return $kb;
+      });
+      out(200, $result);
+
+    case 'triage':
+      if ($method !== 'POST') out(405, ['error' => 'method_not_allowed']);
+      $ws = normalize_ws($body['workspace'] ?? null);
+      $status = in_array($body['status'] ?? null, ['new', 'progress', 'waiting', 'urgent', 'done'], true) ? $body['status'] : null;
+      $ids = array_slice(array_values(array_filter(is_array($body['ids'] ?? null) ? $body['ids'] : [], fn($x) => is_string($x) && mb_strlen($x) <= 120)), 0, 500);
+      if (!$status || !$ids) out(400, ['error' => 'bad_request', 'message' => 'ids[] and a valid status are required']);
+      $t = update_doc($ws, 'triage', function ($t) use ($ids, $status) {
+        foreach ($ids as $id) {
+          if ($status === 'new') unset($t['statuses'][$id]);
+          else $t['statuses'][$id] = ['st' => $status, 'ts' => date('Y-m-d')];
+        }
+        $t['statuses'] = obj($t['statuses']);
+        return $t;
+      });
+      out(200, ['workspace' => $ws, 'triage' => $t['statuses']]);
+
+    case 'sources':
+      // Team source configuration (on/off overrides + hand-added sources), honoured by the cron.
+      if ($method !== 'POST') out(405, ['error' => 'method_not_allowed']);
+      $ws = normalize_ws($body['workspace'] ?? null);
+      $overrides = [];
+      foreach (is_array($body['overrides'] ?? null) ? $body['overrides'] : [] as $id => $o) {
+        if (preg_match('/^\d{1,6}$/', (string)$id) && is_array($o) && is_bool($o['active'] ?? null)) $overrides[(string)$id] = ['active' => $o['active']];
+      }
+      $custom = [];
+      foreach (array_slice(is_array($body['custom'] ?? null) ? $body['custom'] : [], 0, 100) as $s) {
+        $c = clean_source($s, true);
+        $c = ['id' => $c['id'], 'name' => is_string($s['name'] ?? null) ? mb_substr(trim($s['name']), 0, 200) : ''] + $c;
+        $c['area'] = is_string($s['area'] ?? null) && preg_match('/^[a-z][a-z_]{0,29}$/', $s['area']) ? $s['area'] : 'other';
+        $c['type'] = is_string($s['type'] ?? null) ? mb_substr($s['type'], 0, 40) : 'Ustawa';
+        if ($c['id'] !== null && $c['name'] !== '' && is_scannable($c)) $custom[] = $c;
+      }
+      $config = ['overrides' => obj($overrides), 'custom' => $custom];
+      update_doc($ws, 'config', fn() => $config);
+      out(200, ['workspace' => $ws, 'config' => $config]);
+
+    default:
+      out(404, ['error' => 'not_found']);
+  }
+} catch (Exception $e) {
+  send_error($e);
+}

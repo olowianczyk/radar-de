@@ -1,0 +1,4 @@
+# Routes /api/<name> to the PHP port (api/index.php). Static frontend is served as-is.
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteRule ^api/(state|kb|keywords|sources|triage|scan|scan-all)$ api/index.php?r=$1 [L,QSA]
