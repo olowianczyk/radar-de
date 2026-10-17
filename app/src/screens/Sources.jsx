@@ -7,7 +7,7 @@
 // and links the literal API query so anyone can replay it; for every manual
 // source it says why it isn't scanned and how often to review it.
 import React from "react";
-import { Card, Badge, Switch, Icon, Button, IconButton, Input, Select } from "../components/index.js";
+import { Card, Badge, Switch, Icon, Button, IconButton, Input, Select, Hint } from "../components/index.js";
 import { tFor, isManualSource, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES } from "../workspaces.js";
 import { fetchKeywords, sourceQueryUrl, sourceQueries, nextScanRange } from "../isapIntegration.js";
 import { CoverageCard } from "../components/CoverageCard.jsx";
@@ -78,6 +78,7 @@ function ScopeRow({ label, children }) {
 
 function registerLabel(source, t) {
   if (source.register === "SAOS") return t.saos.register;
+  if (source.register === "SEJM") return t.sejm.register;
   return source.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue;
 }
 
@@ -121,6 +122,7 @@ function ScopePanel({ source, lang, t, thesaurus }) {
         <ScopeRow label={t.scopeNext}>
           {range.first ? t.scopeSinceYearStart.replace("{y}", range.from.slice(0, 4)) : t.scopeSinceLast.replace("{d}", fmtIso(range.from, lang))}
           {source.register === "SAOS" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.saos.lookback.replace("{n}", "60")}</div>}
+          {source.register === "SEJM" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.sejm.lookback}</div>}
         </ScopeRow>
         {source.register === "SAOS" && (
           <ScopeRow label={t.saos.freshness}>
@@ -145,7 +147,7 @@ function ScopePanel({ source, lang, t, thesaurus }) {
         ))}
         {source.url && (
           <a href={source.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <Icon name="external-link" size={12} />{source.register === "SAOS" ? "SAOS" : "ISAP"}
+            <Icon name="external-link" size={12} />{source.register === "SAOS" ? "SAOS" : source.register === "SEJM" ? "Sejm" : "ISAP"}
           </a>
         )}
       </div>
@@ -196,22 +198,22 @@ function AddSourceForm({ t, ws, onAdd, onCancel, thesaurus }) {
     <Card padding="lg">
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-heading)" }}>{t.addSourceTitle}</div>
-        <Input label={t.srcName} value={name} onChange={(e) => setName(e.target.value)} />
+        <Input label={<>{t.srcName}<Hint text={t.hints.srcName} /></>} value={name} onChange={(e) => setName(e.target.value)} />
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <div style={{ width: 220 }}>
-            <Select label={t.scopeRegister} value={publisher} onChange={(e) => { const v = e.target.value; setPublisher(v); setMode(v === "SAOS" ? "referencedRegulation" : "title"); }} options={[{ value: "DU", label: t.scopeRegisterValue }, { value: "MP", label: t.scopeRegisterMP }, { value: "SAOS", label: t.saos.register }]} />
+            <Select label={<>{t.scopeRegister}<Hint text={t.hints.register} /></>} value={publisher} onChange={(e) => { const v = e.target.value; setPublisher(v); setMode(v === "SAOS" ? "referencedRegulation" : "title"); }} options={[{ value: "DU", label: t.scopeRegisterValue }, { value: "MP", label: t.scopeRegisterMP }, { value: "SEJM", label: t.sejm.register }, { value: "SAOS", label: t.saos.register }]} />
           </div>
           {isSaos && (
             <>
-              <div style={{ width: 220 }}><Select label={t.saos.court} value={courtType} onChange={(e) => setCourtType(e.target.value)} options={SAOS_COURT_TYPES.map((c) => ({ value: c, label: t.saos.courts[c] }))} /></div>
-              <div style={{ width: 180 }}><Select label={t.saos.judgmentTypes} value={judgmentType} onChange={(e) => setJudgmentType(e.target.value)} options={[{ value: "", label: t.saos.allTypes }, ...SAOS_JUDGMENT_TYPES.map((j) => ({ value: j, label: t.saos.types[j] }))]} /></div>
+              <div style={{ width: 220 }}><Select label={<>{t.saos.court}<Hint text={t.hints.court} /></>} value={courtType} onChange={(e) => setCourtType(e.target.value)} options={SAOS_COURT_TYPES.map((c) => ({ value: c, label: t.saos.courts[c] }))} /></div>
+              <div style={{ width: 180 }}><Select label={<>{t.saos.judgmentTypes}<Hint text={t.hints.judgmentType} /></>} value={judgmentType} onChange={(e) => setJudgmentType(e.target.value)} options={[{ value: "", label: t.saos.allTypes }, ...SAOS_JUDGMENT_TYPES.map((j) => ({ value: j, label: t.saos.types[j] }))]} /></div>
             </>
           )}
           <div style={{ width: 220 }}>
-            <Select label={t.srcMode} value={mode} onChange={(e) => setMode(e.target.value)} options={isSaos ? [{ value: "referencedRegulation", label: t.saos.matchReferenced }, { value: "phrase", label: t.saos.matchPhrase }] : [{ value: "title", label: t.scopeMatchTitle }, { value: "keyword", label: t.scopeMatchKeyword }]} />
+            <Select label={<>{t.srcMode}<Hint text={t.hints.mode} /></>} value={mode} onChange={(e) => setMode(e.target.value)} options={isSaos ? [{ value: "referencedRegulation", label: t.saos.matchReferenced }, { value: "phrase", label: t.saos.matchPhrase }] : publisher === "SEJM" ? [{ value: "title", label: t.scopeMatchTitle }] : [{ value: "title", label: t.scopeMatchTitle }, { value: "keyword", label: t.scopeMatchKeyword }]} />
           </div>
           <div style={{ flex: 1, minWidth: 220 }}>
-            <Input label={isSaos ? modeLabel(mode, t) : mode === "keyword" ? t.srcTerm : t.srcTermTitle} value={term} onChange={(e) => setTerm(e.target.value)} />
+            <Input label={<>{isSaos ? modeLabel(mode, t) : mode === "keyword" ? t.srcTerm : t.srcTermTitle}<Hint text={isSaos ? (mode === "phrase" ? t.hints.termSaosPhrase : t.hints.termSaosRef) : publisher === "SEJM" ? t.hints.termSejm : mode === "keyword" ? t.hints.termKeyword : t.hints.termTitle} /></>} value={term} onChange={(e) => setTerm(e.target.value)} />
             {kwMode && needle.length >= 2 && (
               <div style={{ marginTop: 6, fontSize: 12 }}>
                 {kwSet === undefined && <span style={{ color: "var(--text-muted)" }}>{t.kwChecking}</span>}
@@ -228,7 +230,7 @@ function AddSourceForm({ t, ws, onAdd, onCancel, thesaurus }) {
             )}
           </div>
           <div style={{ width: 220 }}>
-            <Select label={t.srcArea} value={area} onChange={(e) => setArea(e.target.value)} options={Object.keys(ws.areas).map((k) => ({ value: k, label: t.area[k] }))} />
+            <Select label={<>{t.srcArea}<Hint text={t.hints.area} /></>} value={area} onChange={(e) => setArea(e.target.value)} options={Object.keys(ws.areas).map((k) => ({ value: k, label: t.area[k] }))} />
           </div>
         </div>
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{isSaos ? t.saos.howBullet : t.scopeHow[1]}</div>
@@ -284,7 +286,8 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
   const [search, setSearch] = React.useState("");
   const needle = search.trim().toLowerCase();
   const auto = allAuto.filter((s) => {
-    if (filter === "DU" && (s.register === "SAOS" || s.publisher === "MP")) return false;
+    if (filter === "DU" && (s.register === "SAOS" || s.register === "SEJM" || s.publisher === "MP")) return false;
+    if (filter === "SEJM" && s.register !== "SEJM") return false;
     if (filter === "MP" && s.publisher !== "MP") return false;
     if (filter === "SAOS" && s.register !== "SAOS") return false;
     if (filter === "off" && s.active) return false;
@@ -294,15 +297,16 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
   });
   const areaOrder = Object.keys(ws.areas);
   auto.sort((a, b) => areaOrder.indexOf(a.area) - areaOrder.indexOf(b.area));
-  const counts = { all: allAuto.length, DU: allAuto.filter((s) => s.register !== "SAOS" && s.publisher !== "MP").length, MP: allAuto.filter((s) => s.publisher === "MP").length, SAOS: allAuto.filter((s) => s.register === "SAOS").length, off: allAuto.filter((s) => !s.active).length, errors: allAuto.filter((s) => s.error).length };
-  const stripeFor = (s) => (s.register === "SAOS" ? "var(--info-600)" : s.publisher === "MP" ? "var(--warning-500)" : "var(--brand)");
+  const counts = { all: allAuto.length, DU: allAuto.filter((s) => s.register !== "SAOS" && s.register !== "SEJM" && s.publisher !== "MP").length, SEJM: allAuto.filter((s) => s.register === "SEJM").length, MP: allAuto.filter((s) => s.publisher === "MP").length, SAOS: allAuto.filter((s) => s.register === "SAOS").length, off: allAuto.filter((s) => !s.active).length, errors: allAuto.filter((s) => s.error).length };
+  const stripeFor = (s) => (s.register === "SAOS" ? "var(--info-600)" : s.register === "SEJM" ? "var(--amber-600)" : s.publisher === "MP" ? "var(--warning-500)" : "var(--brand)");
 
   const addSource = ({ name, mode, term, publisher, courtType, judgmentType, area }) => {
     const id = Math.max(1000, ...auto.map((s) => s.id)) + 1;
     const saos = publisher === "SAOS";
+    const sejm = publisher === "SEJM";
     setSources((prev) => [...prev, {
-      id, name, type: saos ? "Orzecznictwo" : "Ustawa", url: saos ? "https://www.saos.org.pl/search" : "https://isap.sejm.gov.pl", area,
-      publisher: saos ? "SAOS" : publisher, register: saos ? "SAOS" : "ELI",
+      id, name, type: saos ? "Orzecznictwo" : sejm ? "Projekt ustawy" : "Ustawa", url: saos ? "https://www.saos.org.pl/search" : sejm ? "https://www.sejm.gov.pl/" : "https://isap.sejm.gov.pl", area,
+      publisher: saos ? "SAOS" : publisher, register: saos ? "SAOS" : sejm ? "SEJM" : "ELI",
       courtType: saos ? courtType : null, judgmentTypes: saos && judgmentType ? [judgmentType] : [],
       referencedRegulation: saos && mode === "referencedRegulation" ? term : null, phrase: saos && mode === "phrase" ? term : null,
       keyword: !saos && mode === "keyword" ? term : null, title: !saos && mode === "title" ? term : null,
@@ -323,7 +327,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
       <HowItWorks t={t} />
       {adding && <AddSourceForm t={t} ws={ws} thesaurus={thesaurus} onAdd={addSource} onCancel={() => setAdding(false)} />}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
-        <div style={{ width: 160 }}><Input type="date" label={t.periodFrom} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} /></div>
+        <div style={{ width: 160 }}><Input type="date" label={<>{t.periodFrom}<Hint text={t.hints.period} /></>} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} /></div>
         <div style={{ width: 160 }}><Input type="date" label={t.periodTo} value={scanTo} onChange={(e) => setScanTo(e.target.value)} /></div>
         <Button variant="secondary" iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={16} className={scanning ? "hrbp-spin" : ""} />}
           disabled={scanning || backend === "down"} onClick={runScan}>
@@ -334,7 +338,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.srcFilter.search} value={search} onChange={(e) => setSearch(e.target.value)} iconLeft={<Icon name="search" size={15} />} /></div>
         <div role="group" aria-label={t.srcFilter.all} style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {[["all", t.srcFilter.all], ["DU", t.scopeRegisterValue.replace(/ \(.*\)$/, "")], ["MP", t.scopeRegisterMP.replace(/ \(.*\)$/, "")], ["SAOS", t.saos.registerShort], ["off", t.srcFilter.off], ["errors", t.srcFilter.errors]].map(([id, label]) => (
+          {[["all", t.srcFilter.all], ["DU", t.scopeRegisterValue.replace(/ \(.*\)$/, "")], ["MP", t.scopeRegisterMP.replace(/ \(.*\)$/, "")], ["SEJM", t.sejm.registerShort], ["SAOS", t.saos.registerShort], ["off", t.srcFilter.off], ["errors", t.srcFilter.errors]].map(([id, label]) => (
             (id !== "errors" || counts.errors > 0) && <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)} className={`ui-chip${filter === id ? " ui-chip--on" : ""}`}>{label} <span style={{ opacity: .7 }}>{counts[id]}</span></button>
           ))}
         </div>
@@ -365,9 +369,11 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
                       {queries.map((q, k) => (
                         <span key={q.mode}>{k > 0 ? " / " : ""}{modeLabel(q.mode, t)}: <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-heading)" }}>„{q.term}”</span></span>
                       ))}
+                      <Hint text={t.hints.dot} />
                     </span>
                     {s.publisher === "MP" && <Badge tone="amber">M.P.</Badge>}
                     {s.register === "SAOS" && <Badge tone="blue">{t.saos.registerShort} · {t.saos.courts[s.courtType] || s.courtType}</Badge>}
+                    {s.register === "SEJM" && <Badge tone="amber">{t.sejm.registerShort}</Badge>}
                     <span>· {t.lastChecked}: {s.lastChecked || "—"}</span>
                   </div>
                   {s.error && <div style={{ fontSize: 11.5, color: "var(--danger-600)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{s.error}</div>}
@@ -375,9 +381,9 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
                 {s.register !== "SAOS" && <Badge tone="neutral">{s.type}</Badge>}
                 <div style={{ minWidth: 90, textAlign: "center" }}>
                   <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 20, color: hist.length ? "var(--brand)" : "var(--ink-300)" }}>{hist.length}</div>
-                  <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".04em" }}>{t.changesFound}</div>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: ".04em" }}>{t.changesFound}<Hint text={t.hints.changesFound} size={11} /></div>
                 </div>
-                <Switch checked={s.active} onChange={() => toggle(s.id)} disabled={backend !== "ok"} />
+                <span style={{ display: "inline-flex", alignItems: "center" }}><Switch checked={s.active} onChange={() => toggle(s.id)} disabled={backend !== "ok"} /><Hint text={t.hints.toggle} /></span>
                 <IconButton label={t.scopeTitle} active={isOpen} onClick={() => setExpanded(isOpen ? null : s.id)}>
                   <Icon name={isOpen ? "chevron-up" : "crosshair"} size={16} />
                 </IconButton>

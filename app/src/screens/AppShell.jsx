@@ -271,7 +271,7 @@ function applyConfig(ws, base, config) {
     .filter((c) => !fromCatalogue.some((s) => s.id === c.id))
     .map((c) => {
       const o = overrides[String(c.id)];
-      return { ...c, url: c.register === "SAOS" ? "https://www.saos.org.pl/search" : "https://isap.sejm.gov.pl", publisher: c.register === "SAOS" ? "SAOS" : c.publisher, lastChecked: null, found: 0, scope: null, active: o && typeof o.active === "boolean" ? o.active : true };
+      return { ...c, url: c.register === "SAOS" ? "https://www.saos.org.pl/search" : c.register === "SEJM" ? "https://www.sejm.gov.pl/" : "https://isap.sejm.gov.pl", publisher: c.register === "SAOS" ? "SAOS" : c.register === "SEJM" ? "SEJM" : c.publisher, lastChecked: null, found: 0, scope: null, active: o && typeof o.active === "boolean" ? o.active : true };
     });
   return [...fromCatalogue, ...extra];
 }

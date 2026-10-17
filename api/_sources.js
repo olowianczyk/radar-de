@@ -106,6 +106,36 @@ module.exports = {
       id: 23,
       title: "przeciętnego wynagrodzenia",
       publisher: "MP"
+    },
+    {
+      id: 301,
+      title: "Kodeks pracy",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 302,
+      title: "ubezpieczeń społecznych",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 303,
+      title: "wynagrodz",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 304,
+      title: "rynku pracy",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 305,
+      title: "związkach zawodowych",
+      publisher: "SEJM",
+      register: "SEJM"
     }
   ],
   compliance: [
@@ -269,6 +299,42 @@ module.exports = {
       id: 36,
       title: "o podatku od czynności cywilnoprawnych",
       active: false
+    },
+    {
+      id: 311,
+      title: "praniu pieniędzy",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 312,
+      title: "sygnalist",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 313,
+      title: "danych osobowych",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 314,
+      title: "cyberbezpieczeństwa",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 315,
+      title: "sztucznej inteligencji",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 316,
+      title: "ochronie konkurencji",
+      publisher: "SEJM",
+      register: "SEJM"
     }
   ],
   legal: [
@@ -549,6 +615,36 @@ module.exports = {
     {
       id: 59,
       title: "o usługach zaufania"
+    },
+    {
+      id: 321,
+      title: "Kodeks cywilny",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 322,
+      title: "postępowania cywilnego",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 323,
+      title: "Kodeks spółek",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 324,
+      title: "upadłościowe",
+      publisher: "SEJM",
+      register: "SEJM"
+    },
+    {
+      id: 325,
+      title: "restrukturyzacyjne",
+      publisher: "SEJM",
+      register: "SEJM"
     }
   ]
 };

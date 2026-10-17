@@ -1,6 +1,6 @@
 // Legal changes feed — auto-scan status, KPIs, search+tabs+list, detail panel.
 import React from "react";
-import { Card, StatCard, StatusPill, Badge, Button, Input, Tabs, Icon, Select, Checkbox } from "../components/index.js";
+import { Card, StatCard, StatusPill, Badge, Button, Input, Tabs, Icon, Select, Checkbox, Hint } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
 import { HRBP_STATUS_MAP } from "../data.js";
 import { tFor, areaTone, isManualSource } from "../workspaces.js";
@@ -128,8 +128,8 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
       <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} iconLeft={<Icon name="search" size={16} />} /></div>
         <div style={{ width: 200 }}><Select value={area} onChange={(e) => setArea(e.target.value)} placeholder={t.allAreas} options={[{ value: "", label: t.allAreas }, ...Object.keys(t.area).map((k) => ({ value: k, label: t.area[k] }))]} /></div>
-        {changes.some((c) => c.kind === "judgment") && (
-          <div style={{ width: 190 }}><Select value={kind} onChange={(e) => setKind(e.target.value)} options={[{ value: "all", label: t.saos.kindAll }, { value: "act", label: t.saos.kindAct }, { value: "judgment", label: t.saos.kindJudgment }]} /></div>
+        {changes.some((c) => c.kind === "judgment" || c.kind === "bill") && (
+          <div style={{ width: 190 }}><Select value={kind} onChange={(e) => setKind(e.target.value)} options={[{ value: "all", label: t.saos.kindAll }, { value: "act", label: t.saos.kindAct }, { value: "bill", label: t.sejm.kindBill }, { value: "judgment", label: t.saos.kindJudgment }]} /></div>
         )}
         <div style={{ width: 200 }}>
           <Select value={period} onChange={(e) => setPeriod(e.target.value)} options={[
@@ -189,7 +189,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div onClick={(e) => e.stopPropagation()} style={{ paddingTop: 2 }}><Checkbox checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={c.title[lang]} /></div>
                   <div style={{ width: 36, height: 36, borderRadius: "var(--radius-sm)", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 36px" }}>
-                    <Icon name={c.kind === "judgment" ? "gavel" : "scale"} size={17} />
+                    <Icon name={c.kind === "judgment" ? "gavel" : c.kind === "bill" ? "landmark" : "scale"} size={17} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
@@ -200,6 +200,8 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
                       <Badge tone={areaTone(ws, c.area)} style={{ whiteSpace: "normal", textAlign: "left" }}>{t.area[c.area] || t.area.other}</Badge>
                       {c.actType && <Badge tone="neutral">{c.actType}</Badge>}
+                      {c.bill && <Badge tone="amber" style={{ whiteSpace: "normal", textAlign: "left" }}>{t.sejm.registerShort} · {c.bill.stage}</Badge>}
+                      {c.bill && c.bill.euLaw && <Badge tone="blue">{t.sejm.euLaw}</Badge>}
                       <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>{c.date}</span>
                     </div>
                   </div>
@@ -208,12 +210,15 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
             );
           })}
         </div>
-        <Card padding="lg" style={{ position: "sticky", top: 0 }}>
+        {/* Sticky detail panel capped at viewport height with its own scroll —
+            without the cap a long entry (e.g. Sejm bill with stages + description)
+            was taller than the screen and its bottom (links) unreachable. */}
+        <Card padding="lg" style={{ position: "sticky", top: 0, maxHeight: "calc(100vh - 120px)", overflowY: "auto" }}>
           {sel ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                 <div style={{ width: 44, height: 44, borderRadius: "var(--radius-md)", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 44px" }}>
-                  <Icon name="scale" size={20} />
+                  <Icon name={sel.kind === "judgment" ? "gavel" : sel.kind === "bill" ? "landmark" : "scale"} size={20} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-2xl)", color: "var(--text-heading)" }}>{sel.title[lang]}</h2>
@@ -221,13 +226,13 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                   <StatusPill status={HRBP_STATUS_MAP[sel.status]} lang={lang} label={t.st[sel.status]} />
-                  <span style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{t.reviewStatus}</span>
+                  <span style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{t.reviewStatus}<Hint text={t.hints.reviewStatus} size={11} /></span>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 24, padding: "14px 0", borderTop: "1px solid var(--border-subtle)", borderBottom: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
-                <Meta label={t.published} value={sel.date} />
-                <Meta label={t.effective} value={sel.effective} />
-                <Meta label={t.source} value={/^https?:/.test(sel.source) ? <a href={sel.source} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>{sel.kind === "judgment" ? "SAOS" : "ISAP"} ↗</a> : sel.source} small />
+                <Meta label={sel.kind === "bill" ? t.sejm.stageDate : t.published} value={sel.date} hint={sel.kind === "bill" ? t.hints.stageDate : sel.kind === "judgment" ? null : t.hints.published} />
+                <Meta label={t.effective} value={sel.effective} hint={sel.kind === "act" ? t.hints.effective : null} />
+                <Meta label={t.source} value={/^https?:/.test(sel.source) ? <a href={sel.source} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>{sel.kind === "judgment" ? "SAOS" : sel.kind === "bill" ? "Sejm" : "ISAP"} ↗</a> : sel.source} small />
               </div>
               {sel.kind === "judgment" ? (
               <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -244,10 +249,35 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                 {sel.judgment.keywords.length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{sel.judgment.keywords.map((k) => <Badge key={k} tone="neutral">{k}</Badge>)}</div>}
                 <a href={sel.source} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="external-link" size={12} />{t.saos.openSaos}</a>
               </div>
+              ) : sel.kind === "bill" ? (
+              // Sejm bill at one stage — every later stage is its own feed entry.
+              <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icon name="landmark" size={12} />{t.sejm.bill}
+                </div>
+                <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+                  <Meta label={t.sejm.stage} value={sel.bill.stage || t.noData} small hint={t.hints.stage} />
+                  <Meta label={t.sejm.stageDate} value={sel.date} small />
+                  <Meta label={t.sejm.number} value={sel.bill.number || t.noData} small hint={t.hints.number} />
+                  {sel.bill.processStartDate && <Meta label={t.sejm.started} value={sel.bill.processStartDate.split("-").reverse().join(".")} small hint={t.hints.started} />}
+                </div>
+                {(sel.bill.passed || sel.bill.euLaw || sel.bill.urgent) && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {sel.bill.passed && <Badge tone="green">{t.sejm.passed}</Badge>}
+                    {sel.bill.euLaw && <span style={{ display: "inline-flex", alignItems: "center" }}><Badge tone="blue">{t.sejm.euLaw}</Badge><Hint text={t.hints.euLaw} size={11} /></span>}
+                    {sel.bill.urgent && <Badge tone="amber">{t.sejm.urgent}</Badge>}
+                  </div>
+                )}
+                <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.5 }}>{t.sejm.note}</div>
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  <a href={sel.source} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="external-link" size={12} />{t.sejm.openSejm}</a>
+                  {sel.bill.isapUrl && <a href={sel.bill.isapUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="external-link" size={12} />{t.sejm.openIsap} ({sel.bill.actEli})</a>}
+                </div>
+              </div>
               ) : (
               <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 8 }}>
                 <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
-                  <Icon name="landmark" size={12} />{t.actStatus} <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>— {t.actStatusAsOf.replace("{d}", sel.detectedOn || sel.date)}</span>
+                  <Icon name="landmark" size={12} />{t.actStatus}<Hint text={t.hints.actStatus} size={11} /> <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>— {t.actStatusAsOf.replace("{d}", sel.detectedOn || sel.date)}</span>
                 </div>
                 <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
                   <Meta label={t.actStatus} value={sel.legalStatus || t.noData} small />
@@ -261,9 +291,9 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
               <p style={{ margin: 0, color: "var(--text-body)", fontSize: 14, lineHeight: 1.6 }}>{sel.summary[lang]}</p>
               {sel.matchedBy && (
                 <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Icon name="crosshair" size={12} />{t.foundVia}</div>
+                  <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Icon name="crosshair" size={12} />{t.foundVia}<Hint text={t.hints.foundVia} size={11} /></div>
                   <div style={{ fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.55 }}>
-                    {t.source}: <strong>{sel.matchedBy.sourceName}</strong> · {sel.matchedBy.mode === "keyword" ? t.scopeMatchKeyword : sel.matchedBy.mode === "title" ? t.scopeMatchTitle : sel.matchedBy.mode === "referencedRegulation" ? t.saos.matchReferenced : t.saos.matchPhrase} <span style={{ fontFamily: "var(--font-mono)" }}>„{sel.matchedBy.term}”</span> · {sel.matchedBy.publisher === "SAOS" ? t.saos.register : sel.matchedBy.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue} · {sel.kind === "judgment" ? t.saos.judgmentDate.toLowerCase() : t.foundViaDate} {sel.date}{sel.actType ? <> · {t.actType}: {sel.actType}</> : null}
+                    {t.source}: <strong>{sel.matchedBy.sourceName}</strong> · {sel.matchedBy.mode === "keyword" ? t.scopeMatchKeyword : sel.matchedBy.mode === "title" ? t.scopeMatchTitle : sel.matchedBy.mode === "referencedRegulation" ? t.saos.matchReferenced : t.saos.matchPhrase} <span style={{ fontFamily: "var(--font-mono)" }}>„{sel.matchedBy.term}”</span> · {sel.matchedBy.publisher === "SAOS" ? t.saos.register : sel.matchedBy.publisher === "SEJM" ? t.sejm.register : sel.matchedBy.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue} · {sel.kind === "judgment" ? t.saos.judgmentDate.toLowerCase() : sel.kind === "bill" ? t.sejm.stageDate.toLowerCase() : t.foundViaDate} {sel.date}{sel.actType ? <> · {t.actType}: {sel.actType}</> : null}
                   </div>
                   <a href={sel.matchedBy.queryUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="external-link" size={12} />{sel.kind === "judgment" ? t.scopeOpenQuery.replace("API Sejmu", "SAOS").replace("Sejm API", "SAOS").replace("Sejm-API", "SAOS") : t.scopeOpenQuery}</a>
                 </div>
@@ -320,10 +350,11 @@ function FirstSteps({ t, ws, changes, backend, runScan }) {
   );
 }
 
-function Meta({ label, value, small }) {
+// `hint` (optional) adds an (i) tooltip explaining the field — see components/core/Hint.jsx.
+function Meta({ label, value, small, hint }) {
   return (
     <div>
-      <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600 }}>{label}{hint && <Hint text={hint} size={11} />}</div>
       <div style={{ fontSize: small ? 12.5 : 14, color: "var(--text-heading)", fontWeight: 600, marginTop: 3, maxWidth: 220 }}>{value}</div>
     </div>
   );

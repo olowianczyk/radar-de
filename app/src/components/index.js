@@ -2,6 +2,7 @@ export { Avatar } from "./core/Avatar.jsx";
 export { Badge } from "./core/Badge.jsx";
 export { Button } from "./core/Button.jsx";
 export { Icon } from "./core/Icon.jsx";
+export { Hint } from "./core/Hint.jsx";
 export { IconButton } from "./core/IconButton.jsx";
 export { StatusPill } from "./core/StatusPill.jsx";
 export { Checkbox } from "./forms/Checkbox.jsx";

@@ -103,6 +103,7 @@ const HELP = {
       ["Oba naraz — dla kluczowych kodeksów", "Kodeks pracy, k.c., k.p.c., k.s.h., ustawa AML, UOKiK mają i tytuł, i słowo kluczowe. Powód: nowelizacje zbiorcze („…oraz niektórych innych ustaw”) nie nazywają aktu w tytule — łapie je tylko słowo kluczowe. Wyniki są scalane, duplikaty znikają."],
       ["Monitor Polski — dla obwieszczeń i komunikatów", "Stawki i progi (odsetki ustawowe, przeciętne wynagrodzenie, progi zamówień) nie są w Dz.U., tylko w M.P. — takie źródła mają rejestr M.P."],
       ["Orzecznictwo — po powołanym akcie", "Źródła SAOS dopasowują orzeczenia po akcie, który sąd powołał (np. „Kodeks pracy”), z filtrem sądu i rodzaju orzeczenia. Fraza pełnotekstowa jest szersza i używana tylko tam, gdzie nie ma lepszego kryterium (np. odwołania od decyzji UOKiK)."],
+      ["Projekty ustaw w Sejmie — po fragmencie tytułu", "Źródła Sejm (bieżąca kadencja) łapią projekty ustaw, których tytuł zawiera dany fragment (np. „Kodeks pracy”). Wpis pojawia się, gdy projekt osiąga nowy etap (wpłynięcie, czytanie, uchwalenie, odrzucenie) — każdy kolejny etap to nowy wpis do przeglądu, więc projekt śledzisz aż do końca. Projekty zbiorcze o innym tytule mogą zostać pominięte; etap Senatu i prace w RCL są poza zakresem."],
       ["Celowo szerokie i celowo wyłączone", "Niektóre fragmenty są szerokie z premedytacją i mają to napisane w uwagach (np. „Kodeks karny” łapie też KKS). Źródła o dużym wolumenie albo z „fazy 3” dokumentu wymagań (rynek kapitałowy, nieruchomości, środowisko, KIO, sądy powszechne) są zdefiniowane, ale wyłączone — włączasz je przełącznikiem."],
       ["Obszar prawa to nasza etykieta", "Przypisanie źródła do obszaru (np. „Sankcje i kontrola inwestycji”) służy filtrowaniu w feedzie. Nie pochodzi z Sejmu ani z ISAP."],
     ],
@@ -112,7 +113,7 @@ const HELP = {
     addTitle: "Czy można dodawać własne źródła? Tak — i są wspólne dla działu",
     addSteps: [
       ["Wejdź w „Monitorowane źródła” → „Nowe źródło”", "Formularz jest nad listą. Dodane źródło zapisuje się na serwerze i od następnego skanu (ręcznego lub nocnego) jest traktowane jak każde inne — widzą je wszyscy w dziale."],
-      ["Wybierz rejestr", "Dziennik Ustaw (ustawy, rozporządzenia, teksty jednolite), Monitor Polski (obwieszczenia, komunikaty) albo SAOS (orzecznictwo — wtedy wybierasz też sąd i rodzaj orzeczenia)."],
+      ["Wybierz rejestr", "Dziennik Ustaw (ustawy, rozporządzenia, teksty jednolite), Monitor Polski (obwieszczenia, komunikaty), Sejm (projekty ustaw — tylko tryb „tytuł zawiera”) albo SAOS (orzecznictwo — wtedy wybierasz też sąd i rodzaj orzeczenia)."],
       ["Wybierz tryb i wpisz termin", "„Tytuł zawiera” — wklej fragment oficjalnego tytułu w odmianie, jak w ISAP (np. „o prawach konsumenta”, nie „prawa konsumenta”). „Słowo kluczowe Sejmu” — podczas pisania pokazują się pasujące hasła ze słownika; wybierz jedno z nich. W SAOS: „powołany akt zawiera” (np. „Kodeks cywilny”) lub „fraza w treści”."],
       ["Nadaj nazwę i obszar", "Nazwa jest tym, co zobaczysz w feedzie przy każdej wykrytej zmianie. Obszar służy filtrowaniu."],
       ["Sprawdź, czy źródło działa", "Rozwiń jego panel „Zakres przeszukiwania”: zobaczysz dokładne zapytanie (link „Otwórz zapytanie…” pokazuje surową odpowiedź API) i znacznik słowa kluczowego. Potem kliknij „Sprawdź teraz” z zakresem dat, np. od 1 stycznia — jeśli akt był w tym okresie nowelizowany, powinien się pojawić. Jeśli nic nie ma, otwórz zapytanie i oceń, czy to brak publikacji, czy zły fragment."],
@@ -124,6 +125,37 @@ const HELP = {
       "Odmiana ma znaczenie: w tytułach nowelizacji akt występuje w dopełniaczu/miejscowniku („o zmianie ustawy o rachunkowości”), w tekstach jednolitych tak samo — dlatego fragment „o rachunkowości” działa, a „ustawa o rachunkowość” nie.",
       "Rozporządzenia wykonawcze często nie powtarzają tytułu ustawy — jeśli ich potrzebujesz, dodaj osobne źródło po słowie kluczowym (np. „BHP”).",
       "Prawo UE nie jest w Dz.U. — źródło na „RODO” albo „AI Act” nic nie znajdzie; zobaczysz tylko krajowe ustawy wdrażające.",
+    ],
+    // "How to follow bills that are still being worked on" — Sejm register guide.
+    billsTitle: "Jak śledzić projekty ustaw, które są dopiero w pracach",
+    billsIntro: "Projekt ustawy zmienia się etap po etapie, zanim trafi do Dziennika Ustaw. Źródło typu Sejm pozwala śledzić go od wpłynięcia do uchwalenia — bez ręcznego sprawdzania strony Sejmu.",
+    billsSteps: [
+      ["Dodaj źródło", "„Monitorowane źródła” → „Nowe źródło” → rejestr „Sejm — projekty ustaw”. Tryb jest jeden: „tytuł zawiera”."],
+      ["Wpisz frazę z tytułu", "Fragment tytułu projektu w tej odmianie, w jakiej stoi w tytule. Wielkość liter nie ma znaczenia."],
+      ["Nadaj nazwę i obszar, zapisz", "Nazwa będzie widoczna przy każdym wpisie, który znajdzie to źródło."],
+      ["Kliknij „Sprawdź teraz”", "Pierwszy skan sięga do 1 stycznia bieżącego roku. Potem źródło jest sprawdzane codziennie ok. 06:00."],
+    ],
+    billsPhrasesTitle: "Jak dobrać frazę",
+    billsPhrases: [
+      ["Kodeks pracy", "cała dziedzina — każda nowelizacja kodeksu"],
+      ["ubezpieczeń społecznych", "odmiana jak w tytule („o systemie ubezpieczeń społecznych”), nie „ubezpieczenia społeczne”"],
+      ["wynagrodz", "sam rdzeń — łapie „wynagrodzeń”, „wynagrodzenia”, „wynagrodzeniu”"],
+      ["jawności wynagrodzeń", "unikalny fragment — śledzi jeden konkretny projekt"],
+    ],
+    billsPhrasesTip: "Frazę sprawdzisz przed dodaniem w wyszukiwarce przebiegu procesu legislacyjnego na sejm.gov.pl — jeśli tam projekt się znajdzie, znajdzie go też narzędzie.",
+    billsTrackTitle: "Co dzieje się dalej",
+    billsTrack: [
+      "Każdy nowy etap projektu (wpłynięcie → I czytanie → komisje → II/III czytanie → uchwalono / odrzucono) to nowy wpis w „Zmianach w przepisach”.",
+      "Oznaczasz wpis jako przejrzany — gdy projekt przejdzie dalej, pojawi się kolejny wpis ze statusem „Nowe”. Projekt śledzisz aż do końca prac w Sejmie.",
+      "W szczegółach wpisu: etap i jego data, numer druku, plakietka „wdraża prawo UE”, link „Przebieg w Sejmie” (pełna historia, komisje, teksty druków), a po ogłoszeniu — link do ustawy w ISAP.",
+    ],
+    billsGapsTitle: "Czego to źródło nie złapie — przeglądaj ręcznie",
+    billsGaps: [
+      "Projekty przed wniesieniem do Sejmu (prace rządowe, prekonsultacje, uzgodnienia) — są w RCL (legislacja.gov.pl). Dodaj je jako źródło ręczne „co tydzień”.",
+      "Etap Senatu po uchwaleniu przez Sejm.",
+      "Zmiany samej treści projektu (poprawki, autopoprawki) — narzędzie widzi zmianę etapu, nie tekstu. Tekst czytasz w druku pod linkiem „Przebieg w Sejmie”.",
+      "Projekty zbiorcze o innym tytule (np. „o zmianie niektórych ustaw w celu deregulacji”) — fraza „Kodeks pracy” ich nie złapie. Dodaj osobne źródło z frazą z ich tytułu.",
+      "Tylko bieżąca kadencja Sejmu (X). Po wyborach w 2027 r. kadencja musi zostać przestawiona w kodzie.",
     ],
     faqTitle: "Najczęstsze pytania",
     faq: [
@@ -202,6 +234,7 @@ const HELP = {
       ["Both at once — for key codes", "Labour Code, k.c., k.p.c., k.s.h., the AML and competition acts have both a title and a keyword. Reason: omnibus amendments (“…oraz niektórych innych ustaw”) don’t name the act in the title — only the keyword catches them. Results are merged, duplicates removed."],
       ["Monitor Polski — for notices", "Rates and thresholds (statutory interest, average pay, procurement thresholds) are not in Dz.U. but in M.P. — those sources use the M.P. register."],
       ["Case law — by cited act", "SAOS sources match judgments by the act the court cited (e.g. “Kodeks pracy”), filtered by court and judgment type. A full-text phrase is broader and used only where there is no better criterion (e.g. appeals from UOKiK decisions)."],
+      ["Bills in the Sejm — by title fragment", "Sejm sources (current term) catch bills whose title contains the fragment (e.g. “Kodeks pracy”). An entry appears when a bill reaches a new stage (filed, reading, passed, rejected) — every further stage is a new entry to review, so you follow the bill to the end. Omnibus bills with a different title may be missed; the Senate stage and RCL drafting are out of scope."],
       ["Deliberately broad and deliberately off", "Some fragments are broad on purpose and say so in their notes (e.g. “Kodeks karny” also matches the Fiscal Penal Code). High-volume or “phase 3” sources (capital markets, real estate, environment, KIO, common courts) are defined but switched off — you enable them with the toggle."],
       ["The legal area is our label", "Assigning a source to an area (e.g. “Sanctions & investment screening”) is for filtering the feed. It does not come from the Sejm or ISAP."],
     ],
@@ -211,7 +244,7 @@ const HELP = {
     addTitle: "Can you add your own sources? Yes — and they are shared by the department",
     addSteps: [
       ["Go to “Monitored sources” → “New source”", "The form sits above the list. A new source is saved on the server and treated like any other from the next scan (manual or nightly) — everyone in the department sees it."],
-      ["Pick the register", "Journal of Laws (statutes, regulations, consolidated texts), Monitor Polski (notices) or SAOS (case law — then also pick the court and judgment type)."],
+      ["Pick the register", "Journal of Laws (statutes, regulations, consolidated texts), Monitor Polski (notices), the Sejm (bills — “title contains” only) or SAOS (case law — then also pick the court and judgment type)."],
       ["Pick the mode and type the term", "“Title contains” — paste a fragment of the official title declined as in ISAP (e.g. “o prawach konsumenta”). “Sejm keyword” — matching thesaurus headings appear as you type; pick one. In SAOS: “cited act contains” (e.g. “Kodeks cywilny”) or “phrase in text”."],
       ["Name it and pick an area", "The name is what you will see in the feed next to each detected change. The area is for filtering."],
       ["Check that it works", "Expand its “Search scope” panel: you see the exact query (“Open query…” shows the raw API response) and the keyword marker. Then click “Check now” with a date range, e.g. from 1 January — if the act was amended in that period it should appear. If nothing shows, open the query and judge whether nothing was published or the fragment is wrong."],
@@ -223,6 +256,36 @@ const HELP = {
       "Declension matters: in amendment titles the act appears in the genitive/locative (“o zmianie ustawy o rachunkowości”), likewise in consolidated texts — so “o rachunkowości” works and “ustawa o rachunkowość” does not.",
       "Implementing regulations often don’t repeat the statute’s title — if you need them, add a separate keyword source (e.g. “BHP”).",
       "EU law is not in Dz.U. — a source for “RODO” or “AI Act” finds nothing; you will only see national implementing acts.",
+    ],
+    billsTitle: "How to follow bills that are still being worked on",
+    billsIntro: "A bill changes stage by stage before it reaches the Journal of Laws. A Sejm source follows it from filing to passing — no manual checks of the Sejm website.",
+    billsSteps: [
+      ["Add a source", "“Monitored sources” → “New source” → register “Sejm — bills”. There is one mode: “title contains”."],
+      ["Type a phrase from the title", "A fragment of the bill title declined exactly as in the title. Case does not matter."],
+      ["Give it a name and area, save", "The name is shown on every entry this source finds."],
+      ["Click “Check now”", "The first scan goes back to 1 January of the current year. After that the source is checked daily around 06:00."],
+    ],
+    billsPhrasesTitle: "Choosing the phrase",
+    billsPhrases: [
+      ["Kodeks pracy", "the whole area — every amendment of the Labour Code"],
+      ["ubezpieczeń społecznych", "declined as in the title (“o systemie ubezpieczeń społecznych”), not “ubezpieczenia społeczne”"],
+      ["wynagrodz", "the stem only — catches “wynagrodzeń”, “wynagrodzenia”, “wynagrodzeniu”"],
+      ["jawności wynagrodzeń", "a unique fragment — follows one specific bill"],
+    ],
+    billsPhrasesTip: "Test the phrase first in the legislative-process search on sejm.gov.pl — if the bill shows up there, the tool will find it too.",
+    billsTrackTitle: "What happens next",
+    billsTrack: [
+      "Every new stage (filed → first reading → committees → second/third reading → passed / rejected) is a new entry in “Legal changes”.",
+      "Mark the entry as reviewed — when the bill moves on, another entry appears with status “New”. You follow the bill until the Sejm is done with it.",
+      "The entry details show the stage and its date, print number, an “implements EU law” badge, a “Progress in the Sejm” link (full history, committees, print texts) and, once published, a link to the act in ISAP.",
+    ],
+    billsGapsTitle: "What this source will not catch — review manually",
+    billsGaps: [
+      "Drafts before they reach the Sejm (government work, pre-consultation, inter-ministerial review) — they are on RCL (legislacja.gov.pl). Add them as a weekly manual source.",
+      "The Senate stage after the Sejm passes the bill.",
+      "Changes to the bill text itself (amendments) — the tool sees stage changes, not text. Read the text in the print under “Progress in the Sejm”.",
+      "Omnibus bills with a different title (e.g. “o zmianie niektórych ustaw w celu deregulacji”) — the phrase “Kodeks pracy” will not catch them. Add a separate source with a phrase from their title.",
+      "Current Sejm term (10th) only. After the 2027 election the term has to be switched in the code.",
     ],
     faqTitle: "Frequently asked questions",
     faq: [
@@ -301,6 +364,7 @@ const HELP = {
       ["Beides zugleich — für zentrale Gesetzbücher", "Arbeitsgesetzbuch, k.c., k.p.c., k.s.h., AML- und Wettbewerbsgesetz haben Titel und Schlagwort. Grund: Sammelnovellen („…oraz niektórych innych ustaw“) nennen den Akt nicht im Titel — nur das Schlagwort erfasst sie. Ergebnisse werden zusammengeführt."],
       ["Monitor Polski — für Bekanntmachungen", "Sätze und Schwellen (gesetzliche Zinsen, Durchschnittsentgelt, Vergabeschwellen) stehen nicht im Dz.U., sondern im M.P. — diese Quellen nutzen das Register M.P."],
       ["Rechtsprechung — nach zitiertem Akt", "SAOS-Quellen treffen Urteile über den vom Gericht zitierten Akt (z. B. „Kodeks pracy“), gefiltert nach Gericht und Entscheidungsart. Eine Volltextphrase ist weiter und wird nur ohne besseres Kriterium genutzt (z. B. Rechtsmittel gegen UOKiK-Entscheidungen)."],
+      ["Gesetzentwürfe im Sejm — nach Titelfragment", "Sejm-Quellen (laufende Wahlperiode) erfassen Gesetzentwürfe, deren Titel das Fragment enthält (z. B. „Kodeks pracy“). Ein Eintrag entsteht, wenn der Entwurf eine neue Stufe erreicht (Eingang, Lesung, Verabschiedung, Ablehnung) — jede weitere Stufe ist ein neuer Eintrag, so verfolgen Sie den Entwurf bis zum Ende. Sammelgesetze mit anderem Titel können fehlen; Senatsstufe und RCL-Phase sind nicht erfasst."],
       ["Bewusst weit und bewusst aus", "Manche Fragmente sind absichtlich weit und sagen das in den Hinweisen (z. B. „Kodeks karny“ trifft auch das Finanzstrafgesetzbuch). Quellen mit hohem Volumen oder aus „Phase 3“ (Kapitalmarkt, Immobilien, Umwelt, KIO, ordentliche Gerichte) sind definiert, aber aus — per Schalter aktivierbar."],
       ["Das Rechtsgebiet ist unser Etikett", "Die Zuordnung einer Quelle zu einem Bereich dient dem Filtern im Feed. Sie stammt nicht vom Sejm oder ISAP."],
     ],
@@ -310,7 +374,7 @@ const HELP = {
     addTitle: "Kann man eigene Quellen hinzufügen? Ja — abteilungsweit gemeinsam",
     addSteps: [
       ["„Überwachte Quellen“ → „Neue Quelle“", "Das Formular steht über der Liste. Eine neue Quelle wird auf dem Server gespeichert und ab dem nächsten Scan (manuell oder nächtlich) wie jede andere behandelt — alle in der Abteilung sehen sie."],
-      ["Register wählen", "Gesetzblatt (Gesetze, Verordnungen, konsolidierte Fassungen), Monitor Polski (Bekanntmachungen) oder SAOS (Rechtsprechung — dann auch Gericht und Entscheidungsart wählen)."],
+      ["Register wählen", "Gesetzblatt (Gesetze, Verordnungen, konsolidierte Fassungen), Monitor Polski (Bekanntmachungen), Sejm (Gesetzentwürfe — nur „Titel enthält“) oder SAOS (Rechtsprechung — dann auch Gericht und Entscheidungsart wählen)."],
       ["Trefferart wählen und Begriff eingeben", "„Titel enthält“ — Fragment des amtlichen Titels dekliniert wie in ISAP (z. B. „o prawach konsumenta“). „Sejm-Schlagwort“ — beim Tippen erscheinen passende Thesaurus-Einträge; einen wählen. In SAOS: „zitierter Akt enthält“ (z. B. „Kodeks cywilny“) oder „Phrase im Text“."],
       ["Name und Bereich vergeben", "Der Name erscheint im Feed bei jeder erkannten Änderung. Der Bereich dient dem Filtern."],
       ["Prüfen, ob die Quelle funktioniert", "„Suchumfang“ aufklappen: genaue Abfrage („Abfrage öffnen…“ zeigt die Rohantwort) und Schlagwort-Markierung. Dann „Jetzt prüfen“ mit Zeitraum, z. B. ab 1. Januar — wurde der Akt in dieser Zeit novelliert, sollte er erscheinen. Erscheint nichts, Abfrage öffnen und beurteilen: keine Verkündung oder falsches Fragment."],
@@ -322,6 +386,36 @@ const HELP = {
       "Deklination zählt: in Novellentiteln steht der Akt im Genitiv/Lokativ („o zmianie ustawy o rachunkowości“), ebenso in konsolidierten Fassungen — daher funktioniert „o rachunkowości“, „ustawa o rachunkowość“ nicht.",
       "Durchführungsverordnungen wiederholen den Gesetzestitel oft nicht — bei Bedarf eine eigene Schlagwortquelle anlegen (z. B. „BHP“).",
       "EU-Recht steht nicht im Dz.U. — eine Quelle „RODO“ oder „AI Act“ findet nichts; nur nationale Umsetzungsgesetze erscheinen.",
+    ],
+    billsTitle: "Wie man Gesetzentwürfe verfolgt, die noch in Arbeit sind",
+    billsIntro: "Ein Gesetzentwurf ändert sich Stufe für Stufe, bevor er im Gesetzblatt erscheint. Eine Sejm-Quelle verfolgt ihn vom Eingang bis zur Verabschiedung — ohne manuelles Prüfen der Sejm-Website.",
+    billsSteps: [
+      ["Quelle hinzufügen", "„Überwachte Quellen“ → „Neue Quelle“ → Register „Sejm — Gesetzentwürfe“. Es gibt einen Modus: „Titel enthält“."],
+      ["Phrase aus dem Titel eingeben", "Fragment des Entwurfstitels genau so dekliniert wie im Titel. Groß-/Kleinschreibung egal."],
+      ["Name und Bereich vergeben, speichern", "Der Name steht an jedem Eintrag, den diese Quelle findet."],
+      ["„Jetzt prüfen“ klicken", "Der erste Scan reicht bis zum 1. Januar des laufenden Jahres. Danach wird die Quelle täglich gegen 06:00 geprüft."],
+    ],
+    billsPhrasesTitle: "Die Phrase wählen",
+    billsPhrases: [
+      ["Kodeks pracy", "das ganze Gebiet — jede Novelle des Arbeitsgesetzbuchs"],
+      ["ubezpieczeń społecznych", "dekliniert wie im Titel („o systemie ubezpieczeń społecznych“), nicht „ubezpieczenia społeczne“"],
+      ["wynagrodz", "nur der Stamm — erfasst „wynagrodzeń“, „wynagrodzenia“, „wynagrodzeniu“"],
+      ["jawności wynagrodzeń", "eindeutiges Fragment — verfolgt einen bestimmten Entwurf"],
+    ],
+    billsPhrasesTip: "Phrase vorab in der Verfahrenssuche auf sejm.gov.pl testen — findet sich der Entwurf dort, findet ihn auch das Tool.",
+    billsTrackTitle: "Was danach passiert",
+    billsTrack: [
+      "Jede neue Stufe (Eingang → erste Lesung → Ausschüsse → zweite/dritte Lesung → verabschiedet / abgelehnt) ist ein neuer Eintrag in „Rechtsänderungen“.",
+      "Eintrag als geprüft markieren — geht der Entwurf weiter, erscheint ein weiterer Eintrag mit Status „Neu“. So verfolgen Sie den Entwurf bis zum Ende im Sejm.",
+      "In den Details: Stufe und Datum, Drucksachennummer, Plakette „setzt EU-Recht um“, Link „Verlauf im Sejm“ (ganze Historie, Ausschüsse, Drucksachen) und nach Verkündung ein Link zum Gesetz in ISAP.",
+    ],
+    billsGapsTitle: "Was diese Quelle nicht erfasst — manuell prüfen",
+    billsGaps: [
+      "Entwürfe vor der Einbringung in den Sejm (Regierungsarbeit, Vorkonsultation, Ressortabstimmung) — sie stehen bei RCL (legislacja.gov.pl). Als wöchentliche manuelle Quelle hinzufügen.",
+      "Die Senatsstufe nach der Verabschiedung im Sejm.",
+      "Änderungen am Entwurfstext selbst (Änderungsanträge) — das Tool sieht Stufenwechsel, nicht den Text. Den Text in der Drucksache unter „Verlauf im Sejm“ lesen.",
+      "Sammelentwürfe mit anderem Titel (z. B. „o zmianie niektórych ustaw w celu deregulacji“) — die Phrase „Kodeks pracy“ erfasst sie nicht. Eine eigene Quelle mit einer Phrase aus deren Titel anlegen.",
+      "Nur die laufende Wahlperiode (10.). Nach der Wahl 2027 muss sie im Code umgestellt werden.",
     ],
     faqTitle: "Häufige Fragen",
     faq: [
@@ -361,7 +455,7 @@ export function Help({ lang, ws }) {
   const byArea = areas.map((a) => [a, auto.filter((s) => s.area === a)]).filter(([, list]) => list.length);
   const matchLabel = (s) => [s.keyword ? `${t.scopeMatchKeyword} „${s.keyword}”` : null, s.title ? `${t.scopeMatchTitle} „${s.title}”` : null].filter(Boolean);
 
-  const toc = [["how", h.howTitle], ["works", h.howWorksTitle], ["pipeline", h.pipelineTitle], ["statuses", h.twoStatusesTitle], ["selection", h.selectionTitle], ["add-source", h.addTitle], ["sources", h.sourcesTitle], ["faq", h.faqTitle]];
+  const toc = [["how", h.howTitle], ["works", h.howWorksTitle], ["pipeline", h.pipelineTitle], ["statuses", h.twoStatusesTitle], ["selection", h.selectionTitle], ["add-source", h.addTitle], ["bills", h.billsTitle], ["sources", h.sourcesTitle], ["faq", h.faqTitle]];
   const [activeId, setActiveId] = React.useState("how");
   React.useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return undefined;
@@ -524,6 +618,40 @@ export function Help({ lang, ws }) {
         <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--warning-100)", color: "var(--warning-700)", borderRadius: "var(--radius-md)", fontSize: 13, lineHeight: 1.6 }}>
           <div style={{ fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><Icon name="lightbulb" size={14} />{lang === "pl" ? "Wskazówki" : lang === "de" ? "Hinweise" : "Tips"}</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>{h.addTips.map((x, i) => <li key={i}>{x}</li>)}</ul>
+        </div>
+      </Card>
+
+      {/* Following bills that are still in the Sejm — steps, phrase examples, what happens next, gaps. */}
+      <Card padding="lg">
+        <div id="bills" />
+        <H2 icon="landmark">{h.billsTitle}</H2>
+        <p style={{ margin: "10px 0 0", fontSize: 13.5, lineHeight: 1.6, color: "var(--text-body)" }}>{h.billsIntro}</p>
+        <ol style={{ margin: "14px 0 0", paddingLeft: 22, display: "flex", flexDirection: "column", gap: 10 }}>
+          {h.billsSteps.map(([k, v]) => (
+            <li key={k} style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--text-body)" }}><strong style={{ color: "var(--text-heading)" }}>{k}.</strong> {v}</li>
+          ))}
+        </ol>
+        <div style={{ marginTop: 16, fontSize: 14, fontWeight: 700, color: "var(--text-heading)" }}>{h.billsPhrasesTitle}</div>
+        <div style={{ overflowX: "auto", marginTop: 8 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <tbody>
+              {h.billsPhrases.map(([phrase, use]) => (
+                <tr key={phrase}>
+                  <td style={{ ...td, fontFamily: "var(--font-mono)", color: "var(--text-heading)", whiteSpace: "nowrap" }}>„{phrase}”</td>
+                  <td style={td}>{use}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--text-muted)" }}>{h.billsPhrasesTip}</p>
+        <div style={{ marginTop: 16, fontSize: 14, fontWeight: 700, color: "var(--text-heading)" }}>{h.billsTrackTitle}</div>
+        <ul style={{ margin: "8px 0 0", paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, fontSize: 13.5, lineHeight: 1.6, color: "var(--text-body)" }}>
+          {h.billsTrack.map((x, i) => <li key={i}>{x}</li>)}
+        </ul>
+        <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--warning-100)", color: "var(--warning-700)", borderRadius: "var(--radius-md)", fontSize: 13, lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}><Icon name="alert-triangle" size={14} />{h.billsGapsTitle}</div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>{h.billsGaps.map((x, i) => <li key={i}>{x}</li>)}</ul>
         </div>
       </Card>
 

@@ -153,7 +153,10 @@ export function KnowledgeBase({ lang, ws, selectedId, setSelectedId, kbDocs, add
           })}
         </div>
         )}
-        <Card padding="lg" style={{ position: "sticky", top: 0 }}>
+        {/* Sticky detail panel capped at viewport height with its own scroll —
+            without the cap a long entry (e.g. Sejm bill with stages + description)
+            was taller than the screen and its bottom (links) unreachable. */}
+        <Card padding="lg" style={{ position: "sticky", top: 0, maxHeight: "calc(100vh - 120px)", overflowY: "auto" }}>
           {sel ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>

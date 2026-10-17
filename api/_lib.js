@@ -353,6 +353,114 @@ async function scanSaosSource(s, dateFrom, dateTo, nowStr, forcedRange) {
   return { id: s.id, lastChecked: nowStr, found: detected.length, detected, queries: [query], query, freshness };
 }
 
+// ---- Sejm (bills in progress — "Projekty w Sejmie") ---------------------------
+// Early warning: a bill is visible here weeks or months before it lands in
+// Dz.U. (ISAP/ELI sources only catch it on publication day).
+// Source fields: register "SEJM", title (substring the bill's title must
+// contain, declined as in real titles — same convention as ELI `title`).
+// The scan lists every bill of the current term whose title matches
+// (GET /sejm/term10/processes, only documentType "projekt ustawy"), keeps the
+// ones whose `changeDate` falls on/after the window start (= something moved
+// since the last scan), then reads each candidate's detail for its stages.
+// One feed entry per (bill, stage): the dedupe key carries the stage name, so a
+// bill reappears in the feed every time it advances (I czytanie → komisje →
+// II czytanie → Senat → Prezydent → Uchwalono) — the "continuous" warning.
+// ponytail: term 10 is hard-coded; bump SEJM_TERM when the next Sejm convenes
+// (autumn 2027) — or read it from GET /sejm/term?current=true if it matters.
+const SEJM_TERM = 10;
+const SEJM_API = `https://api.sejm.gov.pl/sejm/term${SEJM_TERM}`;
+
+function isSejmSource(s) {
+  return !!(s && s.register === "SEJM" && s.title);
+}
+
+// The list query a Sejm source runs — returned to the UI as the replayable URL.
+// sort_by=-number = newest bills first; limit 200 is far above any real phrase
+// (measured 10.2026: "ubezpieczeń społecznych" = 22 bills in the whole term).
+function sejmListUrl(title) {
+  const p = new URLSearchParams({ title, documentType: "projekt ustawy", sort_by: "-number", limit: "200" });
+  return `${SEJM_API}/processes?${p.toString()}`;
+}
+
+// Human page of the legislative process ("Przebieg procesu legislacyjnego").
+function sejmProcessUrl(number) {
+  return `https://www.sejm.gov.pl/Sejm${SEJM_TERM}.nsf/PrzebiegProc.xsp?nr=${encodeURIComponent(number)}`;
+}
+
+async function sejmJson(url) {
+  const res = await fetchWithTimeout(url);
+  if (!res.ok) throw new Error(`Sejm API error ${res.status}`);
+  return res.json();
+}
+
+// The bill's current stage as of `dateTo`: the last top-level stage dated on
+// or before it. The closing "End" stage ("Uchwalono", "Wycofano", …) has no
+// date of its own — it inherits the date of the stage before it.
+// ponytail: top-level stages only; committee sub-steps (children) are visible
+// on the Sejm page — read `children` too if users want that granularity.
+function sejmCurrentStage(stages, dateTo) {
+  let cur = null;
+  (Array.isArray(stages) ? stages : []).forEach((st) => {
+    if (st.date && st.date > dateTo) return;
+    if (st.date || cur) cur = { name: st.stageName || st.stageType || "", type: st.stageType || "", date: st.date || (cur && cur.date) || null };
+  });
+  return cur;
+}
+
+async function scanSejmSource(s, dateFrom, dateTo, nowStr) {
+  const url = sejmListUrl(s.title);
+  const query = { mode: "title", term: s.title, register: "SEJM", dateFrom, dateTo, url };
+  let list;
+  try {
+    list = await sejmJson(url);
+  } catch (e) {
+    return { id: s.id, lastChecked: nowStr, found: 0, detected: [], error: e.message, queries: [query], query };
+  }
+  // changeDate = last edit of the process record; anything older than the
+  // window start cannot have moved inside it, so no detail call is needed.
+  const candidates = (Array.isArray(list) ? list : []).filter((p) => (p.changeDate || "").slice(0, 10) >= dateFrom);
+  const details = await mapPool(candidates, 4, (p) => sejmJson(`${SEJM_API}/processes/${encodeURIComponent(p.number)}`).catch(() => null));
+  const detected = [];
+  const errors = [];
+  details.forEach((d, i) => {
+    if (!d) { errors.push(`process ${candidates[i].number}: detail unavailable`); return; }
+    const stage = sejmCurrentStage(d.stages, dateTo);
+    // A changeDate inside the window can be a mere attachment edit — only a
+    // stage dated inside the window counts as "the bill moved".
+    if (!stage || !stage.date || stage.date < dateFrom) return;
+    const isap = (d.links || []).find((l) => l.rel === "isap");
+    detected.push({
+      ts: formatDetectedTs(stage.date),
+      type: "detected",
+      kind: "bill",
+      note: d.title,
+      url: sejmProcessUrl(d.number),
+      // Stage in the key = new feed entry per stage (see header). Triage ids
+      // are capped at 120 chars (api/triage.js) — the slice keeps us under it.
+      eli: `SEJM/${SEJM_TERM}/${d.number}/${stage.name}`.slice(0, 120),
+      via: "title",
+      publisher: "SEJM",
+      billNumber: d.number,
+      stage: stage.name,
+      stageType: stage.type,
+      stageDate: stage.date,
+      processStartDate: d.processStartDate || null,
+      passed: !!d.passed,
+      // UE "ENFORCEMENT" = the bill implements EU law (often with a deadline).
+      euLaw: d.UE === "ENFORCEMENT",
+      urgent: d.urgencyStatus && d.urgencyStatus !== "NORMAL",
+      description: typeof d.description === "string" ? d.description.slice(0, 2000) : "",
+      // Set once the act is published in Dz.U. — links the bill to its act.
+      actEli: d.ELI || null,
+      isapUrl: isap ? isap.href : null,
+      detectedOn: isoToday(),
+    });
+  });
+  const result = { id: s.id, lastChecked: nowStr, found: detected.length, detected, queries: [query], query };
+  if (errors.length) result.error = errors.join("; ");
+  return result;
+}
+
 // The official keyword thesaurus. Cached per function instance — it changes
 // rarely and is ~3k strings; the endpoint also sets a day-long CDN cache.
 let keywordsCache = null;
@@ -433,12 +541,17 @@ function sourceQueries(s) {
     if (isSaosSource(s)) qs.push({ mode: s.referencedRegulation ? "referencedRegulation" : "phrase", term: s.referencedRegulation || s.phrase });
     return qs;
   }
+  if (s.register === "SEJM") {
+    if (isSejmSource(s)) qs.push({ mode: "title", term: s.title });
+    return qs;
+  }
   if (s.keyword) qs.push({ mode: "keyword", term: s.keyword });
   if (s.title) qs.push({ mode: "title", term: s.title });
   return qs;
 }
 
-// Anything the engine can actually scan (Sejm/ELI acts or SAOS judgments).
+// Anything the engine can actually scan (Sejm/ELI acts, SAOS judgments or
+// Sejm bills in progress).
 function isScannable(s) {
   return sourceQueries(s).length > 0;
 }
@@ -464,6 +577,7 @@ async function scanSources(sources, range) {
     const dateFrom = rangeFrom || toIsoDate(s.lastChecked) || isoYearStart();
     const dateTo = rangeFrom ? rangeTo : todayIso;
     if (s.register === "SAOS") return scanSaosSource(s, dateFrom, dateTo, nowStr, !!rangeFrom);
+    if (s.register === "SEJM") return scanSejmSource(s, dateFrom, dateTo, nowStr);
     const publisher = normalizePublisher(s.publisher);
     const queries = qs.map((q) => {
       const opts = { [q.mode]: q.term, publisher, dateFrom, dateTo };
@@ -513,4 +627,4 @@ function parseBody(req) {
   return typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
 }
 
-module.exports = { WORKSPACES, normalizeWorkspace, normalizePublisher, sourceQueries, isScannable, isSaosSource, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES, searchActs, searchJudgments, searchJudgmentsPage, searchJudgmentsCached, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, storageAvailable, loadDoc, saveDoc, sendError, parseBody };
+module.exports = { WORKSPACES, normalizeWorkspace, normalizePublisher, sourceQueries, isScannable, isSaosSource, isSejmSource, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES, searchActs, searchJudgments, searchJudgmentsPage, searchJudgmentsCached, fetchKeywords, isapDocUrl, DEFAULT_SOURCES, scanSources, isoToday, storageAvailable, loadDoc, saveDoc, sendError, parseBody };

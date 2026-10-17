@@ -11,6 +11,8 @@
 const SEJM_SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
 const SAOS_SEARCH_URL = "https://www.saos.org.pl/api/search/judgments";
 export const SAOS_LOOKBACK_DAYS = 60;
+// Sejm bills in progress — mirrors api/_lib.js SEJM_API (term 10).
+const SEJM_PROCESSES_URL = "https://api.sejm.gov.pl/sejm/term10/processes";
 
 function parseDMYHM(s) {
   const [datePart, timePart] = (s || "").split(" ");
@@ -120,6 +122,13 @@ export function sourceQueryUrl(source, dateFrom, dateTo, mode) {
     if (dateTo) p.set("judgmentDateTo", dateTo);
     return `${SAOS_SEARCH_URL}?${p.toString()}`;
   }
+  // Sejm bills: the list query has no date filter (the API offers none) — the
+  // window is applied to each bill's stages afterwards (api/_lib.js
+  // scanSejmSource), so dateFrom/dateTo are intentionally not in the URL.
+  if (source.register === "SEJM") {
+    const p = new URLSearchParams({ title: source.title || "", documentType: "projekt ustawy", sort_by: "-number", limit: "200" });
+    return `${SEJM_PROCESSES_URL}?${p.toString()}`;
+  }
   const params = new URLSearchParams({ publisher: source.publisher === "MP" ? "MP" : "DU", limit: "100" });
   const m = mode || (source.keyword ? "keyword" : "title");
   params.set(m, m === "keyword" ? source.keyword : source.title);
@@ -134,6 +143,10 @@ export function sourceQueries(source) {
   if (source.register === "SAOS") {
     if (source.referencedRegulation) qs.push({ mode: "referencedRegulation", term: source.referencedRegulation });
     else if (source.phrase) qs.push({ mode: "phrase", term: source.phrase });
+    return qs;
+  }
+  if (source.register === "SEJM") {
+    if (source.title) qs.push({ mode: "title", term: source.title });
     return qs;
   }
   if (source.keyword) qs.push({ mode: "keyword", term: source.keyword });
@@ -188,11 +201,14 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
       const [dd, mm, yy] = date.split(".");
       const iso = dd && mm && yy ? `${yy}-${mm}-${dd}` : undefined;
       const isJudgment = e.kind === "judgment";
+      const isBill = e.kind === "bill";
       changes.push({
         id,
         eli: e.eli,
-        kind: isJudgment ? "judgment" : "act",
+        kind: isJudgment ? "judgment" : isBill ? "bill" : "act",
         judgment: isJudgment ? { courtType: e.courtType, courtName: e.courtName, caseNumbers: e.caseNumbers || [], judgmentType: e.judgmentType, judgmentDate: e.judgmentDate, excerpt: e.excerpt || "", keywords: e.keywords || [] } : null,
+        // Sejm bill at one legislative stage (see api/_lib.js scanSejmSource).
+        bill: isBill ? { number: e.billNumber, stage: e.stage, stageType: e.stageType, stageDate: e.stageDate, processStartDate: e.processStartDate, passed: !!e.passed, euLaw: !!e.euLaw, urgent: !!e.urgent, actEli: e.actEli || null, isapUrl: e.isapUrl || null } : null,
         act: source.name,
         area: source.area,
         actType: e.actType,
@@ -210,7 +226,7 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
         // (saos.org.pl/judgments/{id}) so old feed entries open correctly too.
         source: (e.url || source.url || "").replace("saos.org.pl/api/judgments/", "saos.org.pl/judgments/"),
         title: { pl: e.note, de: e.note, en: e.note },
-        summary: isJudgment ? { pl: e.excerpt || "", de: e.excerpt || "", en: e.excerpt || "" } : summary,
+        summary: isJudgment ? { pl: e.excerpt || "", de: e.excerpt || "", en: e.excerpt || "" } : isBill ? { pl: e.description || "", de: e.description || "", en: e.description || "" } : summary,
         affected: [],
         matchedBy: (() => {
           // `via` is recorded by the backend since the multi-query engine;

@@ -16,6 +16,7 @@ for (const ws of WORKSPACES) {
       if (s.title) o.title = s.title;
       if (s.publisher && s.publisher !== "DU") o.publisher = s.publisher;
       if (s.register === "SAOS") { o.register = "SAOS"; o.courtType = s.courtType; if (s.judgmentTypes && s.judgmentTypes.length) o.judgmentTypes = s.judgmentTypes; if (s.referencedRegulation) o.referencedRegulation = s.referencedRegulation; if (s.phrase) o.phrase = s.phrase; }
+      if (s.register === "SEJM") o.register = "SEJM";
       if (s.active === false) o.active = false;
       return o;
     });

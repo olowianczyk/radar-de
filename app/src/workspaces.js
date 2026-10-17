@@ -51,6 +51,12 @@ const src = (id, name, area, o = {}, scope) => ({ id, name, type: o.type || "Ust
 // SAOS case-law source. `o`: { courtType, judgmentTypes?, referencedRegulation? | phrase?, active? }.
 // referencedRegulation = an act the judgment cites (precise); phrase = full-text (broad).
 const saos = (id, name, area, o, scope) => ({ id, name, type: "Orzecznictwo", register: "SAOS", url: "https://www.saos.org.pl/search", area, courtType: o.courtType, judgmentTypes: o.judgmentTypes || [], referencedRegulation: o.referencedRegulation || null, phrase: o.phrase || null, keyword: null, title: null, publisher: "SAOS", active: o.active, scope: scope || null });
+// Sejm bill source ("Projekty w Sejmie" — early warning before Dz.U.).
+// `title` = substring of the bill's title, declined as in real titles (the
+// Sejm API matches it case-insensitively). Scanned by api/_lib.js
+// scanSejmSource: one feed entry per bill per legislative stage.
+const sejm = (id, name, area, title, scope) => ({ id, name, type: "Projekt ustawy", register: "SEJM", url: "https://www.sejm.gov.pl/", area, keyword: null, title, publisher: "SEJM", scope: scope || NOTE_SEJM });
+const NOTE_SEJM = tr("Projekty ustaw Sejmu X kadencji, których tytuł zawiera tę frazę. Nowy wpis w kanale przy każdym kolejnym etapie (wpłynięcie, czytania, Senat, Prezydent, uchwalenie). Nie łapie projektów, których tytuł nie nazywa ustawy (np. „…oraz niektórych innych ustaw”) — te złapie źródło Dz.U. w dniu publikacji.", "Bills of the 10th-term Sejm whose title contains this phrase. A new feed entry at every stage (filed, readings, Senate, President, passed). Misses bills whose title does not name the act (e.g. \"…and certain other acts\") — the Dz.U. source catches those on publication.", "Gesetzentwürfe des Sejm (10. Wahlperiode), deren Titel diese Phrase enthält. Neuer Eintrag bei jeder Phase (Eingang, Lesungen, Senat, Präsident, Verabschiedung). Entwürfe, deren Titel das Gesetz nicht nennt (\"…sowie einiger anderer Gesetze\"), erfasst die Dz.U.-Quelle bei Verkündung.");
 const NOTE_SAOS = tr("SAOS agreguje portale orzeczeń z opóźnieniem — skan cofa się o 60 dni i deduplikuje po id; panel zakresu pokazuje datę najnowszego orzeczenia w SAOS dla tego sądu.", "SAOS aggregates court portals with a delay — the scan looks back 60 days and dedupes by id; the scope panel shows the newest judgment SAOS holds for this court.", "SAOS aggregiert Gerichtsportale verzögert — der Scan geht 60 Tage zurück und dedupliziert nach ID; der Umfangsbereich zeigt das neueste Urteil in SAOS für dieses Gericht.");
 // Why SN / NSA / TK / KIO case law is MANUAL although SAOS has those courts:
 // measured live on 2026-10-16, SAOS stopped receiving them (newest judgment —
@@ -131,7 +137,13 @@ export const WORKSPACES = [
       man(106, "Sąd Najwyższy — Izba Pracy i Ubezpieczeń Społecznych (uchwały, wyroki)", "caselaw", "https://www.sn.pl/orzecznictwo/SitePages/Wyszukiwarka.aspx", "weekly", "caselaw", noteSaosFrozen("SN — do 06.2016", "SN — up to 06.2016", "SN — bis 06.2016")),
       man(102, "EUR-Lex — dyrektywy 2023/970 (jawność wynagrodzeń) i 2024/2831 (praca platformowa)", "pay", "https://eur-lex.europa.eu/", "monthly", "eu"),
       man(103, "Rządowe Centrum Legislacji — projekty z zakresu prawa pracy", "other", "https://legislacja.gov.pl/", "weekly", "draft"),
-      man(104, "Sejm — druki i proces legislacyjny", "other", "https://www.sejm.gov.pl/", "weekly", "draft"),
+      // ponytail: manual id 104 ("Sejm — druki") retired — replaced by the
+      // automatic Sejm sources 301–305 below; ids are not reused.
+      sejm(301, "Projekty w Sejmie — Kodeks pracy", "contracts", "Kodeks pracy"),
+      sejm(302, "Projekty w Sejmie — ubezpieczenia społeczne i emerytury", "social", "ubezpieczeń społecznych"),
+      sejm(303, "Projekty w Sejmie — wynagrodzenia (minimalne, jawność płac)", "pay", "wynagrodz"),
+      sejm(304, "Projekty w Sejmie — rynek pracy i zatrudnianie", "contracts", "rynku pracy"),
+      sejm(305, "Projekty w Sejmie — związki zawodowe i układy zbiorowe", "collective", "związkach zawodowych"),
     ],
   },
   {
@@ -223,7 +235,14 @@ export const WORKSPACES = [
       man(111, "KIS / Eureka — interpretacje indywidualne", "tax", "https://eureka.mf.gov.pl/", "monthly", "guidance"),
       man(112, "Komisja Europejska — wytyczne (konkurencja, AI Act, ESG), pakiety Omnibus", "other", "https://commission.europa.eu/", "monthly", "guidance"),
       man(113, "Rządowe Centrum Legislacji — projekty i OSR", "other", "https://legislacja.gov.pl/", "weekly", "draft"),
-      man(114, "Sejm — druki i proces legislacyjny", "other", "https://www.sejm.gov.pl/", "weekly", "draft"),
+      // ponytail: manual id 114 ("Sejm — druki") retired — replaced by the
+      // automatic Sejm sources 311–316 below; ids are not reused.
+      sejm(311, "Projekty w Sejmie — przeciwdziałanie praniu pieniędzy (AML)", "aml", "praniu pieniędzy"),
+      sejm(312, "Projekty w Sejmie — sygnaliści", "whistle", "sygnalist"),
+      sejm(313, "Projekty w Sejmie — ochrona danych osobowych", "data", "danych osobowych"),
+      sejm(314, "Projekty w Sejmie — cyberbezpieczeństwo", "cyber", "cyberbezpieczeństwa"),
+      sejm(315, "Projekty w Sejmie — sztuczna inteligencja", "cyber", "sztucznej inteligencji"),
+      sejm(316, "Projekty w Sejmie — ochrona konkurencji i konsumentów", "competition", "ochronie konkurencji"),
       man(115, "NSA / WSA (CBOSA) — AML, ochrona danych, uchwały podatkowe", "caselaw", "https://orzeczenia.nsa.gov.pl/", "weekly", "caselaw", noteSaosFrozen("NSA/WSA — brak w SAOS", "NSA/WSA — not in SAOS", "NSA/WSA — nicht in SAOS")),
     ],
   },
@@ -332,7 +351,13 @@ export const WORKSPACES = [
       man(107, "EUR-Lex — znak towarowy UE 2017/1001, wzory 6/2002, tajemnice przedsiębiorstwa 2016/943", "ip", "https://eur-lex.europa.eu/", "monthly", "eu"),
       man(108, "Legislative Observatory PE (OEIL) — projekty UE w trilogu", "other", "https://oeil.secure.europarl.europa.eu/", "monthly", "draft"),
       man(109, "Rządowe Centrum Legislacji — projekty, konsultacje, OSR", "other", "https://legislacja.gov.pl/", "weekly", "draft"),
-      man(110, "Sejm — druki i proces legislacyjny", "other", "https://www.sejm.gov.pl/", "weekly", "draft"),
+      // ponytail: manual id 110 ("Sejm — druki") retired — replaced by the
+      // automatic Sejm sources 321–325 below; ids are not reused.
+      sejm(321, "Projekty w Sejmie — Kodeks cywilny", "codes", "Kodeks cywilny"),
+      sejm(322, "Projekty w Sejmie — Kodeks postępowania cywilnego", "disputes", "postępowania cywilnego"),
+      sejm(323, "Projekty w Sejmie — Kodeks spółek handlowych", "corporate", "Kodeks spółek"),
+      sejm(324, "Projekty w Sejmie — prawo upadłościowe", "insolvency", "upadłościowe"),
+      sejm(325, "Projekty w Sejmie — prawo restrukturyzacyjne", "insolvency", "restrukturyzacyjne"),
       man(111, "Senat — poprawki do ustaw", "other", "https://www.senat.gov.pl/", "weekly", "draft"),
       man(112, "Regulaminy arbitrażowe — SA KIG, Lewiatan, ICC", "disputes", "https://sakig.pl/", "quarterly", "guidance"),
     ],
