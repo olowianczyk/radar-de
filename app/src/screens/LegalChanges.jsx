@@ -1,11 +1,12 @@
 // Legal changes feed — auto-scan status, KPIs, search+tabs+list, detail panel.
 import React from "react";
-import { Card, StatCard, StatusPill, Badge, Button, Input, Tabs, Icon, Select, Checkbox, Hint } from "../components/index.js";
+import { Card, StatCard, StatusPill, Badge, Button, IconButton, Input, Tabs, Icon, Select, Checkbox, Hint } from "../components/index.js";
 import { EmptyState } from "../components/Loading.jsx";
 import { tFor, areaTone, isManualSource } from "../workspaces.js";
 import { latestIsapCheck } from "../isapIntegration.js";
 import { CoverageCard } from "../components/CoverageCard.jsx";
 import { ScanPeriod } from "../components/ScanPeriod.jsx";
+import { useFavorites, favList } from "../favorites.js";
 
 function parseDMY(s) {
   const [d, m, y] = (s || "").split(".").map(Number);
@@ -26,6 +27,17 @@ function periodRange(period, customDate) {
   if (period === "prevYear") return [new Date(now.getFullYear() - 1, 0, 1).getTime(), new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59).getTime()];
   if (period === "curYear") return [new Date(now.getFullYear(), 0, 1).getTime(), now.getTime()];
   return [null, null];
+}
+
+// Star toggle for "Ulubione". stopPropagation: on a feed card the click must
+// not also open the card. aria-pressed tells screen readers the on/off state.
+function FavStar({ t, on, onToggle, size }) {
+  return (
+    <IconButton size={size} label={on ? t.favRemove : t.favAdd} aria-pressed={on} onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      style={{ color: on ? "var(--warning-700)" : "var(--text-muted)" }}>
+      <Icon name="star" size={size === "sm" ? 15 : 18} className={on ? "hrbp-fav-on" : undefined} />
+    </IconButton>
+  );
 }
 
 function ScanBanner({ t, backend, sources, scanning, runScan, resetScans, scanFrom, setScanFrom, scanTo, setScanTo, lastScanFound }) {
@@ -54,7 +66,7 @@ function ScanBanner({ t, backend, sources, scanning, runScan, resetScans, scanFr
           for the whole department (asks for a confirm first, see AppShell). */}
       {typeof resetScans === "function" && (
         <div style={{ flex: "1 0 100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", borderTop: "1px solid var(--border-subtle)", paddingTop: 8, color: "var(--text-muted)", fontSize: 12 }}>
-          <span>{t.resetScansHint}</span>
+          <span>{t.resetScansHint.replaceAll("{ws}", t.wsLabel)}</span>
           <Button variant="ghost" size="sm" disabled={scanning || backend !== "ok"} onClick={resetScans} iconLeft={<Icon name="rotate-ccw" size={14} />}>{t.resetScans}</Button>
         </div>
       )}
@@ -73,9 +85,13 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
   const [selected, setSelected] = React.useState(() => new Set());
   const toggleSelect = (id) => setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const changes = changesProp || [];
+  // Personal stars (this browser, this department — see favorites.js). The
+  // "Ulubione" tab lists them, incl. ones no longer in the feed (after a reset).
+  const { favs, isFav, toggle: toggleFav } = useFavorites(ws.id);
+  const favCount = Object.keys(favs).length;
   const [periodStart, periodEnd] = periodRange(period, customDate);
-  const filtered = changes.filter((c) => {
-    if (tab !== "all" && c.status !== tab) return false;
+  const filtered = (tab === "fav" ? favList(favs, changes) : changes).filter((c) => {
+    if (tab !== "all" && tab !== "fav" && c.status !== tab) return false;
     if (area && c.area !== area) return false;
     if (kind !== "all" && (c.kind || "act") !== kind) return false;
     if (periodStart != null) {
@@ -86,7 +102,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
     if (!q) return true;
     return c.title[lang].toLowerCase().includes(q) || c.act.toLowerCase().includes(q) || c.summary[lang].toLowerCase().includes(q);
   });
-  const sel = changes.find((c) => c.id === selectedId);
+  const sel = changes.find((c) => c.id === selectedId) || favs[selectedId];
   // "Zapisz w bazie wiedzy" in the detail panel — same idea as on the case-law
   // screen: the change becomes an ordinary KB document (title, labelled lines,
   // summary, link), so the team can comment on it and find it later. "Already
@@ -194,6 +210,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
         { id: "urgent", label: t.tabs.urgent, count: changes.filter(c=>c.status==="urgent").length },
         { id: "progress", label: t.st.progress, count: changes.filter(c=>c.status==="progress").length },
         { id: "done", label: t.tabs.done, count: doneCount },
+        { id: "fav", label: t.tabs.fav, count: favCount },
       ]} />
       {selected.size > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "10px 16px", background: "var(--brand-soft)", borderRadius: "var(--radius-md)" }}>
@@ -218,6 +235,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
             </label>
           )}
           {filtered.length === 0 && (
+            tab === "fav" ? <Card padding="none"><EmptyState icon="star" title={t.favEmptyTitle} subtitle={t.favEmptySub} /></Card> :
             <Card padding="none"><EmptyState icon="scale" title={t.feedEmptyTitle} subtitle={t.feedEmptySub} action={changes.length === 0 && backend === "ok" ? <Button variant="primary" iconLeft={<Icon name="calendar-search" size={15} />} disabled={scanning} onClick={() => runScan({ from: `${new Date().getFullYear()}-01-01` })}>{t.firstSteps.scanYear}</Button> : null} /></Card>
           )}
           {filtered.map((c) => {
@@ -233,7 +251,10 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                       <div style={{ fontWeight: 600, color: "var(--text-heading)", fontSize: 14, lineHeight: 1.35, minWidth: 0 }}>{c.title[lang]}</div>
-                      <StatusPill status={c.status} lang={lang} label={t.st[c.status]} style={{ flex: "0 0 auto" }} />
+                      <div style={{ display: "flex", alignItems: "center", gap: 2, flex: "0 0 auto" }}>
+                        <StatusPill status={c.status} lang={lang} label={t.st[c.status]} />
+                        <FavStar t={t} on={isFav(c.id)} onToggle={() => toggleFav(c)} size="sm" />
+                      </div>
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 3 }}>{c.act}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
@@ -264,6 +285,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                   <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-2xl)", color: "var(--text-heading)" }}>{sel.title[lang]}</h2>
                   <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{sel.act}</div>
                 </div>
+                <FavStar t={t} on={isFav(sel.id)} onToggle={() => toggleFav(sel)} />
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                   <StatusPill status={sel.status} lang={lang} label={t.st[sel.status]} />
                   <span style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{t.reviewStatus}<Hint text={t.hints.reviewStatus} size={11} /></span>

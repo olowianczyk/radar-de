@@ -425,7 +425,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
   // history on the server, then mirrors that locally — only once the server
   // confirmed, so the feed never shows a reset that did not happen.
   const resetScans = React.useCallback(() => {
-    if (scanning || !window.confirm(t.resetScansConfirm)) return;
+    if (scanning || !window.confirm(t.resetScansConfirm.replaceAll("{ws}", t.wsLabel))) return;
     setNotice(null);
     resetScansApi(ws.id).then(() => {
       setSourceHistory({});

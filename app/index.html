@@ -14,6 +14,9 @@
   html, body { margin: 0; height: 100%; }
   #root { height: 100vh; }
   .hrbp-spin { animation: hrbp-spin 1s linear infinite; }
+  /* Filled star of a favourite ("Ulubione", LegalChanges FavStar). Lucide sets
+     fill="none" on the <svg> itself, so an inherited fill cannot win — target it. */
+  .hrbp-fav-on svg { fill: currentColor; }
   @keyframes hrbp-spin { to { transform: rotate(360deg); } }
 </style>
 </head>
