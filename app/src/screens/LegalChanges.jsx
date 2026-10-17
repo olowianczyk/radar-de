@@ -6,6 +6,7 @@ import { HRBP_STATUS_MAP } from "../data.js";
 import { tFor, areaTone, isManualSource } from "../workspaces.js";
 import { latestIsapCheck } from "../isapIntegration.js";
 import { CoverageCard } from "../components/CoverageCard.jsx";
+import { ScanPeriod } from "../components/ScanPeriod.jsx";
 
 function parseDMY(s) {
   const [d, m, y] = (s || "").split(".").map(Number);
@@ -39,8 +40,7 @@ function ScanBanner({ t, backend, sources, scanning, runScan, scanFrom, setScanF
         {lastScanFound != null && !scanning && <span style={{ fontWeight: 600, color: "var(--success-600)" }}>· {t.scanDone} ({lastScanFound})</span>}
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap", flex: "0 0 auto" }}>
-        <Input type="date" label={t.periodFrom} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} wrapStyle={{ width: 150 }} />
-        <Input type="date" label={t.periodTo} value={scanTo} onChange={(e) => setScanTo(e.target.value)} wrapStyle={{ width: 150 }} />
+        <ScanPeriod t={t} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} />
         <Button variant="primary" disabled={scanning || backend === "down"} onClick={() => runScan()} iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={15} className={scanning ? "hrbp-spin" : ""} />} style={{ marginBottom: 1 }}>
           {scanning ? t.scanning : t.checkNow}
         </Button>

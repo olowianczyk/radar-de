@@ -11,6 +11,7 @@ import { Card, Badge, Switch, Icon, Button, IconButton, Input, Select, Hint } fr
 import { tFor, isManualSource, SAOS_COURT_TYPES, SAOS_JUDGMENT_TYPES } from "../workspaces.js";
 import { fetchKeywords, sourceQueryUrl, sourceQueries, nextScanRange } from "../isapIntegration.js";
 import { CoverageCard } from "../components/CoverageCard.jsx";
+import { ScanPeriod } from "../components/ScanPeriod.jsx";
 
 function fmtIso(iso, lang) {
   const [y, m, d] = (iso || "").split("-");
@@ -327,8 +328,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
       <HowItWorks t={t} />
       {adding && <AddSourceForm t={t} ws={ws} thesaurus={thesaurus} onAdd={addSource} onCancel={() => setAdding(false)} />}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
-        <div style={{ width: 160 }}><Input type="date" label={<>{t.periodFrom}<Hint text={t.hints.period} /></>} value={scanFrom} onChange={(e) => setScanFrom(e.target.value)} /></div>
-        <div style={{ width: 160 }}><Input type="date" label={t.periodTo} value={scanTo} onChange={(e) => setScanTo(e.target.value)} /></div>
+        <ScanPeriod t={t} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} width={160} fromLabel={<>{t.periodFrom}<Hint text={t.hints.period} /></>} />
         <Button variant="secondary" iconLeft={<Icon name={scanning ? "loader-2" : "refresh-cw"} size={16} className={scanning ? "hrbp-spin" : ""} />}
           disabled={scanning || backend === "down"} onClick={runScan}>
           {scanning ? t.scanning : t.checkNow}
