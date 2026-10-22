@@ -106,6 +106,24 @@
    "publisher": "MP"
   },
   {
+   "id": 401,
+   "title": "2023/970|przejrzystości wynagrodzeń|jednakowego wynagrodzenia|2024/2831|za pośrednictwem platform",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 402,
+   "title": "pracowni|zatrudni|rynku pracy|czasu pracy",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 403,
+   "title": "koordynacji systemów zabezpieczenia społecznego|883/2004|987/2009|delegowania pracowników|96/71",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
    "id": 301,
    "title": "Kodeks pracy",
    "publisher": "SEJM",
@@ -297,6 +315,42 @@
    "id": 36,
    "title": "o podatku od czynności cywilnoprawnych",
    "active": false
+  },
+  {
+   "id": 411,
+   "title": "prania pieniędzy|finansowania terroryzmu|2024/1624|2024/1620|2015/849",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 412,
+   "title": "sztucznej inteligencji|2024/1689|cyberbezpieczeństw|2022/2555|operacyjnej odporności cyfrowej|2022/2554|2023/2854|2022/2065",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 413,
+   "title": "zrównoważonego rozwoju|2022/2464|należytej staranności|2024/1760|2020/852|2023/1115|2023/956",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 414,
+   "title": "środków ograniczających|833/2014|269/2014|765/2006|2021/821",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 415,
+   "title": "danych osobowych|2016/679|2018/1725",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 416,
+   "title": "2019/1937|zgłaszających naruszenia",
+   "publisher": "EU",
+   "register": "EURLEX"
   },
   {
    "id": 311,
@@ -613,6 +667,30 @@
   {
    "id": 59,
    "title": "o usługach zaufania"
+  },
+  {
+   "id": 421,
+   "title": "w sprawach cywilnych i handlowych|1215/2012|593/2008|864/2007|2020/1784|2020/1783",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 422,
+   "title": "znaku towarowego|znaków towarowych|2017/1001|wzorów przemysłowych|wzorów wspólnotowych|6/2002|tajemnic przedsiębiorstwa|2016/943",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 423,
+   "title": "upadłościow|niewypłacalności|2015/848|2019/1023",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 424,
+   "title": "prawa spółek|spółek kapitałowych|2017/1132",
+   "publisher": "EU",
+   "register": "EURLEX"
   },
   {
    "id": 321,

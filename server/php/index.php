@@ -33,7 +33,6 @@ const SEARCH_URL = 'https://api.sejm.gov.pl/eli/acts/search';
 const KEYWORDS_URL = 'https://api.sejm.gov.pl/eli/keywords';
 const SAOS_SEARCH_URL = 'https://www.saos.org.pl/api/search/judgments';
 const SAOS_JUDGMENT_URL = 'https://www.saos.org.pl/judgments/';
-const SAOS_LOOKBACK_DAYS = 60;
 const SAOS_COURT_TYPES = ['COMMON', 'SUPREME', 'ADMINISTRATIVE', 'CONSTITUTIONAL_TRIBUNAL', 'NATIONAL_APPEAL_CHAMBER'];
 const SAOS_JUDGMENT_TYPES = ['SENTENCE', 'DECISION', 'RESOLUTION', 'REGULATION', 'REASONS'];
 const SAOS_FROZEN_COURTS = ['SUPREME', 'CONSTITUTIONAL_TRIBUNAL', 'NATIONAL_APPEAL_CHAMBER', 'ADMINISTRATIVE'];
@@ -42,6 +41,22 @@ const SEJM_TERM = 10; // ponytail: bump when the next Sejm convenes (autumn 2027
 const SEJM_API = 'https://api.sejm.gov.pl/sejm/term' . SEJM_TERM;
 const FETCH_TIMEOUT = 20;
 const JSON_FLAGS = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+// ELI search pages (see _lib.js): ELI_PAGE = the API's max per call, at most
+// ELI_MAX_PAGES per query; past that the result is flagged `truncated`.
+const ELI_PAGE = 100;
+const ELI_MAX_PAGES = 5;
+// How far every incremental scan reaches back behind a source's lastChecked
+// (a forced period scan uses exactly the picked dates). Why these values: see
+// LOOKBACK_DAYS in _lib.js (ELI index lag, late Sejm stage dates, SAOS and the
+// Polish EUR-Lex titles arriving weeks/months late). History dedupes re-finds.
+const LOOKBACK_DAYS = ['ELI' => 7, 'SEJM' => 7, 'SAOS' => 180, 'EURLEX' => 180];
+// EUR-Lex via the Publications Office's Cellar SPARQL endpoint (public, no key).
+const EURLEX_SPARQL = 'https://publications.europa.eu/webapi/rdf/sparql';
+const EURLEX_RT = 'http://publications.europa.eu/resource/authority/resource-type/';
+const EURLEX_ACT_TYPES = ['DIR', 'REG', 'DIR_IMPL', 'REG_IMPL', 'DIR_DEL', 'REG_DEL', 'CORRIGENDUM'];
+const EURLEX_PROPOSAL_TYPES = ['PROP_DIR', 'PROP_REG'];
+const EURLEX_TIMEOUT = 8;   // seconds; the endpoint often hangs — short timeout + retries
+const EURLEX_ATTEMPTS = 3;
 
 function out($code, $data, $cache = 'no-store') {
   http_response_code($code);
@@ -140,14 +155,31 @@ function trimmed_or_null($v, $n = 200) { return is_string($v) && trim($v) !== ''
 
 // ---- Sejm/ELI acts -----------------------------------------------------------
 function normalize_publisher($p) { return in_array($p, ['DU', 'MP'], true) ? $p : 'DU'; }
+// Date window = PUBLICATION date in Dz.U./M.P. (pubDateFrom/pubDateTo), not
+// dateFrom/dateTo (= signing date): an act signed 4.09 and published 15.10 must
+// show up in a window starting 10.10 (see buildSearchParams in _lib.js).
 function search_params($o) {
-  $p = [['publisher', normalize_publisher($o['publisher'] ?? 'DU')], ['limit', $o['limit'] ?? 100]];
-  foreach (['keyword', 'title', 'dateFrom', 'dateTo'] as $k) if (!empty($o[$k])) $p[] = [$k, $o[$k]];
+  $p = [['publisher', normalize_publisher($o['publisher'] ?? 'DU')], ['limit', $o['limit'] ?? ELI_PAGE]];
+  if (!empty($o['offset'])) $p[] = ['offset', $o['offset']];
+  foreach (['keyword' => 'keyword', 'title' => 'title', 'dateFrom' => 'pubDateFrom', 'dateTo' => 'pubDateTo'] as $k => $q) if (!empty($o[$k])) $p[] = [$q, $o[$k]];
   return qs($p);
 }
-function search_acts($o) {
+// One ELI search call -> ['items', 'total'] (total = the API's totalCount, null if absent).
+function search_acts_page($o) {
   $data = fetch_json(SEARCH_URL . '?' . search_params($o), 'Sejm');
-  return $data['items'] ?? [];
+  if (!is_array($data) || !isset($data['items']) || !is_array($data['items'])) throw new Exception('Sejm API: unexpected response shape (no items[])');
+  return ['items' => $data['items'], 'total' => isset($data['totalCount']) && is_numeric($data['totalCount']) ? (int)$data['totalCount'] : null];
+}
+// Scanner: every page of a query, up to ELI_MAX_PAGES; `truncated` = the API
+// reports more matches than were read (flagged, never silently dropped).
+function search_all_acts($o) {
+  $items = [];
+  for ($page = 0; $page < ELI_MAX_PAGES; $page++) {
+    $r = search_acts_page(['limit' => ELI_PAGE, 'offset' => $page * ELI_PAGE] + $o);
+    array_push($items, ...$r['items']);
+    if (count($r['items']) < ELI_PAGE || ($r['total'] !== null && count($items) >= $r['total'])) return ['items' => $items, 'truncated' => false];
+  }
+  return ['items' => $items, 'truncated' => true];
 }
 function isap_doc_url($address) { return "https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=$address"; }
 
@@ -241,14 +273,18 @@ function saos_latest_for($courtType) {
   return $cache[$courtType];
 }
 
-function scan_saos_source($s, $dateFrom, $dateTo, $nowStr, $forced) {
-  $from = $forced ? $dateFrom : shift_iso_days($dateFrom, -SAOS_LOOKBACK_DAYS);
+// $dateFrom already includes the lookback (see scan_sources).
+// ponytail: page 0 only (100 newest judgments in the window); a broader match is
+// flagged `truncated` from SAOS's own total — page through it if users hit that.
+function scan_saos_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
+  $from = $dateFrom;
   $o = ['courtType' => $s['courtType'], 'judgmentTypes' => $s['judgmentTypes'] ?? [], 'referencedRegulation' => ($s['referencedRegulation'] ?? null) ?: null, 'phrase' => ($s['phrase'] ?? null) ?: null, 'dateFrom' => $from, 'dateTo' => $dateTo];
-  $query = ['mode' => !empty($s['referencedRegulation']) ? 'referencedRegulation' : 'phrase', 'term' => ($s['referencedRegulation'] ?? null) ?: $s['phrase'], 'register' => 'SAOS', 'courtType' => $s['courtType'], 'judgmentTypes' => $s['judgmentTypes'] ?? [], 'dateFrom' => $from, 'dateTo' => $dateTo, 'lookbackDays' => $forced ? 0 : SAOS_LOOKBACK_DAYS, 'url' => SAOS_SEARCH_URL . '?' . saos_params($o)];
+  $query = ['mode' => !empty($s['referencedRegulation']) ? 'referencedRegulation' : 'phrase', 'term' => ($s['referencedRegulation'] ?? null) ?: $s['phrase'], 'register' => 'SAOS', 'courtType' => $s['courtType'], 'judgmentTypes' => $s['judgmentTypes'] ?? [], 'dateFrom' => $from, 'dateTo' => $dateTo, 'lookbackDays' => $lookbackDays, 'url' => SAOS_SEARCH_URL . '?' . saos_params($o)];
   $latest = saos_latest_for($s['courtType']);
   $freshness = ['courtType' => $s['courtType'], 'latestJudgmentDate' => $latest, 'checkedOn' => iso_today()];
   try {
-    $items = search_judgments($o);
+    $page = search_judgments_page($o);
+    $items = $page['items'];
   } catch (Exception $e) {
     return ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => 0, 'detected' => [], 'error' => $e->getMessage(), 'queries' => [$query], 'query' => $query, 'freshness' => $freshness];
   }
@@ -270,7 +306,9 @@ function scan_saos_source($s, $dateFrom, $dateTo, $nowStr, $forced) {
     'keywords' => $j['keywords'],
     'detectedOn' => iso_today(),
   ], $items);
-  return ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'queries' => [$query], 'query' => $query, 'freshness' => $freshness];
+  $r = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'queries' => [$query], 'query' => $query, 'freshness' => $freshness];
+  if ($page['total'] !== null && $page['total'] > count($items)) $r['truncated'] = true;
+  return $r;
 }
 
 // ---- Sejm bills in progress ("Projekty w Sejmie") ------------------------------
@@ -287,9 +325,9 @@ function sejm_current_stage($stages, $dateTo) {
   }
   return $cur;
 }
-function scan_sejm_source($s, $dateFrom, $dateTo, $nowStr) {
+function scan_sejm_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
   $url = sejm_list_url($s['title']);
-  $query = ['mode' => 'title', 'term' => $s['title'], 'register' => 'SEJM', 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'url' => $url];
+  $query = ['mode' => 'title', 'term' => $s['title'], 'register' => 'SEJM', 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'lookbackDays' => $lookbackDays, 'url' => $url];
   try {
     $list = fetch_json($url, 'Sejm');
   } catch (Exception $e) {
@@ -333,11 +371,111 @@ function scan_sejm_source($s, $dateFrom, $dateTo, $nowStr) {
   return $r;
 }
 
+// ---- EUR-Lex (EU law + Commission proposals) ----------------------------------
+// Port of the EUR-Lex section of _lib.js — read that for the why. Source fields:
+// register "EURLEX", title = fragments separated by "|", matched case-insensitively
+// against the act's POLISH title (a phrase, or a base act's number like "2016/679"
+// which catches every amendment / implementing act / corrigendum of it).
+// Finds directives + regulations (also implementing/delegated) + corrigenda, and
+// Commission proposals (COM … PC = EU law still in draft). Dated by
+// cdm:work_date_document; the Polish title appears days–weeks later, hence the
+// 180-day lookback and dedupe by CELEX.
+
+// "danych osobowych | 2016/679" -> ["danych osobowych", "2016/679"]. The fragments
+// go into a SPARQL string literal and custom sources come from the login-less app,
+// so quotes, backslashes and line breaks are stripped — nothing typed can break out
+// of the literal. Fragments under 3 characters would match almost everything.
+function eurlex_fragments($title) {
+  $f = array_map(fn($x) => mb_strtolower(trim(preg_replace('/["\\\\\r\n]/', '', $x))), explode('|', (string)$title));
+  return array_slice(array_values(array_filter($f, fn($x) => mb_strlen($x) >= 3)), 0, 10);
+}
+function is_eurlex_source($s) { return ($s['register'] ?? null) === 'EURLEX' && count(eurlex_fragments($s['title'] ?? '')) > 0; }
+
+// Date/type filter first in a subquery (a few hundred works per two months),
+// titles joined afterwards — the other way round the query took 5–20 s.
+function eurlex_query($fragments, $dateFrom, $dateTo) {
+  $types = implode(' ', array_map(fn($t) => '<' . EURLEX_RT . $t . '>', array_merge(EURLEX_ACT_TYPES, EURLEX_PROPOSAL_TYPES)));
+  $match = implode(' || ', array_map(fn($f) => "CONTAINS(LCASE(STR(?title)), \"$f\")", $fragments));
+  return "PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
+SELECT ?celex ?date ?type ?title WHERE {
+  { SELECT DISTINCT ?w ?celex ?date ?type WHERE {
+      VALUES ?type { $types }
+      ?w cdm:work_has_resource-type ?type ; cdm:work_date_document ?date .
+      FILTER(?date >= \"$dateFrom\"^^xsd:date && ?date <= \"$dateTo\"^^xsd:date)
+      ?w cdm:resource_legal_id_celex ?celex .
+  } }
+  ?e cdm:expression_belongs_to_work ?w ;
+     cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/POL> ;
+     cdm:expression_title ?title .
+  FILTER($match)
+} ORDER BY DESC(?date) LIMIT 300";
+}
+function eurlex_url($celex) { return 'https://eur-lex.europa.eu/legal-content/PL/TXT/?uri=CELEX:' . rawurlencode($celex); }
+
+// POST (the query is ~1 kB). Roughly every second request hangs or gets a 502
+// (measured 10.2026), so a short timeout and up to EURLEX_ATTEMPTS tries; a 4xx
+// means our query is wrong and is not retried.
+function eurlex_sparql($query) {
+  $last = null;
+  for ($attempt = 0; $attempt < EURLEX_ATTEMPTS; $attempt++) {
+    $c = curl_init(EURLEX_SPARQL);
+    curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => EURLEX_TIMEOUT, CURLOPT_POST => true, CURLOPT_POSTFIELDS => qs([['query', $query]]), CURLOPT_HTTPHEADER => ['Accept: application/sparql-results+json', 'Content-Type: application/x-www-form-urlencoded']]);
+    $body = curl_exec($c);
+    $status = curl_getinfo($c, CURLINFO_HTTP_CODE);
+    $timedOut = curl_errno($c) === CURLE_OPERATION_TIMEDOUT;
+    $err = curl_error($c);
+    if ($body === false) { $last = $timedOut ? 'EUR-Lex SPARQL: no answer in ' . EURLEX_TIMEOUT . ' s' : ($err ?: 'EUR-Lex SPARQL: fetch failed'); continue; }
+    if ($status < 200 || $status >= 300) { $last = "EUR-Lex SPARQL error $status"; if ($status < 500) break; continue; }
+    $data = json_decode($body, true);
+    if (!is_array($data['results']['bindings'] ?? null)) { $last = 'EUR-Lex SPARQL: unexpected response shape'; break; }
+    return $data['results']['bindings'];
+  }
+  throw new Exception($last);
+}
+
+// One SPARQL row per (work, type) — a work can carry two types (e.g. REG and
+// CORRIGENDUM), so rows are merged by CELEX. Pure (the self-check calls it).
+function eurlex_entries($bindings, $todayIso) {
+  $by = [];
+  foreach ($bindings as $b) {
+    $celex = $b['celex']['value'] ?? null;
+    if (!$celex) continue;
+    $type = str_replace(EURLEX_RT, '', $b['type']['value'] ?? '');
+    $by[$celex] ??= ['celex' => $celex, 'date' => $b['date']['value'] ?? null, 'title' => $b['title']['value'] ?? null, 'types' => []];
+    if (!in_array($type, $by[$celex]['types'], true)) $by[$celex]['types'][] = $type;
+  }
+  $out = [];
+  foreach ($by as $w) {
+    // CELEX sector 3 = legislation; a corrigendum outside it corrects a notice,
+    // a communication or a CFSP decision — not an act this source tracks.
+    $onlyCorr = !array_filter($w['types'], fn($t) => $t !== 'CORRIGENDUM');
+    if ($onlyCorr && $w['celex'][0] !== '3') continue;
+    // "R(nn)" CELEX suffix = corrigendum ("Sprostowanie do …").
+    $euType = array_intersect($w['types'], EURLEX_PROPOSAL_TYPES) ? 'proposal'
+      : (in_array('CORRIGENDUM', $w['types'], true) || preg_match('/R\(\d+\)$/', $w['celex']) ? 'corrigendum' : 'act');
+    $out[] = ['ts' => format_detected_ts($w['date']), 'type' => 'detected', 'kind' => 'eu', 'note' => $w['title'], 'url' => eurlex_url($w['celex']), 'eli' => mb_substr("EU/{$w['celex']}", 0, 120), 'via' => 'title', 'publisher' => 'EU', 'celex' => $w['celex'], 'euType' => $euType, 'euDocTypes' => $w['types'], 'documentDate' => $w['date'] ?: null, 'detectedOn' => $todayIso];
+  }
+  return $out;
+}
+
+function scan_eurlex_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
+  $sparql = eurlex_query(eurlex_fragments($s['title']), $dateFrom, $dateTo);
+  // Replayable in a browser: the endpoint renders an HTML table for format=text/html.
+  $query = ['mode' => 'title', 'term' => $s['title'], 'register' => 'EURLEX', 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'lookbackDays' => $lookbackDays, 'url' => EURLEX_SPARQL . '?' . qs([['query', $sparql], ['format', 'text/html']])];
+  try {
+    $detected = eurlex_entries(eurlex_sparql($sparql), iso_today());
+    return ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'queries' => [$query], 'query' => $query];
+  } catch (Exception $e) {
+    return ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => 0, 'detected' => [], 'error' => $e->getMessage(), 'queries' => [$query], 'query' => $query];
+  }
+}
+
 // ---- scan engine ---------------------------------------------------------------
 function source_queries($s) {
   $reg = $s['register'] ?? null;
   if ($reg === 'SAOS') return is_saos_source($s) ? [['mode' => !empty($s['referencedRegulation']) ? 'referencedRegulation' : 'phrase', 'term' => ($s['referencedRegulation'] ?? null) ?: $s['phrase']]] : [];
   if ($reg === 'SEJM') return is_sejm_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
+  if ($reg === 'EURLEX') return is_eurlex_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
   $qs = [];
   if (!empty($s['keyword'])) $qs[] = ['mode' => 'keyword', 'term' => $s['keyword']];
   if (!empty($s['title'])) $qs[] = ['mode' => 'title', 'term' => $s['title']];
@@ -345,9 +483,60 @@ function source_queries($s) {
 }
 function is_scannable($s) { return count(source_queries($s)) > 0; }
 
+// One ELI (Dz.U./M.P.) source: its 1–2 queries, every page each, deduped by ELI
+// id across the queries.
+function scan_eli_source($s, $qs, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
+  $today = iso_today();
+  $publisher = normalize_publisher($s['publisher'] ?? null);
+  $queries = array_map(fn($q) => $q + ['publisher' => $publisher, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'lookbackDays' => $lookbackDays, 'url' => SEARCH_URL . '?' . search_params([$q['mode'] => $q['term'], 'publisher' => $publisher, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo])], $qs);
+  $detected = [];
+  $seen = [];
+  $errors = [];
+  $truncated = false;
+  foreach ($queries as $q) {
+    try {
+      $r = search_all_acts([$q['mode'] => $q['term'], 'publisher' => $publisher, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo]);
+      if ($r['truncated']) $truncated = true;
+      foreach ($r['items'] as $item) {
+        $key = ($item['ELI'] ?? null) ?: (($item['title'] ?? '') . '|' . ($item['address'] ?? ''));
+        if (isset($seen[$key])) continue;
+        $seen[$key] = true;
+        // Feed date = publication in the gazette (what the window filters on);
+        // the signing date only as a fallback for a record without one.
+        $e = ['ts' => format_detected_ts(($item['promulgation'] ?? null) ?: ($item['announcementDate'] ?? null)), 'type' => 'detected', 'note' => $item['title'] ?? null, 'url' => isap_doc_url($item['address'] ?? '')];
+        if (isset($item['ELI'])) $e['eli'] = $item['ELI'];
+        if (isset($item['type'])) $e['actType'] = $item['type'];
+        $detected[] = $e + [
+          'via' => $q['mode'],
+          'publisher' => $publisher,
+          // The act's legal status AS REPORTED BY THE SEJM API AT SCAN TIME — never re-checked.
+          'legalStatus' => ($item['status'] ?? null) ?: null,
+          'inForce' => ($item['inForce'] ?? null) ?: null,
+          'entryIntoForce' => ($item['entryIntoForce'] ?? null) ?: null,
+          'changeDate' => ($item['changeDate'] ?? null) ?: null,
+          'displayAddress' => ($item['displayAddress'] ?? null) ?: null,
+          'detectedOn' => $today,
+        ];
+      }
+    } catch (Exception $e) {
+      $errors[] = $e->getMessage();
+    }
+  }
+  $r = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'queries' => $queries, 'query' => $queries[0]];
+  if ($truncated) $r['truncated'] = true;
+  if ($errors) $r['error'] = implode('; ', $errors);
+  return $r;
+}
+
 // Same as scanSources in _lib.js, but sequential — no parallel pool: gentler
 // on the public APIs, same request count, a slower manual scan.
 // ponytail: curl_multi if "Sprawdź teraz" ever becomes too slow.
+// Incremental window = lastChecked − LOOKBACK_DAYS[register] … today; a forced
+// $range = exactly the picked period (no lookback); a source's first-ever scan
+// starts on 1 January (no lookback either).
+// lastChecked only moves forward on a COMPLETE incremental scan: a source with
+// any error, or a forced-period scan, keeps its previous lastChecked — otherwise a
+// failed night (or a manual look at last March) would skip the gap for good.
 function scan_sources($sources, $range) {
   $today = iso_today();
   $nowStr = format_now();
@@ -356,42 +545,19 @@ function scan_sources($sources, $range) {
   $out = [];
   foreach ($sources as $s) {
     $qs = source_queries($s);
-    if (!$qs) { $out[] = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => 0, 'detected' => []]; continue; }
-    $dateFrom = $rangeFrom ?: (to_iso_date($s['lastChecked'] ?? null) ?: date('Y') . '-01-01');
+    if (!$qs) { $out[] = ['id' => $s['id'], 'lastChecked' => ($s['lastChecked'] ?? null) ?: null, 'found' => 0, 'detected' => []]; continue; }
+    $register = in_array($s['register'] ?? null, ['SAOS', 'SEJM', 'EURLEX'], true) ? $s['register'] : 'ELI';
+    $last = to_iso_date($s['lastChecked'] ?? null);
+    $lookbackDays = $rangeFrom || !$last ? 0 : LOOKBACK_DAYS[$register];
+    $dateFrom = $rangeFrom ?: ($last ? shift_iso_days($last, -$lookbackDays) : date('Y') . '-01-01');
     $dateTo = $rangeFrom ? $rangeTo : $today;
-    if (($s['register'] ?? null) === 'SAOS') { $out[] = scan_saos_source($s, $dateFrom, $dateTo, $nowStr, (bool)$rangeFrom); continue; }
-    if (($s['register'] ?? null) === 'SEJM') { $out[] = scan_sejm_source($s, $dateFrom, $dateTo, $nowStr); continue; }
-    $publisher = normalize_publisher($s['publisher'] ?? null);
-    $queries = array_map(fn($q) => $q + ['publisher' => $publisher, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'url' => SEARCH_URL . '?' . search_params([$q['mode'] => $q['term'], 'publisher' => $publisher, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo])], $qs);
-    $detected = [];
-    $seen = [];
-    $errors = [];
-    foreach ($queries as $q) {
-      try {
-        foreach (search_acts([$q['mode'] => $q['term'], 'publisher' => $publisher, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo]) as $item) {
-          $key = ($item['ELI'] ?? null) ?: (($item['title'] ?? '') . '|' . ($item['address'] ?? ''));
-          if (isset($seen[$key])) continue;
-          $seen[$key] = true;
-          $e = ['ts' => format_detected_ts($item['announcementDate'] ?? null), 'type' => 'detected', 'note' => $item['title'] ?? null, 'url' => isap_doc_url($item['address'] ?? '')];
-          if (isset($item['ELI'])) $e['eli'] = $item['ELI'];
-          if (isset($item['type'])) $e['actType'] = $item['type'];
-          $detected[] = $e + [
-            'via' => $q['mode'],
-            'publisher' => $publisher,
-            'legalStatus' => ($item['status'] ?? null) ?: null,
-            'inForce' => ($item['inForce'] ?? null) ?: null,
-            'entryIntoForce' => ($item['entryIntoForce'] ?? null) ?: null,
-            'changeDate' => ($item['changeDate'] ?? null) ?: null,
-            'displayAddress' => ($item['displayAddress'] ?? null) ?: null,
-            'detectedOn' => $today,
-          ];
-        }
-      } catch (Exception $e) {
-        $errors[] = $e->getMessage();
-      }
-    }
-    $r = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'queries' => $queries, 'query' => $queries[0]];
-    if ($errors) $r['error'] = implode('; ', $errors);
+    $r = match ($register) {
+      'SAOS' => scan_saos_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
+      'SEJM' => scan_sejm_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
+      'EURLEX' => scan_eurlex_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
+      default => scan_eli_source($s, $qs, $dateFrom, $dateTo, $nowStr, $lookbackDays),
+    };
+    if ($rangeFrom || isset($r['error'])) $r['lastChecked'] = ($s['lastChecked'] ?? null) ?: null;
     $out[] = $r;
   }
   return $out;
@@ -455,7 +621,9 @@ function scan_workspace($ws, $sources, $range) {
         $ids = array_column($results, 'id');
         $untouched = array_values(array_filter($prev['sources'], fn($p) => !in_array($p['id'], $ids)));
         return [
-          'sources' => array_merge($untouched, array_map(fn($r) => ['id' => $r['id'], 'lastChecked' => $r['lastChecked'], 'found' => $r['found']] + (isset($r['freshness']) ? ['freshness' => $r['freshness']] : []), $results)),
+          // error / truncated are persisted too, so a failed nightly scan is visible
+          // in the UI next morning, not only to whoever clicked "Sprawdź teraz".
+          'sources' => array_merge($untouched, array_map(fn($r) => ['id' => $r['id'], 'lastChecked' => $r['lastChecked'], 'found' => $r['found']] + array_intersect_key($r, ['error' => 1, 'truncated' => 1, 'freshness' => 1]), $results)),
           'history' => obj(merge_history($prev['history'] ?? [], $results, $fresh)),
           'lastRun' => $lastRun,
         ];
@@ -465,6 +633,12 @@ function scan_workspace($ws, $sources, $range) {
       $persistError = $e->getMessage();
     }
   }
+  // `found` = matches in the scanned window (incl. ones already in history — every
+  // scan looks back); `fresh` = really new. ponytail: counted from $fresh, so it
+  // stays 0 when persisting failed (nothing was merged either).
+  $freshBy = array_count_values(array_map(fn($f) => (string)$f['sourceId'], $fresh));
+  foreach ($results as &$r) $r['fresh'] = $freshBy[(string)$r['id']] ?? 0;
+  unset($r);
   // Queue only what really got persisted; a queue failure must not fail the scan.
   if ($persisted) try { queue_for_digest($ws, $fresh); } catch (Exception $e) { /* as in scan-all.js */ }
   return ['workspace' => $ws, 'results' => $results, 'lastRun' => $lastRun, 'persisted' => $persisted, 'persistError' => $persistError];
@@ -475,7 +649,7 @@ function scan_all() {
   foreach (WORKSPACES as $ws) {
     $r = scan_workspace($ws, null, null);
     // After each department's scan its daily digest goes out (no-op when nothing is queued or mail is not configured).
-    $runs[] = ['workspace' => $ws, 'lastRun' => $r['lastRun'], 'persisted' => $r['persisted'], 'persistError' => $r['persistError'], 'found' => array_sum(array_column($r['results'], 'found')), 'errors' => count(array_filter($r['results'], fn($x) => isset($x['error']))), 'mail' => send_digest($ws)];
+    $runs[] = ['workspace' => $ws, 'lastRun' => $r['lastRun'], 'persisted' => $r['persisted'], 'persistError' => $r['persistError'], 'found' => array_sum(array_column($r['results'], 'found')), 'fresh' => array_sum(array_column($r['results'], 'fresh')), 'errors' => count(array_filter($r['results'], fn($x) => isset($x['error']))), 'mail' => send_digest($ws)];
   }
   return ['runs' => $runs];
 }
@@ -485,12 +659,13 @@ function scan_all() {
 function clean_source($s, $trim) {
   $s = is_array($s) ? $s : [];
   $str = $trim ? 'trimmed_or_null' : 'str_or_null';
-  $reg = in_array($s['register'] ?? null, ['SAOS', 'SEJM'], true) ? $s['register'] : 'ELI';
+  // EURLEX keeps publisher "EU" so it is routed to the SPARQL scanner, not a Dz.U. title search.
+  $reg = in_array($s['register'] ?? null, ['SAOS', 'SEJM', 'EURLEX'], true) ? $s['register'] : 'ELI';
   return [
     'id' => is_numeric($s['id'] ?? null) ? +$s['id'] : null,
     'keyword' => $str($s['keyword'] ?? null),
     'title' => $str($s['title'] ?? null),
-    'publisher' => $reg === 'SEJM' ? 'SEJM' : (($s['publisher'] ?? null) === 'MP' ? 'MP' : 'DU'),
+    'publisher' => $reg === 'SEJM' ? 'SEJM' : ($reg === 'EURLEX' ? 'EU' : (($s['publisher'] ?? null) === 'MP' ? 'MP' : 'DU')),
     'register' => $reg,
     'courtType' => in_array($s['courtType'] ?? null, SAOS_COURT_TYPES, true) ? $s['courtType'] : null,
     'judgmentTypes' => is_array($s['judgmentTypes'] ?? null) ? array_slice(array_values(array_filter($s['judgmentTypes'], fn($j) => in_array($j, SAOS_JUDGMENT_TYPES, true))), 0, 5) : [],
@@ -503,6 +678,8 @@ function clean_source($s, $trim) {
 const MAX_QUEUE = 300;      // backlog kept while mail is not configured yet
 const MAX_PER_SECTION = 40;
 const WS_LABEL = ['hr' => 'HR', 'compliance' => 'Compliance', 'legal' => 'Dział prawny'];
+// Polish labels for EUR-Lex entry types (euType from eurlex_entries).
+const EU_TYPE_LABEL = ['act' => 'akt UE', 'proposal' => 'projekt Komisji (COM)', 'corrigendum' => 'sprostowanie'];
 const TEST_EVERY_S = 600;   // POST /api/notify: one test mail per department per 10 min
 
 function hrbp_config() { static $c; return $c ??= (is_file(CONFIG_FILE) ? (require CONFIG_FILE) : []); }
@@ -528,6 +705,9 @@ function queue_for_digest($ws, $fresh) {
     $i['courtName'] = ($e['courtName'] ?? null) ?: null;
     if (!empty($e['caseNumbers'])) $i['caseNumbers'] = $e['caseNumbers'];
     $i['entryIntoForce'] = ($e['entryIntoForce'] ?? null) ?: null;
+    // EUR-Lex: CELEX number + act / proposal / corrigendum (eurlex_entries).
+    if (!empty($e['celex'])) $i['celex'] = $e['celex'];
+    if (!empty($e['euType'])) $i['euType'] = $e['euType'];
     return $i;
   }, $fresh);
   update_doc($ws, 'notify', function ($doc) use ($items) {
@@ -542,11 +722,13 @@ function build_digest($ws, $items, $names) {
     ['Nowe i zmienione akty prawne', array_values(array_filter($items, fn($i) => $i['kind'] === 'act'))],
     ['Projekty ustaw w Sejmie — nowy etap', array_values(array_filter($items, fn($i) => $i['kind'] === 'bill'))],
     ['Nowe orzeczenia sądów', array_values(array_filter($items, fn($i) => $i['kind'] === 'judgment'))],
+    ['Prawo UE (EUR-Lex) — akty i projekty Komisji', array_values(array_filter($items, fn($i) => $i['kind'] === 'eu'))],
   ], fn($s) => $s[1]);
   $detail = fn($i) => implode(' · ', array_filter([
     $names[$i['sourceId']] ?? null,
     $i['kind'] === 'bill' && !empty($i['stage']) ? "etap: {$i['stage']}" . (!empty($i['passed']) ? ' (uchwalona)' : '') : null,
     $i['kind'] === 'judgment' ? implode(' · ', array_filter([$i['courtName'] ?? null, implode(', ', $i['caseNumbers'] ?? [])])) : null,
+    $i['kind'] === 'eu' ? implode(' · ', array_filter([EU_TYPE_LABEL[$i['euType'] ?? ''] ?? null, !empty($i['celex']) ? "CELEX {$i['celex']}" : null])) : null,
     !empty($i['entryIntoForce']) ? "wejście w życie: {$i['entryIntoForce']}" : null,
     !empty($i['ts']) ? explode(' ', $i['ts'])[0] : null,
   ]));
@@ -675,6 +857,17 @@ try {
       if ($method === 'POST') {
         // "Sprawdź teraz": the frontend's real per-source state; open by design (no login).
         $ws = normalize_ws($body['workspace'] ?? null);
+        if (($body['action'] ?? null) === 'reset') {
+          // "Wyczyść wykrycia": empties the department's scan doc (detected history,
+          // per-source lastChecked/found/error, lastRun), so the next scan for a picked
+          // period reports everything in it as new again. Triage statuses, KB, source
+          // config and the digest queue are NOT touched. Under the doc lock, so a scan
+          // finishing at the same moment cannot interleave half-way.
+          // ponytail: no login (open link, by design) — anyone with the link can reset;
+          // gate it once access is restricted (2FA plan).
+          update_doc($ws, 'scan', fn() => empty_doc('scan'));
+          out(200, ['workspace' => $ws, 'reset' => true]);
+        }
         $sources = [];
         foreach (array_slice(is_array($body['sources'] ?? null) ? $body['sources'] : [], 0, 150) as $s) {
           $c = clean_source($s, false);
@@ -747,7 +940,7 @@ try {
       $ws = normalize_ws($body['workspace'] ?? null);
       $ids = array_slice(array_values(array_filter(is_array($body['ids'] ?? null) ? $body['ids'] : [], fn($x) => is_string($x) && mb_strlen($x) <= 120)), 0, 500);
       $opt = fn($k, $n) => is_string($body[$k] ?? null) ? mb_substr(trim($body[$k]), 0, $n) : null;
-      $status = !array_key_exists('status', $body) ? null : (in_array($body['status'], ['new', 'progress', 'waiting', 'urgent', 'done'], true) ? $body['status'] : false);
+      $status = !array_key_exists('status', $body) ? null : (in_array($body['status'], ['new', 'progress', 'urgent', 'done'], true) ? $body['status'] : false);
       $owner = $opt('owner', 80);
       $due = $opt('due', 10);
       if ($due !== null && $due !== '' && !is_iso_date($due)) $due = false;
