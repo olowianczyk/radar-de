@@ -12,7 +12,7 @@ const SEJM_SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
 const SAOS_SEARCH_URL = "https://www.saos.org.pl/api/search/judgments";
 // Days every incremental scan reaches back behind lastChecked, per register —
 // mirrors api/_lib.js LOOKBACK_DAYS (reasons documented there).
-export const LOOKBACK_DAYS = { ELI: 7, SEJM: 7, SAOS: 180, EURLEX: 180 };
+export const LOOKBACK_DAYS = { ELI: 7, SEJM: 7, SAOS: 180, EURLEX: 180, RCL: 7 };
 // Sejm bills in progress — mirrors api/_lib.js SEJM_API (term 10).
 const SEJM_PROCESSES_URL = "https://api.sejm.gov.pl/sejm/term10/processes";
 // EUR-Lex (Cellar SPARQL) — mirrors api/_lib.js EURLEX_* constants. Kept in
@@ -229,7 +229,7 @@ export function nextScanRange(source) {
   const [d, m, y] = datePart.split(".").map(Number);
   let from = d ? `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : `${new Date().getFullYear()}-01-01`;
   const first = !d;
-  const back = LOOKBACK_DAYS[["SAOS", "SEJM", "EURLEX"].includes(source.register) ? source.register : "ELI"];
+  const back = LOOKBACK_DAYS[["SAOS", "SEJM", "EURLEX", "RCL"].includes(source.register) ? source.register : "ELI"];
   if (back && !first) {
     const dt = new Date(`${from}T00:00:00Z`); dt.setUTCDate(dt.getUTCDate() - back); from = dt.toISOString().slice(0, 10);
   }
@@ -260,10 +260,12 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
       const isJudgment = e.kind === "judgment";
       const isBill = e.kind === "bill";
       const isEu = e.kind === "eu";
+      // Government draft from RCL (before the Sejm) — see scan_rcl_source in server/php/index.php.
+      const isDraft = e.kind === "draft";
       changes.push({
         id,
         eli: e.eli,
-        kind: isJudgment ? "judgment" : isBill ? "bill" : isEu ? "eu" : "act",
+        kind: isJudgment ? "judgment" : isBill ? "bill" : isEu ? "eu" : isDraft ? "draft" : "act",
         judgment: isJudgment ? { courtType: e.courtType, courtName: e.courtName, caseNumbers: e.caseNumbers || [], judgmentType: e.judgmentType, judgmentDate: e.judgmentDate, excerpt: e.excerpt || "", keywords: e.keywords || [] } : null,
         // Sejm bill at one legislative stage (see api/_lib.js scanSejmSource).
         bill: isBill ? { number: e.billNumber, stage: e.stage, stageType: e.stageType, stageDate: e.stageDate, processStartDate: e.processStartDate, passed: !!e.passed, euLaw: !!e.euLaw, urgent: !!e.urgent, actEli: e.actEli || null, isapUrl: e.isapUrl || null } : null,
@@ -290,7 +292,7 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
         // isSavedKb in LegalChanges.jsx).
         ownUrl: !!e.url,
         title: { pl: e.note, de: e.note, en: e.note },
-        summary: isJudgment ? { pl: e.excerpt || "", de: e.excerpt || "", en: e.excerpt || "" } : isBill ? { pl: e.description || "", de: e.description || "", en: e.description || "" } : summary,
+        summary: isJudgment ? { pl: e.excerpt || "", de: e.excerpt || "", en: e.excerpt || "" } : isBill ? { pl: e.description || "", de: e.description || "", en: e.description || "" } : isDraft ? (() => { const d = [e.draftType, e.wykazNumber && `nr ${e.wykazNumber}`, e.applicant, e.createdDate && `utworzono ${isoToDmy(e.createdDate)}`].filter(Boolean).join(" · "); return { pl: d, de: d, en: d }; })() : summary,
         matchedBy: (() => {
           // `via` is recorded by the backend since the multi-query engine;
           // older history entries fall back to the source's first query.

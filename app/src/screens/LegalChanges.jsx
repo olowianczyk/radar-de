@@ -183,8 +183,8 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
       <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} iconLeft={<Icon name="search" size={16} />} /></div>
         <div style={{ width: 200 }}><Select value={area} onChange={(e) => setArea(e.target.value)} placeholder={t.allAreas} options={[{ value: "", label: t.allAreas }, ...Object.keys(t.area).map((k) => ({ value: k, label: t.area[k] }))]} /></div>
-        {changes.some((c) => c.kind === "judgment" || c.kind === "bill" || c.kind === "eu") && (
-          <div style={{ width: 190 }}><Select value={kind} onChange={(e) => setKind(e.target.value)} options={[{ value: "all", label: t.saos.kindAll }, { value: "act", label: t.saos.kindAct }, { value: "bill", label: t.sejm.kindBill }, { value: "eu", label: t.eu.kindEu }, { value: "judgment", label: t.saos.kindJudgment }]} /></div>
+        {changes.some((c) => c.kind === "judgment" || c.kind === "bill" || c.kind === "eu" || c.kind === "draft") && (
+          <div style={{ width: 190 }}><Select value={kind} onChange={(e) => setKind(e.target.value)} options={[{ value: "all", label: t.saos.kindAll }, { value: "act", label: t.saos.kindAct }, { value: "bill", label: t.sejm.kindBill }, { value: "eu", label: t.eu.kindEu }, { value: "draft", label: "Projekt rządowy (RCL)" }, { value: "judgment", label: t.saos.kindJudgment }]} /></div>
         )}
         <div style={{ width: 200 }}>
           <Select value={period} onChange={(e) => setPeriod(e.target.value)} options={[
@@ -246,7 +246,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div onClick={(e) => e.stopPropagation()} style={{ paddingTop: 2 }}><Checkbox checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={c.title[lang]} /></div>
                   <div style={{ width: 36, height: 36, borderRadius: "var(--radius-sm)", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 36px" }}>
-                    <Icon name={c.kind === "judgment" ? "gavel" : c.kind === "bill" ? "landmark" : c.kind === "eu" ? "globe" : "scale"} size={17} />
+                    <Icon name={c.kind === "judgment" ? "gavel" : c.kind === "bill" || c.kind === "draft" ? "landmark" : c.kind === "eu" ? "globe" : "scale"} size={17} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
@@ -279,7 +279,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                 <div style={{ width: 44, height: 44, borderRadius: "var(--radius-md)", background: "var(--brand-soft)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 44px" }}>
-                  <Icon name={sel.kind === "judgment" ? "gavel" : sel.kind === "bill" ? "landmark" : sel.kind === "eu" ? "globe" : "scale"} size={20} />
+                  <Icon name={sel.kind === "judgment" ? "gavel" : sel.kind === "bill" || sel.kind === "draft" ? "landmark" : sel.kind === "eu" ? "globe" : "scale"} size={20} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-2xl)", color: "var(--text-heading)" }}>{sel.title[lang]}</h2>
@@ -294,7 +294,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
               <div style={{ display: "flex", gap: 24, padding: "14px 0", borderTop: "1px solid var(--border-subtle)", borderBottom: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
                 <Meta label={sel.kind === "bill" ? t.sejm.stageDate : t.published} value={sel.date} hint={sel.kind === "bill" ? t.hints.stageDate : sel.kind === "judgment" ? null : t.hints.published} />
                 <Meta label={t.effective} value={sel.effective} hint={sel.kind === "act" ? t.hints.effective : null} />
-                <Meta label={t.source} value={/^https?:/.test(sel.source) ? <a href={sel.source} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>{sel.kind === "judgment" ? "SAOS" : sel.kind === "bill" ? "Sejm" : sel.kind === "eu" ? "EUR-Lex" : "ISAP"} ↗</a> : sel.source} small />
+                <Meta label={t.source} value={/^https?:/.test(sel.source) ? <a href={sel.source} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>{sel.kind === "judgment" ? "SAOS" : sel.kind === "draft" ? "RCL" : sel.kind === "bill" ? "Sejm" : sel.kind === "eu" ? "EUR-Lex" : "ISAP"} ↗</a> : sel.source} small />
               </div>
               {sel.kind === "judgment" ? (
               <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 8 }}>

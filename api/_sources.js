@@ -154,6 +154,12 @@ module.exports = {
       title: "związkach zawodowych",
       publisher: "SEJM",
       register: "SEJM"
+    },
+    {
+      id: 351,
+      title: "staż|praktyk|kodeks pracy|kodeksu pracy|wynagrodz|czas pracy|czasu pracy|urlop|zatrudni|rynku pracy|związk|układ|ubezpieczeń społecznych|emerytur|pracowni|pracodawc",
+      publisher: "RCL",
+      register: "RCL"
     }
   ],
   compliance: [

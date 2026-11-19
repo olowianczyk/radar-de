@@ -49,7 +49,7 @@ const ELI_MAX_PAGES = 5;
 // (a forced period scan uses exactly the picked dates). Why these values: see
 // LOOKBACK_DAYS in _lib.js (ELI index lag, late Sejm stage dates, SAOS and the
 // Polish EUR-Lex titles arriving weeks/months late). History dedupes re-finds.
-const LOOKBACK_DAYS = ['ELI' => 7, 'SEJM' => 7, 'SAOS' => 180, 'EURLEX' => 180];
+const LOOKBACK_DAYS = ['ELI' => 7, 'SEJM' => 7, 'SAOS' => 180, 'EURLEX' => 180, 'RCL' => 7];
 // EUR-Lex via the Publications Office's Cellar SPARQL endpoint (public, no key).
 const EURLEX_SPARQL = 'https://publications.europa.eu/webapi/rdf/sparql';
 const EURLEX_RT = 'http://publications.europa.eu/resource/authority/resource-type/';
@@ -371,6 +371,91 @@ function scan_sejm_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
   return $r;
 }
 
+// ---- RCL: government drafts before they reach the Sejm ("Projekty rządowe") -----------
+// Rządowe Centrum Legislacji publishes every government draft (ustawy, założenia do
+// ustaw) from the moment it enters the Rada Ministrów's work list — months before a
+// Sejm print exists, so the SEJM scanner cannot see it. There is no API/RSS: we read
+// the public HTML list (/lista), which supports server-side filters and sorting.
+// Source fields: register "RCL", title = fragments separated by "|", matched
+// case-insensitively against the draft's title (same syntax as EUR-Lex fragments).
+// One feed entry per draft (dedupe key RCL/<id>) — later stage changes are NOT
+// reported yet. shortcut: HTML scraping, breaks if RCL changes its markup; the
+// parser returns 0 rows on a layout change and scan_rcl_source flags that as an error.
+const RCL_BASE = 'https://legislacja.rcl.gov.pl';
+const RCL_TYPES = ['2' => 'projekt ustawy', '1' => 'założenia do projektu ustawy']; // typeId on /lista
+
+function is_rcl_source($s) { return ($s['register'] ?? null) === 'RCL' && count(eurlex_fragments($s['title'] ?? '')) > 0; }
+function rcl_list_url($typeId, $all) {
+  // Newest modification first; pSize=0 = the whole register (≈2.7k rows, ~7 s), used only
+  // when the 100 newest rows do not reach back far enough (first scan, forced old period).
+  return RCL_BASE . '/lista?' . qs([['typeId', $typeId], ['pSize', $all ? 0 : 100], ['sKey', 'modifiedDate'], ['sOrder', 'desc']]);
+}
+function fetch_html($url, $label) {
+  $c = curl_init($url);
+  curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 45, CURLOPT_FOLLOWLOCATION => true, CURLOPT_USERAGENT => 'RadarLegislacyjny/1.0 (monitoring projektow ustaw)', CURLOPT_HTTPHEADER => ['Accept: text/html']]);
+  $body = curl_exec($c);
+  $status = curl_getinfo($c, CURLINFO_HTTP_CODE);
+  $err = curl_error($c);
+  if ($body === false) throw new Exception($err ?: 'fetch failed');
+  if ($status < 200 || $status >= 300) throw new Exception("$label error $status");
+  // RCL's firewall answers 200 with a "Request Rejected" page — treat it as a failure, not as "no rows".
+  if (stripos($body, 'Request Rejected') !== false && stripos($body, '/projekt/') === false) throw new Exception("$label: request rejected by firewall");
+  return $body;
+}
+function rcl_text($html) { return trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'))); }
+function rcl_iso($dmy) { return preg_match('/^(\d\d)-(\d\d)-(\d{4})$/', (string)$dmy, $m) ? "$m[3]-$m[2]-$m[1]" : null; }
+// Rows of /lista: title, applicant, wykaz number (UD…/UC…), created, modified.
+function parse_rcl_list($html) {
+  $rows = [];
+  if (!preg_match_all('~<tr[^>]*>(.*?)</tr\s*>~s', $html, $trs)) return $rows;
+  foreach ($trs[1] as $tr) {
+    if (!preg_match('~<a href="/projekt/(\d+)"[^>]*>(.*?)</a>~s', $tr, $a) || !preg_match_all('~<td[^>]*>(.*?)</td\s*>~s', $tr, $tds) || count($tds[1]) < 5) continue;
+    $rows[] = ['id' => $a[1], 'title' => rcl_text($a[2]), 'applicant' => rcl_text($tds[1][1]), 'number' => rcl_text($tds[1][2]), 'created' => rcl_iso(rcl_text($tds[1][3])), 'modified' => rcl_iso(rcl_text($tds[1][4]))];
+  }
+  return $rows;
+}
+function scan_rcl_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
+  $fragments = eurlex_fragments($s['title']);
+  $query = ['mode' => 'title', 'term' => $s['title'], 'register' => 'RCL', 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'lookbackDays' => $lookbackDays, 'url' => RCL_BASE . '/lista?typeId=2'];
+  $detected = [];
+  $seen = [];
+  try {
+    foreach (RCL_TYPES as $typeId => $typeName) {
+      $rows = parse_rcl_list(fetch_html(rcl_list_url($typeId, false), 'RCL'));
+      if (!$rows) throw new Exception('RCL: list not recognised (layout changed?)');
+      // The 100 newest rows reach back far enough only if the oldest of them is already older than the window.
+      $oldest = end($rows)['modified'] ?? null;
+      if (!$oldest || $oldest >= $dateFrom) $rows = parse_rcl_list(fetch_html(rcl_list_url($typeId, true), 'RCL'));
+      foreach ($rows as $r) {
+        $changed = $r['modified'] ?: $r['created'];
+        if (!$changed || $changed < $dateFrom || $changed > $dateTo || isset($seen[$r['id']])) continue;
+        $low = mb_strtolower($r['title']);
+        if (!array_filter($fragments, fn($f) => mb_strpos($low, $f) !== false)) continue;
+        $seen[$r['id']] = true;
+        $detected[] = [
+          'ts' => format_detected_ts($changed),
+          'type' => 'detected',
+          'kind' => 'draft',
+          'note' => $r['title'],
+          'url' => RCL_BASE . '/projekt/' . $r['id'],
+          'eli' => 'RCL/' . $r['id'],
+          'via' => 'title',
+          'publisher' => 'RCL',
+          'draftType' => $typeName,
+          'wykazNumber' => $r['number'] ?: null,
+          'applicant' => $r['applicant'] ?: null,
+          'createdDate' => $r['created'],
+          'modifiedDate' => $r['modified'],
+          'detectedOn' => iso_today(),
+        ];
+      }
+    }
+  } catch (Exception $e) {
+    return ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'error' => $e->getMessage(), 'queries' => [$query], 'query' => $query];
+  }
+  return ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'queries' => [$query], 'query' => $query];
+}
+
 // ---- EUR-Lex (EU law + Commission proposals) ----------------------------------
 // Port of the EUR-Lex section of _lib.js — read that for the why. Source fields:
 // register "EURLEX", title = fragments separated by "|", matched case-insensitively
@@ -476,6 +561,7 @@ function source_queries($s) {
   if ($reg === 'SAOS') return is_saos_source($s) ? [['mode' => !empty($s['referencedRegulation']) ? 'referencedRegulation' : 'phrase', 'term' => ($s['referencedRegulation'] ?? null) ?: $s['phrase']]] : [];
   if ($reg === 'SEJM') return is_sejm_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
   if ($reg === 'EURLEX') return is_eurlex_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
+  if ($reg === 'RCL') return is_rcl_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
   $qs = [];
   if (!empty($s['keyword'])) $qs[] = ['mode' => 'keyword', 'term' => $s['keyword']];
   if (!empty($s['title'])) $qs[] = ['mode' => 'title', 'term' => $s['title']];
@@ -546,7 +632,7 @@ function scan_sources($sources, $range) {
   foreach ($sources as $s) {
     $qs = source_queries($s);
     if (!$qs) { $out[] = ['id' => $s['id'], 'lastChecked' => ($s['lastChecked'] ?? null) ?: null, 'found' => 0, 'detected' => []]; continue; }
-    $register = in_array($s['register'] ?? null, ['SAOS', 'SEJM', 'EURLEX'], true) ? $s['register'] : 'ELI';
+    $register = in_array($s['register'] ?? null, ['SAOS', 'SEJM', 'EURLEX', 'RCL'], true) ? $s['register'] : 'ELI';
     $last = to_iso_date($s['lastChecked'] ?? null);
     $lookbackDays = $rangeFrom || !$last ? 0 : LOOKBACK_DAYS[$register];
     $dateFrom = $rangeFrom ?: ($last ? shift_iso_days($last, -$lookbackDays) : date('Y') . '-01-01');
@@ -555,6 +641,7 @@ function scan_sources($sources, $range) {
       'SAOS' => scan_saos_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
       'SEJM' => scan_sejm_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
       'EURLEX' => scan_eurlex_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
+      'RCL' => scan_rcl_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
       default => scan_eli_source($s, $qs, $dateFrom, $dateTo, $nowStr, $lookbackDays),
     };
     if ($rangeFrom || isset($r['error'])) $r['lastChecked'] = ($s['lastChecked'] ?? null) ?: null;
@@ -660,12 +747,12 @@ function clean_source($s, $trim) {
   $s = is_array($s) ? $s : [];
   $str = $trim ? 'trimmed_or_null' : 'str_or_null';
   // EURLEX keeps publisher "EU" so it is routed to the SPARQL scanner, not a Dz.U. title search.
-  $reg = in_array($s['register'] ?? null, ['SAOS', 'SEJM', 'EURLEX'], true) ? $s['register'] : 'ELI';
+  $reg = in_array($s['register'] ?? null, ['SAOS', 'SEJM', 'EURLEX', 'RCL'], true) ? $s['register'] : 'ELI';
   return [
     'id' => is_numeric($s['id'] ?? null) ? +$s['id'] : null,
     'keyword' => $str($s['keyword'] ?? null),
     'title' => $str($s['title'] ?? null),
-    'publisher' => $reg === 'SEJM' ? 'SEJM' : ($reg === 'EURLEX' ? 'EU' : (($s['publisher'] ?? null) === 'MP' ? 'MP' : 'DU')),
+    'publisher' => $reg === 'SEJM' ? 'SEJM' : ($reg === 'RCL' ? 'RCL' : ($reg === 'EURLEX' ? 'EU' : (($s['publisher'] ?? null) === 'MP' ? 'MP' : 'DU')),
     'register' => $reg,
     'courtType' => in_array($s['courtType'] ?? null, SAOS_COURT_TYPES, true) ? $s['courtType'] : null,
     'judgmentTypes' => is_array($s['judgmentTypes'] ?? null) ? array_slice(array_values(array_filter($s['judgmentTypes'], fn($j) => in_array($j, SAOS_JUDGMENT_TYPES, true))), 0, 5) : [],

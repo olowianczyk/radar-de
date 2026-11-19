@@ -70,6 +70,13 @@ const noteSaosFrozen = (pl, en, de) => tr(
   `Automatyczny skan niemożliwy: SAOS nie otrzymuje już tych orzeczeń (${pl}). Przeglądaj portal sądu.`,
   `No automatic scan: SAOS no longer receives these judgments (${en}). Review the court's own portal.`,
   `Kein automatischer Scan: SAOS erhält diese Entscheidungen nicht mehr (${de}). Das Gerichtsportal prüfen.`);
+// RCL source ("Projekty rządowe" — government drafts BEFORE the Sejm, i.e. the
+// earliest possible warning). `title` = "|"-separated fragments matched
+// case-insensitively against the draft's title on legislacja.rcl.gov.pl
+// (server/php/index.php scan_rcl_source). One feed entry per draft; later
+// stage changes are not reported yet.
+const rcl = (id, name, area, title, scope) => ({ id, name, type: "Projekt rządowy", register: "RCL", url: "https://legislacja.rcl.gov.pl/lista?typeId=2", area, keyword: null, title, publisher: "RCL", scope: scope || NOTE_RCL });
+const NOTE_RCL = tr("Rządowe projekty ustaw i założenia do projektów ustaw z RCL (legislacja.rcl.gov.pl), których tytuł zawiera jeden z fragmentów. Wpis pojawia się, gdy projekt trafia do wykazu lub jest zmieniany — miesiące przed Sejmem. Jeden wpis na projekt; kolejne etapy prac nie są jeszcze raportowane.", "Government draft acts and policy assumptions from RCL (legislacja.rcl.gov.pl) whose title contains one of the fragments. An entry appears when a draft enters the list or is modified — months before the Sejm. One entry per draft; later stages are not reported yet.", "Regierungsentwürfe und Eckpunkte aus dem RCL (legislacja.rcl.gov.pl), deren Titel eines der Fragmente enthält. Ein Eintrag erscheint, wenn ein Entwurf in die Liste kommt oder geändert wird — Monate vor dem Sejm. Ein Eintrag pro Entwurf; spätere Phasen werden noch nicht gemeldet.");
 // EUR-Lex source (EU law + Commission proposals, scanned via the public
 // Cellar SPARQL endpoint — api/_lib.js scanEurlexSource). `title` = "|"-
 // separated fragments matched case-insensitively against the POLISH title:
@@ -156,6 +163,7 @@ export const WORKSPACES = [
       sejm(303, "Projekty w Sejmie — wynagrodzenia (minimalne, jawność płac)", "pay", "wynagrodz"),
       sejm(304, "Projekty w Sejmie — rynek pracy i zatrudnianie", "contracts", "rynku pracy"),
       sejm(305, "Projekty w Sejmie — związki zawodowe i układy zbiorowe", "collective", "związkach zawodowych"),
+      rcl(351, "Projekty rządowe (RCL) — prawo pracy i zatrudnienie", "contracts", "staż|praktyk|kodeks pracy|kodeksu pracy|wynagrodz|czas pracy|czasu pracy|urlop|zatrudni|rynku pracy|związk|układ|ubezpieczeń społecznych|emerytur|pracowni|pracodawc"),
     ],
   },
   {
