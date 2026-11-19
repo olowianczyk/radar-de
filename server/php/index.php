@@ -28,7 +28,7 @@ define('DATA_DIR', getenv('HRBP_DATA_DIR') ?: HOME_DIR . '/private/hrbp'); // en
 define('CONFIG_FILE', dirname(DATA_DIR) . '/hrbp-config.php');
 define('SMTP_FILE', dirname(DATA_DIR) . '/smtp.php');
 const WORKSPACES = ['hr', 'compliance', 'legal'];
-const DOCS = ['scan', 'kb', 'triage', 'config', 'notify'];
+const DOCS = ['scan', 'kb', 'triage', 'config', 'notify', 'watch'];
 const SEARCH_URL = 'https://api.sejm.gov.pl/eli/acts/search';
 const KEYWORDS_URL = 'https://api.sejm.gov.pl/eli/keywords';
 const SAOS_SEARCH_URL = 'https://www.saos.org.pl/api/search/judgments';
@@ -79,7 +79,7 @@ function doc_path($ws, $doc) {
   return DATA_DIR . '/' . normalize_ws($ws) . "/$doc.json";
 }
 function empty_doc($doc) {
-  return ['scan' => ['sources' => [], 'history' => [], 'lastRun' => null], 'kb' => ['docs' => []], 'triage' => ['statuses' => []], 'config' => ['overrides' => [], 'custom' => []], 'notify' => ['queue' => [], 'lastSent' => null, 'lastError' => null]][$doc];
+  return ['scan' => ['sources' => [], 'history' => [], 'lastRun' => null], 'kb' => ['docs' => []], 'triage' => ['statuses' => []], 'config' => ['overrides' => [], 'custom' => []], 'notify' => ['queue' => [], 'lastSent' => null, 'lastError' => null], 'watch' => ['items' => []]][$doc];
 }
 function read_json_file($path) {
   if (!is_file($path)) return null;
@@ -382,6 +382,7 @@ function scan_sejm_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
 // reported yet. shortcut: HTML scraping, breaks if RCL changes its markup; the
 // parser returns 0 rows on a layout change and scan_rcl_source flags that as an error.
 const RCL_BASE = 'https://legislacja.rcl.gov.pl';
+const RCL_MAX_CARDS = 20;
 const RCL_TYPES = ['2' => 'projekt ustawy', '1' => 'założenia do projektu ustawy']; // typeId on /lista
 
 function is_rcl_source($s) { return ($s['register'] ?? null) === 'RCL' && count(eurlex_fragments($s['title'] ?? '')) > 0; }
@@ -414,11 +415,110 @@ function parse_rcl_list($html) {
   }
   return $rows;
 }
+// Stage list of a draft's card: "1. Uzgodnienia  Data ostatniej modyfikacji: dd-mm-yyyy" … (the numbered
+// path Zgłoszenia → Uzgodnienia → Konsultacje → Komitety → Rada Ministrów → Sejm). Returns the furthest
+// stage that has a date: ['no' => 9, 'name' => 'Stały Komitet…', 'date' => '2026-10-29'] or null.
+// Best effort: any fetch/parse problem gives null and the entry is still reported, just without a stage.
+function rcl_current_stage($id) {
+  try {
+    $t = rcl_text(preg_replace('~<(script|style)\b.*?</\1>~s', '', fetch_html(RCL_BASE . '/projekt/' . $id, 'RCL card')));
+  } catch (Exception $e) { return null; }
+  $p = strpos($t, '1. Zgłoszenia'); // every card starts its stage list like this
+  if ($p === false) return null;
+  $seg = substr($t, $p);
+  $seg = substr($seg, 0, strpos($seg, 'Historia przeglądania') ?: 3000);
+  $best = null;
+  if (preg_match_all('~(\d{1,2})\. (.+?)(?: Data ostatniej modyfikacji: (\d\d-\d\d-\d{4}))?(?= \d{1,2}\. |$)~u', $seg, $m, PREG_SET_ORDER))
+    foreach ($m as $x) if (!empty($x[3])) $best = ['no' => (int)$x[1], 'name' => $x[2], 'date' => rcl_iso($x[3])];
+  return $best;
+}
+// Normalised title core for matching an RCL draft with a Sejm print: lower case, only letters/digits,
+// without the "Rządowy/Poselski projekt ustawy" prefix (RCL says "Projekt ustawy o …", the Sejm "Rządowy projekt ustawy o …").
+function print_title_core($t) {
+  $n = trim(preg_replace('/[^\p{L}\p{N}]+/u', ' ', mb_strtolower((string)$t)));
+  return preg_replace('/^(rządowy |poselski )?projekt (ustawy|rozporządzenia) /u', '', $n);
+}
+// Sejm print (druk) of a government draft, matched by title -> ['number','url'] or null. The prints list is cached 1 h on disk.
+// Measured 11.2026: 43 of the 100 newest ustawa drafts matched. A draft not yet sent to the Sejm (or retitled there) just gets null.
+// UNVERIFIED: written without a PHP interpreter at hand — run once on the host before relying on it.
+function sejm_print_for_title($title) {
+  static $idx;
+  if ($idx === null) {
+    $idx = [];
+    $path = DATA_DIR . '/cache/sejm-prints.json';
+    $hit = null;
+    if (storage_available()) { try { $hit = read_json_file($path); } catch (Exception $e) { $hit = null; } }
+    if ($hit && is_array($hit['rows'] ?? null) && time() - strtotime($hit['savedAt']) < 3600) {
+      $rows = $hit['rows'];
+    } else {
+      try { $rows = fetch_json(SEJM_API . '/prints', 'Sejm'); } catch (Exception $e) { return null; }
+      if (!is_array($rows)) return null;
+      $rows = array_map(fn($p) => ['number' => (string)($p['number'] ?? ''), 'title' => (string)($p['title'] ?? '')], $rows);
+      if (storage_available()) { try { write_json_file($path, ['savedAt' => iso_now(), 'rows' => $rows]); } catch (Exception $e) { /* only costs a re-download */ } }
+    }
+    foreach ($rows as $p) if ($p['number'] !== '') $idx[print_title_core($p['title'])] = $p['number'];
+  }
+  $n = $idx[print_title_core($title)] ?? null;
+  return $n ? ['number' => $n, 'url' => 'https://www.sejm.gov.pl/Sejm' . SEJM_TERM . '.nsf/druk.xsp?nr=' . rawurlencode($n)] : null;
+}
+// One feed entry for a draft. A new stage date gives a new eli, so every step of the draft shows up once in the feed.
+function rcl_entry($r, $typeName, $stage, $changed, $watched) {
+  // Only a draft already sent to the Sejm can have a print: skip the lookup for earlier stages.
+  $print = ($stage && mb_stripos($stage['name'], 'Sejm') !== false) ? sejm_print_for_title($r['title']) : null;
+  return [
+    'ts' => format_detected_ts($changed),
+    'type' => 'detected',
+    'kind' => 'draft',
+    'note' => $r['title'],
+    'url' => RCL_BASE . '/projekt/' . $r['id'],
+    'eli' => 'RCL/' . $r['id'] . ($stage ? '@' . $stage['no'] . '-' . $stage['date'] : ''),
+    'stage' => $stage ? $stage['name'] : null,
+    'stageDate' => $stage ? $stage['date'] : null,
+    'via' => $watched ? 'watch' : 'title',
+    'watched' => $watched,
+    'publisher' => 'RCL',
+    'draftType' => $typeName,
+    'wykazNumber' => $r['number'] ?: null,
+    'sejmPrint' => $print,
+    'applicant' => $r['applicant'] ?: null,
+    'createdDate' => $r['created'],
+    'modifiedDate' => $r['modified'],
+    'detectedOn' => iso_today(),
+  ];
+}
+// The whole RCL register (both types, ~2.7k rows, ~15 s), id => row + 'typeName'. Fetched at most once per request.
+function rcl_all_rows() {
+  static $all;
+  if ($all !== null) return $all;
+  // Disk cache (10 min): adding several drafts in a row must not re-download ~2.7k rows (~15 s) each time.
+  $path = DATA_DIR . '/cache/rcl-all.json';
+  if (storage_available()) {
+    try { $hit = read_json_file($path); } catch (Exception $e) { $hit = null; }
+    if ($hit && is_array($hit['rows'] ?? null) && time() - strtotime($hit['savedAt']) < 600) return $all = $hit['rows'];
+  }
+  $all = [];
+  foreach (RCL_TYPES as $typeId => $typeName) {
+    foreach (parse_rcl_list(fetch_html(rcl_list_url($typeId, true), 'RCL')) as $row) $all[$row['id']] = $row + ['typeName' => $typeName];
+  }
+  if (storage_available()) { try { write_json_file($path, ['savedAt' => iso_now(), 'rows' => $all]); } catch (Exception $e) { /* only costs the next call a re-download */ } }
+  return $all;
+}
+// "UD307", "UD 307", "12404454" or a /projekt/<id> link -> the register row, or null.
+function rcl_find($query) {
+  $q = trim((string)$query);
+  $id = preg_match('~/projekt/(\d+)~', $q, $m) ? $m[1] : (preg_match('/^\d{5,10}$/', $q) ? $q : null);
+  $flat = fn($x) => strtoupper(preg_replace('/\s+/', '', (string)$x));
+  foreach (rcl_all_rows() as $row) {
+    if ($id !== null ? $row['id'] === $id : ($flat($q) !== '' && $flat($row['number']) === $flat($q))) return $row;
+  }
+  return null;
+}
 function scan_rcl_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
   $fragments = eurlex_fragments($s['title']);
   $query = ['mode' => 'title', 'term' => $s['title'], 'register' => 'RCL', 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'lookbackDays' => $lookbackDays, 'url' => RCL_BASE . '/lista?typeId=2'];
   $detected = [];
   $seen = [];
+  $cards = 0;
   try {
     foreach (RCL_TYPES as $typeId => $typeName) {
       $rows = parse_rcl_list(fetch_html(rcl_list_url($typeId, false), 'RCL'));
@@ -432,22 +532,23 @@ function scan_rcl_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
         $low = mb_strtolower($r['title']);
         if (!array_filter($fragments, fn($f) => mb_strpos($low, $f) !== false)) continue;
         $seen[$r['id']] = true;
-        $detected[] = [
-          'ts' => format_detected_ts($changed),
-          'type' => 'detected',
-          'kind' => 'draft',
-          'note' => $r['title'],
-          'url' => RCL_BASE . '/projekt/' . $r['id'],
-          'eli' => 'RCL/' . $r['id'],
-          'via' => 'title',
-          'publisher' => 'RCL',
-          'draftType' => $typeName,
-          'wykazNumber' => $r['number'] ?: null,
-          'applicant' => $r['applicant'] ?: null,
-          'createdDate' => $r['created'],
-          'modifiedDate' => $r['modified'],
-          'detectedOn' => iso_today(),
-        ];
+        // At most RCL_MAX_CARDS card fetches per scan keeps a first scan polite towards RCL.
+        $stage = $cards++ < RCL_MAX_CARDS ? rcl_current_stage($r['id']) : null;
+        $detected[] = rcl_entry($r, $typeName, $stage, $changed, false);
+      }
+    }
+    // Watched drafts ("Monitoruj") are tracked whatever their title or last-change date: always read the
+    // card, so a new stage shows up even when the title matches no keyword.
+    $watch = array_values(array_filter(array_map('strval', is_array($s['watch'] ?? null) ? $s['watch'] : []), fn($id) => preg_match('/^\d{1,12}$/', $id)));
+    if ($watch) {
+      $all = rcl_all_rows();
+      foreach (array_slice($watch, 0, 50) as $id) {
+        $r = $all[$id] ?? null;
+        if (!$r) continue;
+        $stage = rcl_current_stage($id);
+        $e = rcl_entry($r, $r['typeName'], $stage, $r['modified'] ?: $r['created'], true);
+        foreach ($detected as $k => $d) if (($d['url'] ?? '') === $e['url'] && ($d['eli'] ?? '') === $e['eli']) { $detected[$k]['watched'] = true; continue 2; }
+        $detected[] = $e;
       }
     }
   } catch (Exception $e) {
@@ -697,6 +798,11 @@ function scan_workspace($ws, $sources, $range) {
     $last = array_column($prev['sources'], 'lastChecked', 'id');
     $sources = array_map(fn($s) => !empty($last[$s['id']]) ? ['lastChecked' => $last[$s['id']]] + $s : $s, effective_sources($ws, $config));
   }
+  // Watched RCL drafts ride on the department's first RCL source (see scan_rcl_source).
+  try { $watchIds = array_column(load_doc($ws, 'watch')['items'], 'id'); } catch (Exception $e) { $watchIds = []; }
+  if ($watchIds) {
+    foreach ($sources as $i => $src) if (($src['register'] ?? null) === 'RCL') { $sources[$i]['watch'] = $watchIds; break; }
+  }
   $results = scan_sources($sources, $range);
   $lastRun = iso_now();
   $persisted = false;
@@ -727,7 +833,9 @@ function scan_workspace($ws, $sources, $range) {
   foreach ($results as &$r) $r['fresh'] = $freshBy[(string)$r['id']] ?? 0;
   unset($r);
   // Queue only what really got persisted; a queue failure must not fail the scan.
-  if ($persisted) try { queue_for_digest($ws, $fresh); } catch (Exception $e) { /* as in scan-all.js */ }
+  // Urgent entries (watched draft moved on / draft reached the Sejm) go out at once as an alert;
+  // whatever the alert could not carry (mail off, send failed) stays in the daily digest.
+  if ($persisted) try { queue_for_digest($ws, send_alerts($ws, $fresh)); } catch (Exception $e) { /* as in scan-all.js */ }
   return ['workspace' => $ws, 'results' => $results, 'lastRun' => $lastRun, 'persisted' => $persisted, 'persistError' => $persistError];
 }
 
@@ -795,6 +903,8 @@ function queue_for_digest($ws, $fresh) {
     // EUR-Lex: CELEX number + act / proposal / corrigendum (eurlex_entries).
     if (!empty($e['celex'])) $i['celex'] = $e['celex'];
     if (!empty($e['euType'])) $i['euType'] = $e['euType'];
+    // RCL government draft (scan_rcl_source): who proposes it and its wykaz number.
+    if ($kind === 'draft') { $i['applicant'] = ($e['applicant'] ?? null) ?: null; $i['wykazNumber'] = ($e['wykazNumber'] ?? null) ?: null; }
     return $i;
   }, $fresh);
   update_doc($ws, 'notify', function ($doc) use ($items) {
@@ -802,19 +912,56 @@ function queue_for_digest($ws, $fresh) {
     return $doc;
   });
 }
+// ---- immediate alerts (RCL drafts) ---------------------------------------------
+// An entry is urgent when it is a draft the user watches, or a draft that has just
+// reached the Sejm (the last step before it becomes law). `$fresh` only holds entries
+// seen for the first time, so each stage change alerts exactly once.
+function is_alert_entry($f) {
+  $e = $f['e'];
+  return ($e['kind'] ?? '') === 'draft' && (!empty($e['watched']) || mb_stripos((string)($e['stage'] ?? ''), 'Sejm') !== false);
+}
+// Mails the urgent entries of one scan and returns the entries still to be queued for the
+// digest: everything non-urgent, plus the urgent ones if mail is not configured or failed.
+// Never throws. shortcut: one mail per scan, no per-recipient retry; same limit as send_mail.
+function send_alerts($ws, $fresh) {
+  $urgent = array_values(array_filter($fresh, 'is_alert_entry'));
+  $to = recipients_for($ws);
+  if (!$urgent || !smtp_configured() || !$to) return $fresh;
+  $appUrl = rtrim((string)(hrbp_config()['app_url'] ?? 'https://radar.aospot.com'), '/') . "/app/#/$ws/feed";
+  $lines = [];
+  foreach ($urgent as $f) {
+    $e = $f['e'];
+    $lines[] = '- ' . ($e['note'] ?? '') . "\n  " . implode(' · ', array_filter([
+      !empty($e['stage']) ? "etap: {$e['stage']}" . (!empty($e['stageDate']) ? " ({$e['stageDate']})" : '') : null,
+      !empty($e['watched']) ? 'monitorowany' : null,
+      !empty($e['sejmPrint']['number']) ? "druk Sejmu nr {$e['sejmPrint']['number']}" : null,
+      $e['applicant'] ?? null,
+    ])) . (!empty($e['url']) ? "\n  {$e['url']}" : '');
+  }
+  $n = count($urgent);
+  $subject = 'ALERT Radar Legislacyjny (' . (WS_LABEL[$ws] ?? $ws) . '): ' . ($n === 1 ? 'zmiana etapu projektu' : "zmiana etapu $n projektów");
+  try {
+    send_mail($to, ['subject' => $subject, 'text' => "$subject\n\n" . implode("\n\n", $lines) . "\n\nOtwórz w aplikacji: $appUrl\n\nAlert wysyła Radar Legislacyjny od razu po skanie, gdy monitorowany projekt zmieni etap lub trafi do Sejmu."]);
+    return array_values(array_filter($fresh, fn($f) => !is_alert_entry($f)));
+  } catch (Exception $e) {
+    return $fresh;
+  }
+}
 // Plain-text digest (smtp_mail sends text/plain) — the text part of buildDigest.
 function build_digest($ws, $items, $names) {
   $appUrl = rtrim((string)(hrbp_config()['app_url'] ?? 'https://radar.aospot.com'), '/') . "/app/#/$ws/feed";
   $sections = array_filter([
     ['Nowe i zmienione akty prawne', array_values(array_filter($items, fn($i) => $i['kind'] === 'act'))],
     ['Projekty ustaw w Sejmie — nowy etap', array_values(array_filter($items, fn($i) => $i['kind'] === 'bill'))],
-    ['Nowe orzeczenia sądów', array_values(array_filter($items, fn($i) => $i['kind'] === 'judgment'))],
+    ['Projekty rządowe (RCL) — przed Sejmem', array_values(array_filter($items, fn($i) => $i['kind'] === 'draft'))],
+    ['Nowe orzeczenia sądów',array_values(array_filter($items, fn($i) => $i['kind'] === 'judgment'))],
     ['Prawo UE (EUR-Lex) — akty i projekty Komisji', array_values(array_filter($items, fn($i) => $i['kind'] === 'eu'))],
   ], fn($s) => $s[1]);
   $detail = fn($i) => implode(' · ', array_filter([
     $names[$i['sourceId']] ?? null,
     $i['kind'] === 'bill' && !empty($i['stage']) ? "etap: {$i['stage']}" . (!empty($i['passed']) ? ' (uchwalona)' : '') : null,
     $i['kind'] === 'judgment' ? implode(' · ', array_filter([$i['courtName'] ?? null, implode(', ', $i['caseNumbers'] ?? [])])) : null,
+    $i['kind'] === 'draft' ? implode(' · ', array_filter([!empty($i['stage']) ? "etap: {$i['stage']}" : null, !empty($i['wykazNumber']) ? "nr {$i['wykazNumber']}" : null, $i['applicant'] ?? null])) : null,
     $i['kind'] === 'eu' ? implode(' · ', array_filter([EU_TYPE_LABEL[$i['euType'] ?? ''] ?? null, !empty($i['celex']) ? "CELEX {$i['celex']}" : null])) : null,
     !empty($i['entryIntoForce']) ? "wejście w życie: {$i['entryIntoForce']}" : null,
     !empty($i['ts']) ? explode(' ', $i['ts'])[0] : null,
@@ -916,7 +1063,7 @@ try {
       // Everything the frontend needs on load for one workspace.
       $ws = normalize_ws($_GET['ws'] ?? null);
       $scan = load_doc($ws, 'scan');
-      out(200, ['workspace' => $ws, 'storage' => storage_available(), 'sources' => $scan['sources'], 'history' => obj($scan['history']), 'lastRun' => $scan['lastRun'], 'triage' => obj(load_doc($ws, 'triage')['statuses']), 'config' => config_out(load_doc($ws, 'config')), 'notify' => notify_status($ws, load_doc($ws, 'notify'))], 'public, max-age=0, must-revalidate');
+      out(200, ['workspace' => $ws, 'storage' => storage_available(), 'sources' => $scan['sources'], 'history' => obj($scan['history']), 'lastRun' => $scan['lastRun'], 'triage' => obj(load_doc($ws, 'triage')['statuses']), 'config' => config_out(load_doc($ws, 'config')), 'notify' => notify_status($ws, load_doc($ws, 'notify')), 'watch' => load_doc($ws, 'watch')['items']], 'public, max-age=0, must-revalidate');
 
     case 'keywords':
       $kw = fetch_keywords();
@@ -1067,6 +1214,32 @@ try {
       });
       if ($doc['lastError']) out(502, ['error' => 'send_failed', 'message' => $doc['lastError'], 'notify' => notify_status($ws, $doc)]);
       out(200, ['workspace' => $ws, 'ok' => true, 'notify' => notify_status($ws, $doc)]);
+
+    case 'watch':
+      // Watchlist of RCL drafts: { workspace, action: 'add'|'remove', query } — query is a wykaz number
+      // (UD307), a /projekt/<id> link or the id. Scans then follow every listed draft's stages.
+      // ponytail: no login (open link, by design), like triage — gate it with the 2FA plan.
+      if ($method !== 'POST') out(405, ['error' => 'method_not_allowed']);
+      $ws = normalize_ws($body['workspace'] ?? null);
+      $query = is_string($body['query'] ?? null) ? mb_substr(trim($body['query']), 0, 200) : '';
+      $action = $body['action'] ?? 'add';
+      if ($query === '' || !in_array($action, ['add', 'remove'], true)) out(400, ['error' => 'bad_request', 'message' => 'query and action add|remove are required']);
+      if ($action === 'add') {
+        $row = rcl_find($query);
+        if (!$row) out(404, ['error' => 'not_found', 'message' => 'RCL: no draft with that number / id']);
+        $item = ['id' => $row['id'], 'number' => $row['number'] ?: null, 'title' => $row['title'], 'url' => RCL_BASE . '/projekt/' . $row['id'], 'addedAt' => iso_now()];
+        $w = update_doc($ws, 'watch', function ($w) use ($item) {
+          if (!in_array($item['id'], array_column($w['items'], 'id'), true)) $w['items'][] = $item;
+          return $w;
+        });
+      } else {
+        $id = preg_match('~(\d{5,12})~', $query, $m) ? $m[1] : $query;
+        $w = update_doc($ws, 'watch', function ($w) use ($id) {
+          $w['items'] = array_values(array_filter($w['items'], fn($i) => $i['id'] !== $id));
+          return $w;
+        });
+      }
+      out(200, ['workspace' => $ws, 'watch' => $w['items']]);
 
     case 'sources':
       // Team source configuration (on/off overrides + hand-added sources), honoured by the cron.

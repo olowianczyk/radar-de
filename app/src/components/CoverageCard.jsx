@@ -32,6 +32,8 @@ export function coverageStats(ws, sources) {
     saos: auto.filter((s) => s.register === "SAOS").length,
     // EURLEX sources = EU acts + Commission proposals (publisher "EU", so not counted in du).
     eu: auto.filter((s) => s.register === "EURLEX").length,
+    // RCL sources = government drafts before the Sejm (publisher "RCL", so not counted in du).
+    rcl: auto.filter((s) => s.register === "RCL").length,
     manual: list.filter(isManualSource).length,
     daily: list.filter((s) => isManualSource(s) && s.cadence === "daily").length,
   };

@@ -85,7 +85,7 @@ const HELP = {
       "Treści aktu ani tego, co konkretnie się zmieniło — tylko fakt ogłoszenia aktu pasującego do źródła.",
       "Istotności zmiany dla firmy — to ocena człowieka; dlatego istnieje status przeglądu.",
       "Późniejszych losów aktu (nowelizacje, uchylenie, wejście w życie po dacie wykrycia) — patrz wyżej, migawka.",
-      "Aktów spoza Dz.U. i M.P.: prawa UE, orzeczeń, projektów ustaw (to osobne rejestry: EUR-Lex, SAOS, Sejm) ani decyzji urzędów (lista źródeł ręcznych).",
+      "Aktów spoza Dz.U. i M.P.: prawa UE, orzeczeń, projektów ustaw (to osobne rejestry: EUR-Lex, SAOS, Sejm, RCL) ani decyzji urzędów (lista źródeł ręcznych).",
       "Aktów starszych niż okno dat: pierwsze skanowanie zaczyna się od 1 stycznia bieżącego roku; starsze znajdziesz ręcznym skanem z własnym zakresem dat.",
     ],
     sourcesTitle: "Które źródła są monitorowane w tym dziale",
@@ -151,7 +151,7 @@ const HELP = {
     ],
     billsGapsTitle: "Czego to źródło nie złapie — przeglądaj ręcznie",
     billsGaps: [
-      "Projekty przed wniesieniem do Sejmu (prace rządowe, prekonsultacje, uzgodnienia) — są w RCL (legislacja.gov.pl). Dodaj je jako źródło ręczne „co tydzień”.",
+      "Projekty przed wniesieniem do Sejmu (prace rządowe, prekonsultacje, uzgodnienia) — skanuje rejestr RCL (legislacja.gov.pl): rejestr „RCL — projekty rządowe” w źródłach. Każdy nowy etap prac (np. konsultacje, komisja prawnicza, skierowanie do Sejmu) to wpis w „Zmianach w przepisach”, zakładka „Projekty”. Konkretny projekt możesz dodać do monitorowanych po numerze UD (np. UD307) — przycisk „Monitoruj”. Gdy projekt trafi do Sejmu, w szczegółach pojawi się link „Druk Sejmu” (dopasowanie po tytule).",
       "Etap Senatu po uchwaleniu przez Sejm.",
       "Zmiany samej treści projektu (poprawki, autopoprawki) — narzędzie widzi zmianę etapu, nie tekstu. Tekst czytasz w druku pod linkiem „Przebieg w Sejmie”.",
       "Projekty zbiorcze o innym tytule (np. „o zmianie niektórych ustaw w celu deregulacji”) — fraza „Kodeks pracy” ich nie złapie. Dodaj osobne źródło z frazą z ich tytułu.",
@@ -160,7 +160,7 @@ const HELP = {
     faqTitle: "Najczęstsze pytania",
     faq: [
       ["Źródło od dawna nic nie znajduje. Czy działa?", "Najpierw otwórz jego panel „Zakres przeszukiwania”. Jeśli słowo kluczowe ma czerwony znacznik, nie istnieje w słowniku Sejmu — zmień je na podpowiedziane albo przełącz źródło na dopasowanie po tytule. Jeśli znacznik jest zielony, prawdopodobnie w tym okresie po prostu nie opublikowano pasującego aktu — kliknij „Otwórz zapytanie w API Sejmu”, aby to potwierdzić."],
-      ["Czego tu nie zobaczę?", "Orzeczeń TSUE, decyzji i wytycznych regulatorów (UOKiK, UODO, KNF), list sankcyjnych oraz projektów rządowych w RCL i w Senacie. Te pozycje są na liście źródeł ręcznych z linkami. Prawo UE (akty i projekty Komisji) skanuje EUR-Lex, projekty ustaw w Sejmie — rejestr Sejmu, orzecznictwo sądów powszechnych — SAOS."],
+      ["Czego tu nie zobaczę?", "Orzeczeń TSUE, decyzji i wytycznych regulatorów (UOKiK, UODO, KNF), list sankcyjnych oraz projektów w Senacie. Te pozycje są na liście źródeł ręcznych z linkami. Prawo UE (akty i projekty Komisji) skanuje EUR-Lex, projekty ustaw w Sejmie — rejestr Sejmu, orzecznictwo sądów powszechnych — SAOS."],
       ["Dlaczego widzę akt, który mnie nie dotyczy?", "Dopasowanie po tytule lub słowie kluczowym bywa szersze niż temat (np. „Kodeks karny” łapie też Kodeks karny skarbowy). Oznacz zmianę jako „Wdrożone”, aby zniknęła z listy nowych, albo zawęź źródło."],
       ["Co jest wspólne, a co tylko moje?", "Wspólne dla całego działu: wyniki skanów, statusy przeglądu, włączone/wyłączone i dodane źródła, baza wiedzy z komentarzami. Tylko w Twojej przeglądarce: ulubione dokumenty, przeczytane powiadomienia, język i tryb ciemny."],
       ["Co się dzieje, gdy coś nie działa?", "Aplikacja pokazuje czerwony pasek z komunikatem: brak połączenia z backendem, brak podłączonego magazynu danych, nieudany lub niezapisany skan, błąd zapisu statusu. Przyciski zapisu są wtedy wyłączone. Nic nie jest udawane — jeśli nie widzisz komunikatu o błędzie, operacja naprawdę się powiodła."],
@@ -281,7 +281,7 @@ const HELP = {
     ],
     billsGapsTitle: "What this source will not catch — review manually",
     billsGaps: [
-      "Drafts before they reach the Sejm (government work, pre-consultation, inter-ministerial review) — they are on RCL (legislacja.gov.pl). Add them as a weekly manual source.",
+      "Drafts before they reach the Sejm (government work, pre-consultation, inter-ministerial review) — the RCL register (legislacja.gov.pl) is scanned: add the source “RCL — government drafts”. Every new stage (consultation, legal commission, referral to the Sejm) becomes an entry under “Bills”. You can also follow one draft by its UD number (e.g. UD307) with the “Monitoruj” button. Once a draft reaches the Sejm, its details show a “Druk Sejmu” link (matched by title).",
       "The Senate stage after the Sejm passes the bill.",
       "Changes to the bill text itself (amendments) — the tool sees stage changes, not text. Read the text in the print under “Progress in the Sejm”.",
       "Omnibus bills with a different title (e.g. “o zmianie niektórych ustaw w celu deregulacji”) — the phrase “Kodeks pracy” will not catch them. Add a separate source with a phrase from their title.",
@@ -290,7 +290,7 @@ const HELP = {
     faqTitle: "Frequently asked questions",
     faq: [
       ["A source hasn't found anything for a long time. Does it work?", "Open its “Search scope” panel first. If the keyword has a red marker it doesn't exist in the Sejm thesaurus — change it to a suggested one or switch the source to title matching. If the marker is green, most likely no matching act was published in that period — click “Open query in the Sejm API” to confirm."],
-      ["What won't I see here?", "CJEU judgments, regulators' decisions and guidelines (UOKiK, UODO, KNF), sanctions lists and government drafts at RCL and in the Senate. These are on the manual-source list with links. EU law (acts and Commission proposals) is scanned via EUR-Lex, bills in the Sejm via the Sejm register, common-court case law via SAOS."],
+      ["What won't I see here?", "CJEU judgments, regulators' decisions and guidelines (UOKiK, UODO, KNF), sanctions lists and bills in the Senate. These are on the manual-source list with links. EU law (acts and Commission proposals) is scanned via EUR-Lex, bills in the Sejm via the Sejm register, common-court case law via SAOS."],
       ["Why do I see an act that doesn't concern me?", "Title or keyword matching can be broader than the topic (e.g. “Kodeks karny” also matches the Fiscal Penal Code). Mark the change “Implemented” to remove it from the new list, or narrow the source."],
       ["What is shared and what is only mine?", "Shared by the whole department: scan results, review statuses, sources switched on/off or added, the knowledge base with comments. Only in your browser: favourite documents, read notifications, language and dark mode."],
       ["What happens when something fails?", "The app shows a red bar with the message: backend unreachable, no data store attached, scan failed or not saved, status not saved. Write buttons are disabled meanwhile. Nothing is faked — if you see no error, the operation really succeeded."],
@@ -411,7 +411,7 @@ const HELP = {
     ],
     billsGapsTitle: "Was diese Quelle nicht erfasst — manuell prüfen",
     billsGaps: [
-      "Entwürfe vor der Einbringung in den Sejm (Regierungsarbeit, Vorkonsultation, Ressortabstimmung) — sie stehen bei RCL (legislacja.gov.pl). Als wöchentliche manuelle Quelle hinzufügen.",
+      "Entwürfe vor der Einbringung in den Sejm (Regierungsarbeit, Vorkonsultation, Ressortabstimmung) — das RCL-Register (legislacja.gov.pl) wird gescannt: Quelle „RCL — Regierungsprojekte“ hinzufügen. Jede neue Phase (Konsultation, Rechtskommission, Überweisung an den Sejm) wird ein Eintrag im Tab „Entwürfe“. Einzelne Entwürfe lassen sich per UD-Nummer (z. B. UD307) mit „Monitoruj“ verfolgen. Sobald ein Entwurf im Sejm ist, zeigt die Detailansicht einen Link „Druk Sejmu“ (Zuordnung per Titel).",
       "Die Senatsstufe nach der Verabschiedung im Sejm.",
       "Änderungen am Entwurfstext selbst (Änderungsanträge) — das Tool sieht Stufenwechsel, nicht den Text. Den Text in der Drucksache unter „Verlauf im Sejm“ lesen.",
       "Sammelentwürfe mit anderem Titel (z. B. „o zmianie niektórych ustaw w celu deregulacji“) — die Phrase „Kodeks pracy“ erfasst sie nicht. Eine eigene Quelle mit einer Phrase aus deren Titel anlegen.",
@@ -420,7 +420,7 @@ const HELP = {
     faqTitle: "Häufige Fragen",
     faq: [
       ["Eine Quelle findet seit langem nichts. Funktioniert sie?", "Zuerst den Bereich „Suchumfang“ öffnen. Rote Markierung am Schlagwort: nicht im Sejm-Thesaurus — auf einen Vorschlag ändern oder auf Titeltreffer umstellen. Grüne Markierung: vermutlich wurde im Zeitraum kein passender Akt verkündet — „Abfrage in der Sejm-API öffnen“ zur Bestätigung."],
-      ["Was sehe ich hier nicht?", "EuGH-Urteile, Behördenentscheidungen und -leitlinien (UOKiK, UODO, KNF), Sanktionslisten und Regierungsentwürfe im RCL und im Senat. Diese stehen mit Links in der Liste der manuellen Quellen. EU-Recht (Rechtsakte und Kommissionsvorschläge) wird über EUR-Lex gescannt, Gesetzentwürfe im Sejm über das Sejm-Register, Rechtsprechung der ordentlichen Gerichte über SAOS."],
+      ["Was sehe ich hier nicht?", "EuGH-Urteile, Behördenentscheidungen und -leitlinien (UOKiK, UODO, KNF), Sanktionslisten und Gesetzentwürfe im Senat. Diese stehen mit Links in der Liste der manuellen Quellen. EU-Recht (Rechtsakte und Kommissionsvorschläge) wird über EUR-Lex gescannt, Gesetzentwürfe im Sejm über das Sejm-Register, Rechtsprechung der ordentlichen Gerichte über SAOS."],
       ["Warum sehe ich einen Akt, der mich nicht betrifft?", "Titel- oder Schlagworttreffer können weiter sein als das Thema (z. B. erfasst „Kodeks karny“ auch das Finanzstrafgesetzbuch). Als „Umgesetzt“ markieren oder die Quelle enger fassen."],
       ["Was ist gemeinsam, was nur meins?", "Gemeinsam für die Abteilung: Scan-Ergebnisse, Prüfstatus, ein-/ausgeschaltete und hinzugefügte Quellen, Wissensbasis mit Kommentaren. Nur in Ihrem Browser: Favoriten, gelesene Benachrichtigungen, Sprache und Dunkelmodus."],
       ["Was passiert, wenn etwas nicht funktioniert?", "Die App zeigt einen roten Balken mit der Meldung: Backend nicht erreichbar, kein Datenspeicher, Scan fehlgeschlagen oder nicht gespeichert, Status nicht gespeichert. Schreib-Buttons sind dann deaktiviert. Nichts wird vorgetäuscht — ohne Fehlermeldung ist die Aktion wirklich gelungen."],
@@ -465,7 +465,7 @@ export function Help({ lang, ws, setActive, sources }) {
     s.referencedRegulation ? `${t.saos.matchReferenced} „${s.referencedRegulation}”` : null,
     s.phrase ? `${t.saos.matchPhrase} „${s.phrase}”` : null,
   ].filter(Boolean);
-  const registerLabel = (s) => ({ SEJM: t.sejm.registerShort, EURLEX: t.eu.registerShort, SAOS: t.saos.registerShort }[s.register] || (s.publisher === "MP" ? "M.P." : "Dz.U."));
+  const registerLabel = (s) => ({ SEJM: t.sejm.registerShort, EURLEX: t.eu.registerShort, RCL: "RCL", SAOS: t.saos.registerShort }[s.register] || (s.publisher === "MP" ? "M.P." : "Dz.U."));
 
   const toc = [["how", h.howTitle], ["works", h.howWorksTitle], ["pipeline", h.pipelineTitle], ["statuses", h.twoStatusesTitle], ["selection", h.selectionTitle], ["add-source", h.addTitle], ["bills", h.billsTitle], ["sources", h.sourcesTitle], ["faq", h.faqTitle]];
   const [activeId, setActiveId] = React.useState("how");

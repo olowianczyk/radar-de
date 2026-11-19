@@ -74,7 +74,7 @@ function ScanBanner({ t, backend, sources, scanning, runScan, resetScans, scanFr
   );
 }
 
-export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, backend, sources, scanning, runScan, resetScans, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb }) {
+export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, backend, sources, scanning, runScan, resetScans, changes: changesProp, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, watch = [], watchDraft }) {
   const t = tFor(lang, ws);
   const [period, setPeriod] = React.useState("all");
   const [customDate, setCustomDate] = React.useState("");
@@ -82,6 +82,9 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
   const [query, setQuery] = React.useState("");
   const [area, setArea] = React.useState("");
   const [kind, setKind] = React.useState("all");
+  const [watchQuery, setWatchQuery] = React.useState("");
+  const [watchBusy, setWatchBusy] = React.useState(false);
+  const [watchErr, setWatchErr] = React.useState("");
   const [selected, setSelected] = React.useState(() => new Set());
   const toggleSelect = (id) => setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const changes = changesProp || [];
@@ -91,7 +94,9 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
   const favCount = Object.keys(favs).length;
   const [periodStart, periodEnd] = periodRange(period, customDate);
   const filtered = (tab === "fav" ? favList(favs, changes) : changes).filter((c) => {
-    if (tab !== "all" && tab !== "fav" && c.status !== tab) return false;
+    // "Projekty" tab = bills in the Sejm + government drafts (RCL), regardless of triage status.
+    if (tab === "projects") { if (c.kind !== "bill" && c.kind !== "draft") return false; }
+    else if (tab !== "all" && tab !== "fav" && c.status !== tab) return false;
     if (area && c.area !== area) return false;
     if (kind !== "all" && (c.kind || "act") !== kind) return false;
     if (periodStart != null) {
@@ -100,7 +105,10 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
     }
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    return c.title[lang].toLowerCase().includes(q) || c.act.toLowerCase().includes(q) || c.summary[lang].toLowerCase().includes(q);
+    // Also match ignoring spaces, so "UD 307" finds the wykaz number "UD307" in an RCL draft's summary.
+    const flat = (x) => x.toLowerCase().replace(/\s+/g, "");
+    const hay = `${c.title[lang]} ${c.act} ${c.summary[lang]}`;
+    return hay.toLowerCase().includes(q) || flat(hay).includes(flat(q));
   });
   const sel = changes.find((c) => c.id === selectedId) || favs[selectedId];
   // "Zapisz w bazie wiedzy" in the detail panel — same idea as on the case-law
@@ -206,12 +214,35 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
       </div>
       <Tabs activeId={tab} onSelect={setTab} tabs={[
         { id: "all", label: t.tabs.all, count: changes.length },
+        { id: "projects", label: lang === "en" ? "Bills" : lang === "de" ? "Entwürfe" : "Projekty", count: changes.filter(c => c.kind === "bill" || c.kind === "draft").length },
         { id: "new", label: t.tabs.new, count: newCount },
         { id: "urgent", label: t.tabs.urgent, count: changes.filter(c=>c.status==="urgent").length },
         { id: "progress", label: t.st.progress, count: changes.filter(c=>c.status==="progress").length },
         { id: "done", label: t.tabs.done, count: doneCount },
         { id: "fav", label: t.tabs.fav, count: favCount },
       ]} />
+      {tab === "projects" && watchDraft && (
+        <Card padding="sm">
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <Input value={watchQuery} onChange={(e) => setWatchQuery(e.target.value)} placeholder="Dodaj projekt do monitorowania: nr UD (np. UD307), link RCL lub id" style={{ flex: 1, minWidth: 240 }} />
+            <Button variant="primary" disabled={backend !== "ok" || !watchQuery.trim() || watchBusy} iconLeft={<Icon name="bookmark" size={16} />}
+              onClick={() => { setWatchBusy(true); setWatchErr(""); watchDraft("add", watchQuery.trim()).then(() => setWatchQuery("")).catch((e) => setWatchErr(String(e && e.message || e))).finally(() => setWatchBusy(false)); }}>Monitoruj</Button>
+          </div>
+          {watchErr && <div style={{ fontSize: 12, color: "var(--danger-600)", marginTop: 6 }}>{watchErr}</div>}
+          {watch.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+              <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600 }}>Monitorowane projekty ({watch.length})</div>
+              {watch.map((w) => (
+                <div key={w.id} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5 }}>
+                  <Badge tone="amber">{w.number || "RCL"}</Badge>
+                  <a href={w.url} target="_blank" rel="noreferrer" style={{ color: "var(--brand)", flex: 1, minWidth: 0 }}>{w.title}</a>
+                  <IconButton label="Przestań monitorować" size="sm" onClick={() => watchDraft("remove", String(w.id)).catch(() => {})}><Icon name="x" size={14} /></IconButton>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
       {selected.size > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "10px 16px", background: "var(--brand-soft)", borderRadius: "var(--radius-md)" }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: "var(--on-brand-soft)" }}>{t.selectedCount.replace("{n}", String(selected.size))}</span>
@@ -261,6 +292,8 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                       <Badge tone={areaTone(ws, c.area)} style={{ whiteSpace: "normal", textAlign: "left" }}>{t.area[c.area] || t.area.other}</Badge>
                       {c.actType && <Badge tone="neutral">{c.actType}</Badge>}
                       {c.bill && <Badge tone="amber" style={{ whiteSpace: "normal", textAlign: "left" }}>{t.sejm.registerShort} · {c.bill.stage}</Badge>}
+                      {c.draft && <Badge tone="amber" style={{ whiteSpace: "normal", textAlign: "left" }}>RCL{c.draft.number ? ` · ${c.draft.number}` : ""}{c.draft.stage ? ` · ${c.draft.stage}` : ""}</Badge>}
+                      {c.draft && c.draft.watched && <Badge tone="blue">Monitorowany</Badge>}
                       {c.bill && c.bill.euLaw && <Badge tone="blue">{t.sejm.euLaw}</Badge>}
                       {c.eu && <Badge tone="green">{t.eu.registerShort} · {t.eu.types[c.eu.euType] || c.eu.euType}</Badge>}
                       <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>{c.date}</span>
@@ -380,6 +413,15 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                 {sel.status !== "done" && <Button variant="ghost" disabled={backend !== "ok"} iconLeft={<Icon name="file-check-2" size={16} />} onClick={() => setChangeStatus(sel.id, "done")}>{t.updateDoc}</Button>}
                 {sel.status !== "urgent" && sel.status !== "done" && <Button variant="ghost" disabled={backend !== "ok"} iconLeft={<Icon name="alert-triangle" size={16} />} onClick={() => setChangeStatus(sel.id, "urgent")}>{t.markUrgent}</Button>}
                 <Button variant="secondary" iconLeft={<Icon name="printer" size={16} />} onClick={() => openPrint([sel])}>{t.print}</Button>
+                {/* RCL draft: follow it — every scan then reports each new legislative stage (watchlist lives on the server). */}
+                {sel.kind === "draft" && watchDraft && (() => {
+                  const rclId = (String(sel.eli || "").match(/^RCL\/(\d+)/) || [])[1];
+                  if (!rclId) return null;
+                  const on = watch.some((w) => String(w.id) === rclId);
+                  return <Button variant={on ? "ghost" : "secondary"} disabled={backend !== "ok"} iconLeft={<Icon name={on ? "bookmark-check" : "bookmark"} size={16} />} onClick={() => watchDraft(on ? "remove" : "add", rclId).catch(() => {})}>{on ? "Monitorowany — usuń" : "Monitoruj projekt"}</Button>;
+                })()}
+                {/* Draft already in the Sejm: link to its print (matched by title on the server). */}
+                {sel.draft?.sejmPrint && <Button variant="ghost" iconLeft={<Icon name="external-link" size={16} />} onClick={() => window.open(sel.draft.sejmPrint.url, "_blank", "noopener")}>Druk Sejmu nr {sel.draft.sejmPrint.number}</Button>}
                 {canSaveKb && (isSavedKb(sel)
                   ? <span style={{ fontSize: 12.5, color: "var(--success-600)", display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="bookmark-check" size={15} />{t.kbSave.saved}</span>
                   : <Button variant="secondary" disabled={savingKb} iconLeft={<Icon name="bookmark" size={16} />} onClick={() => saveChangeToKb(sel)}>{savingKb ? t.kbSave.saving : t.kbSave.save}</Button>)}

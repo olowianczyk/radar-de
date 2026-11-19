@@ -5,7 +5,7 @@ import { SidebarNav, IconButton, Icon, Badge } from "../components/index.js";
 import { LoadingState } from "../components/Loading.jsx";
 import { RadarMark } from "../components/RadarMark.jsx";
 import { WORKSPACES, ACCENTS, ACCENT_SWATCH, THEMES, THEME_ICON, initialSources, isManualSource, tFor } from "../workspaces.js";
-import { latestIsapCheck, forceScan, fetchPersistedState, buildChangesFromHistory, fetchKbDocs, addKbDoc, addKbComment, deleteKbDoc, saveTriage, saveSourceConfig, resetScans as resetScansApi } from "../isapIntegration.js";
+import { latestIsapCheck, forceScan, fetchPersistedState, saveWatch, buildChangesFromHistory, fetchKbDocs, addKbDoc, addKbComment, deleteKbDoc, saveTriage, saveSourceConfig, resetScans as resetScansApi } from "../isapIntegration.js";
 
 function useSources(ws) {
   return React.useState(() => initialSources(ws));
@@ -277,7 +277,7 @@ function applyConfig(ws, base, config) {
     .filter((c) => !fromCatalogue.some((s) => s.id === c.id))
     .map((c) => {
       const o = overrides[String(c.id)];
-      return { ...c, url: c.register === "SAOS" ? "https://www.saos.org.pl/search" : c.register === "SEJM" ? "https://www.sejm.gov.pl/" : "https://isap.sejm.gov.pl", publisher: c.register === "SAOS" ? "SAOS" : c.register === "SEJM" ? "SEJM" : c.publisher, lastChecked: null, found: 0, scope: null, active: o && typeof o.active === "boolean" ? o.active : true };
+      return { ...c, url: c.register === "SAOS" ? "https://www.saos.org.pl/search" : c.register === "SEJM" ? "https://www.sejm.gov.pl/" : c.register === "RCL" ? "https://legislacja.rcl.gov.pl/" : "https://isap.sejm.gov.pl", publisher: c.register === "SAOS" ? "SAOS" : c.register === "SEJM" ? "SEJM" : c.register === "RCL" ? "RCL" : c.publisher, lastChecked: null, found: 0, scope: null, active: o && typeof o.active === "boolean" ? o.active : true };
     });
   return [...fromCatalogue, ...extra];
 }
@@ -336,6 +336,9 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
   const [kbDocs, setKbDocs] = React.useState([]);
   // E-mail digest status from /api/state (masked recipients, queue, last send).
   const [notify, setNotify] = React.useState(null);
+  // Watched RCL drafts ("Monitoruj") — shared per department, followed by every scan.
+  const [watch, setWatch] = React.useState([]);
+  const watchDraft = React.useCallback((action, query) => saveWatch(ws.id, action, query).then(setWatch).catch((e) => { reportError("Nie udało się zapisać listy monitorowanych", e); throw e; }), [ws.id, reportError]);
   React.useEffect(() => {
     fetchPersistedState(ws.id).then((state) => {
       setBackend(state.storage ? "ok" : "storage");
@@ -347,6 +350,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
       setSourceHistory(state.history || {});
       setStatusMap(state.triage || {});
       setNotify(state.notify || null);
+      setWatch(state.watch || []);
       // One-time migration of statuses set before they were shared: push the
       // browser-local map to the server if the server has none yet.
       try {
@@ -579,7 +583,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
         )}
         <main style={{ flex: 1, ...(isMobile ? { minHeight: 0, overflowY: "auto" } : {}), padding: isMobile ? 16 : 28 }}>
           <div key={active} className="hrbp-screen" style={{ maxWidth: "var(--content-max)", margin: "0 auto" }}>
-            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, appearance, backend, sources, setSources, sourceHistory, scanning, runScan, resetScans, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment, removeKb, notify, setNotify }) : children}
+            {initialLoading ? <LoadingState label={t.loading} /> : React.isValidElement(children) ? React.cloneElement(children, { ws, dark, setDark, appearance, backend, sources, setSources, sourceHistory, scanning, runScan, resetScans, changes, scanFrom, setScanFrom, scanTo, setScanTo, setChangeStatus, lastScanFound, kbDocs, addKb, addComment, removeKb, notify, setNotify, watch, watchDraft }) : children}
           </div>
         </main>
       </div>

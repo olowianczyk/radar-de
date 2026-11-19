@@ -81,6 +81,7 @@ function registerLabel(source, t) {
   if (source.register === "SAOS") return t.saos.register;
   if (source.register === "SEJM") return t.sejm.register;
   if (source.register === "EURLEX") return t.eu.register;
+  if (source.register === "RCL") return "RCL — projekty rządowe";
   return source.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue;
 }
 
@@ -124,7 +125,7 @@ function ScopePanel({ source, lang, t, thesaurus }) {
         <ScopeRow label={t.scopeNext}>
           {range.first ? t.scopeSinceYearStart.replace("{y}", range.from.slice(0, 4)) : t.scopeSinceLast.replace("{d}", fmtIso(range.from, lang))}
           {/* The "from" date above already includes the lookback; these say why. */}
-          {!range.first && !["SAOS", "SEJM", "EURLEX"].includes(source.register) && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.eliLookback.replace("{n}", String(LOOKBACK_DAYS.ELI))}</div>}
+          {!range.first && !["SAOS", "SEJM", "EURLEX", "RCL"].includes(source.register) && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.eliLookback.replace("{n}", String(LOOKBACK_DAYS.ELI))}</div>}
           {source.register === "SAOS" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.saos.lookback.replace("{n}", String(LOOKBACK_DAYS.SAOS))}</div>}
           {source.register === "SEJM" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.sejm.lookback}</div>}
           {source.register === "EURLEX" && <div style={{ fontWeight: 500, color: "var(--text-muted)", fontSize: 12 }}>{t.eu.lookback}</div>}
@@ -152,7 +153,7 @@ function ScopePanel({ source, lang, t, thesaurus }) {
         ))}
         {source.url && (
           <a href={source.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <Icon name="external-link" size={12} />{source.register === "SAOS" ? "SAOS" : source.register === "SEJM" ? "Sejm" : source.register === "EURLEX" ? "EUR-Lex" : "ISAP"}
+            <Icon name="external-link" size={12} />{source.register === "SAOS" ? "SAOS" : source.register === "SEJM" ? "Sejm" : source.register === "EURLEX" ? "EUR-Lex" : source.register === "RCL" ? "RCL" : "ISAP"}
           </a>
         )}
       </div>
@@ -294,7 +295,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
   const [search, setSearch] = React.useState("");
   const needle = search.trim().toLowerCase();
   const auto = allAuto.filter((s) => {
-    if (filter === "DU" && (s.register === "SAOS" || s.register === "SEJM" || s.register === "EURLEX" || s.publisher === "MP")) return false;
+    if (filter === "DU" && (s.register === "SAOS" || s.register === "SEJM" || s.register === "EURLEX" || s.register === "RCL" || s.publisher === "MP")) return false;
     if (filter === "EURLEX" && s.register !== "EURLEX") return false;
     if (filter === "SEJM" && s.register !== "SEJM") return false;
     if (filter === "MP" && s.publisher !== "MP") return false;
@@ -306,8 +307,8 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
   });
   const areaOrder = Object.keys(ws.areas);
   auto.sort((a, b) => areaOrder.indexOf(a.area) - areaOrder.indexOf(b.area));
-  const counts = { all: allAuto.length, DU: allAuto.filter((s) => s.register !== "SAOS" && s.register !== "SEJM" && s.register !== "EURLEX" && s.publisher !== "MP").length, EURLEX: allAuto.filter((s) => s.register === "EURLEX").length, SEJM: allAuto.filter((s) => s.register === "SEJM").length, MP: allAuto.filter((s) => s.publisher === "MP").length, SAOS: allAuto.filter((s) => s.register === "SAOS").length, off: allAuto.filter((s) => !s.active).length, errors: allAuto.filter((s) => s.error).length };
-  const stripeFor = (s) => (s.register === "SAOS" ? "var(--info-600)" : s.register === "SEJM" ? "var(--warning-700)" : s.register === "EURLEX" ? "var(--success-600)" : s.publisher === "MP" ? "var(--warning-500)" : "var(--brand)");
+  const counts = { all: allAuto.length, DU: allAuto.filter((s) => s.register !== "SAOS" && s.register !== "SEJM" && s.register !== "EURLEX" && s.register !== "RCL" && s.publisher !== "MP").length, EURLEX: allAuto.filter((s) => s.register === "EURLEX").length, SEJM: allAuto.filter((s) => s.register === "SEJM").length, MP: allAuto.filter((s) => s.publisher === "MP").length, SAOS: allAuto.filter((s) => s.register === "SAOS").length, off: allAuto.filter((s) => !s.active).length, errors: allAuto.filter((s) => s.error).length };
+  const stripeFor = (s) => (s.register === "SAOS" ? "var(--info-600)" : s.register === "SEJM" ? "var(--warning-700)" : s.register === "EURLEX" ? "var(--success-600)" : s.register === "RCL" ? "var(--warning-600)" : s.publisher === "MP" ? "var(--warning-500)" : "var(--brand)");
 
   const addSource = ({ name, mode, term, publisher, courtType, judgmentType, area }) => {
     const id = Math.max(1000, ...auto.map((s) => s.id)) + 1;
@@ -384,6 +385,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
                     {s.register === "SAOS" && <Badge tone="blue">{t.saos.registerShort} · {t.saos.courts[s.courtType] || s.courtType}</Badge>}
                     {s.register === "SEJM" && <Badge tone="amber">{t.sejm.registerShort}</Badge>}
                     {s.register === "EURLEX" && <Badge tone="green">{t.eu.registerShort}</Badge>}
+                    {s.register === "RCL" && <Badge tone="amber">RCL</Badge>}
                     <span>· {t.lastChecked}: {s.lastChecked || "—"}</span>
                   </div>
                   {s.error && <div style={{ fontSize: 11.5, color: "var(--danger-600)", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}><Icon name="alert-triangle" size={12} />{s.error}</div>}

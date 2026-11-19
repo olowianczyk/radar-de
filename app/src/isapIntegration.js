@@ -122,6 +122,13 @@ export async function saveTriage(ws, ids, status) {
   return data.triage || {};
 }
 
+// Watchlist of RCL drafts: action "add" (query = wykaz number like UD307, a /projekt/<id> link or the id)
+// or "remove". Resolves with the fresh list [{ id, number, title, url, addedAt }].
+export async function saveWatch(ws, action, query) {
+  const data = await post("/api/watch", { workspace: ws, action, query });
+  return data.watch || [];
+}
+
 // Sends a test e-mail to the department's recipients (configured in Vercel env
 // vars, see api/_mail.js). Resolves with the fresh notify status.
 export async function sendTestMail(ws) {
@@ -265,6 +272,8 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
       changes.push({
         id,
         eli: e.eli,
+        // RCL draft facts for the feed badges (stage, wykaz number, followed via the watchlist).
+        draft: isDraft ? { stage: e.stage || null, number: e.wykazNumber || null, watched: !!e.watched, sejmPrint: e.sejmPrint || null } : undefined,
         kind: isJudgment ? "judgment" : isBill ? "bill" : isEu ? "eu" : isDraft ? "draft" : "act",
         judgment: isJudgment ? { courtType: e.courtType, courtName: e.courtName, caseNumbers: e.caseNumbers || [], judgmentType: e.judgmentType, judgmentDate: e.judgmentDate, excerpt: e.excerpt || "", keywords: e.keywords || [] } : null,
         // Sejm bill at one legislative stage (see api/_lib.js scanSejmSource).
@@ -292,7 +301,7 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
         // isSavedKb in LegalChanges.jsx).
         ownUrl: !!e.url,
         title: { pl: e.note, de: e.note, en: e.note },
-        summary: isJudgment ? { pl: e.excerpt || "", de: e.excerpt || "", en: e.excerpt || "" } : isBill ? { pl: e.description || "", de: e.description || "", en: e.description || "" } : isDraft ? (() => { const d = [e.draftType, e.wykazNumber && `nr ${e.wykazNumber}`, e.applicant, e.createdDate && `utworzono ${isoToDmy(e.createdDate)}`].filter(Boolean).join(" · "); return { pl: d, de: d, en: d }; })() : summary,
+        summary: isJudgment ? { pl: e.excerpt || "", de: e.excerpt || "", en: e.excerpt || "" } : isBill ? { pl: e.description || "", de: e.description || "", en: e.description || "" } : isDraft ? (() => { const d = [e.draftType, e.stage && `etap: ${e.stage}${e.stageDate ? ` (${isoToDmy(e.stageDate)})` : ""}`, e.wykazNumber && `nr ${e.wykazNumber}`, e.applicant, e.createdDate && `utworzono ${isoToDmy(e.createdDate)}`].filter(Boolean).join(" · "); return { pl: d, de: d, en: d }; })() : summary,
         matchedBy: (() => {
           // `via` is recorded by the backend since the multi-query engine;
           // older history entries fall back to the source's first query.

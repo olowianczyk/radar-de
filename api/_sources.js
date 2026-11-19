@@ -395,6 +395,12 @@ module.exports = {
       title: "ochronie konkurencji",
       publisher: "SEJM",
       register: "SEJM"
+    },
+    {
+      id: 352,
+      title: "pranie pieniędzy|praniu pieniędzy|sygnalist|danych osobowych|cyberbezpiecz|sztucznej inteligencji|konkurencji|konsument|przeciwdziałan|korupcj|sankcj|zamówień publicznych|odpowiedzialności podmiotów",
+      publisher: "RCL",
+      register: "RCL"
     }
   ],
   legal: [
@@ -729,6 +735,12 @@ module.exports = {
       title: "restrukturyzacyjne",
       publisher: "SEJM",
       register: "SEJM"
+    },
+    {
+      id: 353,
+      title: "kodeks cywilny|kodeksu cywilnego|postępowania cywilnego|spółek|upadłościowe|restrukturyzacyjne|prawo własności|postępowania administracyjnego|rejestr|księgi wieczyste|notariat|adwokat|radcach prawnych|KRS|ochronie danych",
+      publisher: "RCL",
+      register: "RCL"
     }
   ]
 };
