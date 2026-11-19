@@ -860,7 +860,7 @@ function clean_source($s, $trim) {
     'id' => is_numeric($s['id'] ?? null) ? +$s['id'] : null,
     'keyword' => $str($s['keyword'] ?? null),
     'title' => $str($s['title'] ?? null),
-    'publisher' => $reg === 'SEJM' ? 'SEJM' : ($reg === 'RCL' ? 'RCL' : ($reg === 'EURLEX' ? 'EU' : (($s['publisher'] ?? null) === 'MP' ? 'MP' : 'DU')),
+    'publisher' => $reg === 'SEJM' ? 'SEJM' : ($reg === 'RCL' ? 'RCL' : ($reg === 'EURLEX' ? 'EU' : (($s['publisher'] ?? null) === 'MP' ? 'MP' : 'DU'))),
     'register' => $reg,
     'courtType' => in_array($s['courtType'] ?? null, SAOS_COURT_TYPES, true) ? $s['courtType'] : null,
     'judgmentTypes' => is_array($s['judgmentTypes'] ?? null) ? array_slice(array_values(array_filter($s['judgmentTypes'], fn($j) => in_array($j, SAOS_JUDGMENT_TYPES, true))), 0, 5) : [],
