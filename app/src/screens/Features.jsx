@@ -229,7 +229,7 @@ const FEATURES = {
   },
   de: {
     title: "Funktionen der App",
-    intro: "Radar Legislacyjny prüft täglich die öffentlichen Rechtsregister und sammelt an einem Ort, was Ihre Abteilung betrifft: neue Rechtsakte, Gesetzentwürfe im Sejm, EU-Recht und Gerichtsurteile. Unten finden Sie alle Funktionen, Bildschirm für Bildschirm. Die Anleitung erklärt die Details.",
+    intro: "Rechtsradar prüft täglich die öffentlichen Rechtsregister und sammelt an einem Ort, was Ihre Abteilung betrifft: neue Rechtsakte, Gesetzentwürfe im Sejm, EU-Recht und Gerichtsurteile. Unten finden Sie alle Funktionen, Bildschirm für Bildschirm. Die Anleitung erklärt die Details.",
     open: "Öffnen",
     toHelp: "Details in der Anleitung",
     modules: [

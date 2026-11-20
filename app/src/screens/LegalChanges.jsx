@@ -6,6 +6,8 @@ import { tFor, areaTone, isManualSource } from "../workspaces.js";
 import { latestIsapCheck } from "../isapIntegration.js";
 import { CoverageCard } from "../components/CoverageCard.jsx";
 import { ScanPeriod } from "../components/ScanPeriod.jsx";
+import { draftStageIndex } from "../draftStage.js";
+import { impactTags } from "../impactTags.js";
 import { useFavorites, favList } from "../favorites.js";
 
 function parseDMY(s) {
@@ -180,7 +182,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
         </div>
       </div>
       <FirstSteps t={t} ws={ws} changes={changes} backend={backend} runScan={runScan} />
-      <CoverageCard t={t} ws={ws} sources={sources} variant="compact" />
+      <CoverageCard t={t} ws={ws} sources={sources} variant="compact" lang={lang} />
       <ScanBanner t={t} backend={backend} sources={sources} scanning={scanning} runScan={runScan} resetScans={resetScans} scanFrom={scanFrom} setScanFrom={setScanFrom} scanTo={scanTo} setScanTo={setScanTo} lastScanFound={lastScanFound} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16 }}>
         <StatCard label={t.kpi.new} value={String(newCount)} accent={newCount ? "danger" : "petrol"} icon={<Icon name="sparkles" size={18} />} />
@@ -192,7 +194,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
         <div style={{ flex: 1, minWidth: 220 }}><Input placeholder={t.search} value={query} onChange={(e) => setQuery(e.target.value)} iconLeft={<Icon name="search" size={16} />} /></div>
         <div style={{ width: 200 }}><Select value={area} onChange={(e) => setArea(e.target.value)} placeholder={t.allAreas} options={[{ value: "", label: t.allAreas }, ...Object.keys(t.area).map((k) => ({ value: k, label: t.area[k] }))]} /></div>
         {changes.some((c) => c.kind === "judgment" || c.kind === "bill" || c.kind === "eu" || c.kind === "draft") && (
-          <div style={{ width: 190 }}><Select value={kind} onChange={(e) => setKind(e.target.value)} options={[{ value: "all", label: t.saos.kindAll }, { value: "act", label: t.saos.kindAct }, { value: "bill", label: t.sejm.kindBill }, { value: "eu", label: t.eu.kindEu }, { value: "draft", label: "Projekt rządowy (RCL)" }, { value: "judgment", label: t.saos.kindJudgment }]} /></div>
+          <div style={{ width: 190 }}><Select value={kind} onChange={(e) => setKind(e.target.value)} options={[{ value: "all", label: t.saos.kindAll }, { value: "act", label: t.saos.kindAct }, { value: "bill", label: t.sejm.kindBill }, { value: "eu", label: t.eu.kindEu }, { value: "draft", label: t.kindDraft }, { value: "judgment", label: t.saos.kindJudgment }]} /></div>
         )}
         <div style={{ width: 200 }}>
           <Select value={period} onChange={(e) => setPeriod(e.target.value)} options={[
@@ -224,19 +226,19 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
       {tab === "projects" && watchDraft && (
         <Card padding="sm">
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <Input value={watchQuery} onChange={(e) => setWatchQuery(e.target.value)} placeholder="Dodaj projekt do monitorowania: nr UD (np. UD307), link RCL lub id" style={{ flex: 1, minWidth: 240 }} />
+            <Input value={watchQuery} onChange={(e) => setWatchQuery(e.target.value)} placeholder={t.watchPlaceholder} style={{ flex: 1, minWidth: 240 }} />
             <Button variant="primary" disabled={backend !== "ok" || !watchQuery.trim() || watchBusy} iconLeft={<Icon name="bookmark" size={16} />}
-              onClick={() => { setWatchBusy(true); setWatchErr(""); watchDraft("add", watchQuery.trim()).then(() => setWatchQuery("")).catch((e) => setWatchErr(String(e && e.message || e))).finally(() => setWatchBusy(false)); }}>Monitoruj</Button>
+              onClick={() => { setWatchBusy(true); setWatchErr(""); watchDraft("add", watchQuery.trim()).then(() => setWatchQuery("")).catch((e) => setWatchErr(String(e && e.message || e))).finally(() => setWatchBusy(false)); }}>{t.watchButton}</Button>
           </div>
           {watchErr && <div style={{ fontSize: 12, color: "var(--danger-600)", marginTop: 6 }}>{watchErr}</div>}
           {watch.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
-              <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600 }}>Monitorowane projekty ({watch.length})</div>
+              <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600 }}>{t.watchListTitle} ({watch.length})</div>
               {watch.map((w) => (
                 <div key={w.id} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5 }}>
                   <Badge tone="amber">{w.number || "RCL"}</Badge>
                   <a href={w.url} target="_blank" rel="noreferrer" style={{ color: "var(--brand)", flex: 1, minWidth: 0 }}>{w.title}</a>
-                  <IconButton label="Przestań monitorować" size="sm" onClick={() => watchDraft("remove", String(w.id)).catch(() => {})}><Icon name="x" size={14} /></IconButton>
+                  <IconButton label={t.watchStop} size="sm" onClick={() => watchDraft("remove", String(w.id)).catch(() => {})}><Icon name="x" size={14} /></IconButton>
                 </div>
               ))}
             </div>
@@ -291,9 +293,11 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
                       <Badge tone={areaTone(ws, c.area)} style={{ whiteSpace: "normal", textAlign: "left" }}>{t.area[c.area] || t.area.other}</Badge>
                       {c.actType && <Badge tone="neutral">{c.actType}</Badge>}
+                      {/* Znacznik wpływu na HR: słowa kluczowe w tytule (impactTags.js); to wskazówka, nie ocena prawna. */}
+                      {impactTags(`${c.title || ""} ${c.act || ""}`).map((id) => <Badge key={id} tone="green">{t.impactTags[id]}</Badge>)}
                       {c.bill && <Badge tone="amber" style={{ whiteSpace: "normal", textAlign: "left" }}>{t.sejm.registerShort} · {c.bill.stage}</Badge>}
                       {c.draft && <Badge tone="amber" style={{ whiteSpace: "normal", textAlign: "left" }}>RCL{c.draft.number ? ` · ${c.draft.number}` : ""}{c.draft.stage ? ` · ${c.draft.stage}` : ""}</Badge>}
-                      {c.draft && c.draft.watched && <Badge tone="blue">Monitorowany</Badge>}
+                      {c.draft && c.draft.watched && <Badge tone="blue">{t.watchedBadge}</Badge>}
                       {c.bill && c.bill.euLaw && <Badge tone="blue">{t.sejm.euLaw}</Badge>}
                       {c.eu && <Badge tone="green">{t.eu.registerShort} · {t.eu.types[c.eu.euType] || c.eu.euType}</Badge>}
                       <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>{c.date}</span>
@@ -403,7 +407,7 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                 <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 6 }}>
                   <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Icon name="crosshair" size={12} />{t.foundVia}<Hint text={t.hints.foundVia} size={11} /></div>
                   <div style={{ fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.55 }}>
-                    {t.source}: <strong>{sel.matchedBy.sourceName}</strong> · {sel.matchedBy.mode === "keyword" ? t.scopeMatchKeyword : sel.matchedBy.mode === "title" ? t.scopeMatchTitle : sel.matchedBy.mode === "referencedRegulation" ? t.saos.matchReferenced : t.saos.matchPhrase} <span style={{ fontFamily: "var(--font-mono)" }}>„{sel.matchedBy.term}”</span> · {sel.matchedBy.publisher === "SAOS" ? t.saos.register : sel.matchedBy.publisher === "SEJM" ? t.sejm.register : sel.matchedBy.publisher === "EU" ? t.eu.register : sel.matchedBy.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue} · {sel.kind === "judgment" ? t.saos.judgmentDate.toLowerCase() : sel.kind === "bill" ? t.sejm.stageDate.toLowerCase() : sel.kind === "eu" ? t.eu.docDate.toLowerCase() : t.foundViaDate} {sel.date}{sel.actType ? <> · {t.actType}: {sel.actType}</> : null}
+                    {t.source}: <strong>{sel.matchedBy.sourceName}</strong> · {sel.matchedBy.mode === "keyword" ? t.scopeMatchKeyword : sel.matchedBy.mode === "title" ? t.scopeMatchTitle : sel.matchedBy.mode === "referencedRegulation" ? t.saos.matchReferenced : t.saos.matchPhrase} <span style={{ fontFamily: "var(--font-mono)" }}>„{sel.matchedBy.term}”</span> · {sel.matchedBy.publisher === "SAOS" ? t.saos.register : sel.matchedBy.publisher === "SEJM" ? t.sejm.register : sel.matchedBy.publisher === "EU" ? t.eu.register : sel.matchedBy.publisher === "MP" ? t.scopeRegisterMP : sel.matchedBy.publisher === "RIP" ? t.ripRegister : sel.matchedBy.publisher === "RIPCASE" ? t.ripcaseRegister : sel.matchedBy.publisher === "DIP" ? t.dipRegister : sel.matchedBy.publisher === "REFE" ? t.refeRegister : sel.matchedBy.publisher === "BAGRSS" ? t.bagrssRegister : t.scopeRegisterValue} · {sel.kind === "judgment" ? t.saos.judgmentDate.toLowerCase() : sel.kind === "bill" ? t.sejm.stageDate.toLowerCase() : sel.kind === "eu" ? t.eu.docDate.toLowerCase() : t.foundViaDate} {sel.date}{sel.actType ? <> · {t.actType}: {sel.actType}</> : null}
                   </div>
                   <a href={sel.matchedBy.queryUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="external-link" size={12} />{sel.kind === "eu" ? t.eu.openQuery : sel.kind === "judgment" ? t.scopeOpenQuery.replace("API Sejmu", "SAOS").replace("Sejm API", "SAOS").replace("Sejm-API", "SAOS") : t.scopeOpenQuery}</a>
                 </div>
@@ -413,15 +417,32 @@ export function LegalChanges({ lang, ws, selectedId, setSelectedId, printBase, b
                 {sel.status !== "done" && <Button variant="ghost" disabled={backend !== "ok"} iconLeft={<Icon name="file-check-2" size={16} />} onClick={() => setChangeStatus(sel.id, "done")}>{t.updateDoc}</Button>}
                 {sel.status !== "urgent" && sel.status !== "done" && <Button variant="ghost" disabled={backend !== "ok"} iconLeft={<Icon name="alert-triangle" size={16} />} onClick={() => setChangeStatus(sel.id, "urgent")}>{t.markUrgent}</Button>}
                 <Button variant="secondary" iconLeft={<Icon name="printer" size={16} />} onClick={() => openPrint([sel])}>{t.print}</Button>
+                {/* Pętla PL, poz. 7: "etap procesu" projektu rządowego. Rysujemy tylko, gdy nazwa etapu z RCL
+                    jest rozpoznana (draftStageIndex >= 0); opisy są ogólne i nie zawierają żadnych dat ani prognoz. */}
+                {sel.kind === "draft" && t.draftFlow && (() => {
+                  const idx = draftStageIndex(sel.draft && sel.draft.stage);
+                  if (idx < 0) return null;
+                  const f = t.draftFlow;
+                  return (
+                    <div style={{ padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+                      <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-muted)", fontWeight: 600 }}>{f.title}</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {f.steps.map((name, i) => <Badge key={i} tone={i === idx ? "amber" : i < idx ? "green" : "neutral"}>{i + 1}. {name}</Badge>)}
+                      </div>
+                      <div style={{ fontSize: 13, lineHeight: 1.5 }}>{f.now[idx]} <span style={{ color: "var(--text-muted)" }}>{f.next[idx]}</span></div>
+                      <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{f.note}</div>
+                    </div>
+                  );
+                })()}
                 {/* RCL draft: follow it — every scan then reports each new legislative stage (watchlist lives on the server). */}
                 {sel.kind === "draft" && watchDraft && (() => {
                   const rclId = (String(sel.eli || "").match(/^RCL\/(\d+)/) || [])[1];
                   if (!rclId) return null;
                   const on = watch.some((w) => String(w.id) === rclId);
-                  return <Button variant={on ? "ghost" : "secondary"} disabled={backend !== "ok"} iconLeft={<Icon name={on ? "bookmark-check" : "bookmark"} size={16} />} onClick={() => watchDraft(on ? "remove" : "add", rclId).catch(() => {})}>{on ? "Monitorowany — usuń" : "Monitoruj projekt"}</Button>;
+                  return <Button variant={on ? "ghost" : "secondary"} disabled={backend !== "ok"} iconLeft={<Icon name={on ? "bookmark-check" : "bookmark"} size={16} />} onClick={() => watchDraft(on ? "remove" : "add", rclId).catch(() => {})}>{on ? t.watchOn : t.watchAdd}</Button>;
                 })()}
                 {/* Draft already in the Sejm: link to its print (matched by title on the server). */}
-                {sel.draft?.sejmPrint && <Button variant="ghost" iconLeft={<Icon name="external-link" size={16} />} onClick={() => window.open(sel.draft.sejmPrint.url, "_blank", "noopener")}>Druk Sejmu nr {sel.draft.sejmPrint.number}</Button>}
+                {sel.draft?.sejmPrint && <Button variant="ghost" iconLeft={<Icon name="external-link" size={16} />} onClick={() => window.open(sel.draft.sejmPrint.url, "_blank", "noopener")}>{t.sejmPrintBtn} {sel.draft.sejmPrint.number}</Button>}
                 {canSaveKb && (isSavedKb(sel)
                   ? <span style={{ fontSize: 12.5, color: "var(--success-600)", display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="bookmark-check" size={15} />{t.kbSave.saved}</span>
                   : <Button variant="secondary" disabled={savingKb} iconLeft={<Icon name="bookmark" size={16} />} onClick={() => saveChangeToKb(sel)}>{savingKb ? t.kbSave.saving : t.kbSave.save}</Button>)}

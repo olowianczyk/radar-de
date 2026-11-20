@@ -12,7 +12,7 @@ const SEJM_SEARCH_URL = "https://api.sejm.gov.pl/eli/acts/search";
 const SAOS_SEARCH_URL = "https://www.saos.org.pl/api/search/judgments";
 // Days every incremental scan reaches back behind lastChecked, per register —
 // mirrors api/_lib.js LOOKBACK_DAYS (reasons documented there).
-export const LOOKBACK_DAYS = { ELI: 7, SEJM: 7, SAOS: 180, EURLEX: 180, RCL: 7 };
+export const LOOKBACK_DAYS = { ELI: 7, SEJM: 7, SAOS: 180, EURLEX: 180, RCL: 7, RIP: 7, RIPCASE: 60, DIP: 7, REFE: 14, BAGRSS: 7 };
 // Sejm bills in progress — mirrors api/_lib.js SEJM_API (term 10).
 const SEJM_PROCESSES_URL = "https://api.sejm.gov.pl/sejm/term10/processes";
 // EUR-Lex (Cellar SPARQL) — mirrors api/_lib.js EURLEX_* constants. Kept in
@@ -236,7 +236,7 @@ export function nextScanRange(source) {
   const [d, m, y] = datePart.split(".").map(Number);
   let from = d ? `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : `${new Date().getFullYear()}-01-01`;
   const first = !d;
-  const back = LOOKBACK_DAYS[["SAOS", "SEJM", "EURLEX", "RCL"].includes(source.register) ? source.register : "ELI"];
+  const back = LOOKBACK_DAYS[["SAOS", "SEJM", "EURLEX", "RCL", "RIP", "RIPCASE", "DIP", "REFE", "BAGRSS"].includes(source.register) ? source.register : "ELI"];
   if (back && !first) {
     const dt = new Date(`${from}T00:00:00Z`); dt.setUTCDate(dt.getUTCDate() - back); from = dt.toISOString().slice(0, 10);
   }
@@ -306,7 +306,7 @@ export function buildChangesFromHistory(sourceHistory, sources, statusMap) {
           // `via` is recorded by the backend since the multi-query engine;
           // older history entries fall back to the source's first query.
           const mode = e.via || (source.register === "SAOS" ? (source.referencedRegulation ? "referencedRegulation" : "phrase") : source.keyword ? "keyword" : "title");
-          const term = mode === "keyword" ? source.keyword : mode === "title" ? source.title : mode === "referencedRegulation" ? source.referencedRegulation : source.phrase;
+          const term = mode === "keyword" ? source.keyword : mode === "title" ? (source.title || source.court) : mode === "referencedRegulation" ? source.referencedRegulation : source.phrase;
           return {
             sourceName: source.name,
             mode,

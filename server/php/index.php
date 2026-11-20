@@ -49,7 +49,9 @@ const ELI_MAX_PAGES = 5;
 // (a forced period scan uses exactly the picked dates). Why these values: see
 // LOOKBACK_DAYS in _lib.js (ELI index lag, late Sejm stage dates, SAOS and the
 // Polish EUR-Lex titles arriving weeks/months late). History dedupes re-finds.
-const LOOKBACK_DAYS = ['ELI' => 7, 'SEJM' => 7, 'SAOS' => 180, 'EURLEX' => 180, 'RCL' => 7];
+const LOOKBACK_DAYS = ['ELI' => 7, 'SEJM' => 7, 'SAOS' => 180, 'EURLEX' => 180, 'RCL' => 7, 'RIP' => 7, 'RIPCASE' => 60, 'DIP' => 7, 'REFE' => 14, 'BAGRSS' => 7];
+// Every register a source may name; anything else is treated as ELI (Polish Dz.U./M.P.).
+const REGISTERS = ['SAOS', 'SEJM', 'EURLEX', 'RCL', 'RIP', 'RIPCASE', 'DIP', 'REFE', 'BAGRSS'];
 // EUR-Lex via the Publications Office's Cellar SPARQL endpoint (public, no key).
 const EURLEX_SPARQL = 'https://publications.europa.eu/webapi/rdf/sparql';
 const EURLEX_RT = 'http://publications.europa.eu/resource/authority/resource-type/';
@@ -124,9 +126,27 @@ function config_out($c) { return ['overrides' => obj($c['overrides'] ?? []), 'cu
 function qs($pairs) {
   return implode('&', array_map(fn($p) => urlencode($p[0]) . '=' . urlencode((string)$p[1]), $pairs));
 }
-function fetch_json($url, $label, $assoc = true) {
+// Retry wrapper for upstream GETs. WHY: one slow/flaky answer (e.g. SAOS source 202 timing out at
+// 20 s) used to fail the whole source for the night. HOW: run $fn up to $attempts times; retry only
+// TRANSIENT failures (curl error such as a timeout, HTTP 5xx, HTTP 429, invalid JSON) after a short
+// pause. A definite 4xx (bad request, forbidden, not found) is never retried - repeating cannot help.
+// `$pauseS` is a parameter so tests need not sleep. Worst case a dead source costs attempts x timeout.
+function with_retry($fn, $attempts = 2, $pauseS = 1) {
+  for ($i = 1; ; $i++) {
+    try { return $fn(); }
+    catch (Exception $e) {
+      $definite4xx = preg_match('/ error 4(?!29)\d\d$/', $e->getMessage());
+      if ($i >= $attempts || $definite4xx) throw $e;
+      if ($pauseS) sleep($pauseS);
+    }
+  }
+}
+function fetch_json($url, $label, $assoc = true, $headers = []) {
+  return with_retry(fn() => fetch_json_once($url, $label, $assoc, $headers));
+}
+function fetch_json_once($url, $label, $assoc = true, $headers = []) {
   $c = curl_init($url);
-  curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => FETCH_TIMEOUT, CURLOPT_FOLLOWLOCATION => true, CURLOPT_HTTPHEADER => ['Accept: application/json']]);
+  curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => FETCH_TIMEOUT, CURLOPT_FOLLOWLOCATION => true, CURLOPT_HTTPHEADER => array_merge(['Accept: application/json'], $headers)]);
   $body = curl_exec($c);
   $status = curl_getinfo($c, CURLINFO_HTTP_CODE);
   $err = curl_error($c);
@@ -391,9 +411,12 @@ function rcl_list_url($typeId, $all) {
   // when the 100 newest rows do not reach back far enough (first scan, forced old period).
   return RCL_BASE . '/lista?' . qs([['typeId', $typeId], ['pSize', $all ? 0 : 100], ['sKey', 'modifiedDate'], ['sOrder', 'desc']]);
 }
-function fetch_html($url, $label) {
+function fetch_html($url, $label, $ua = 'RadarLegislacyjny/1.0 (monitoring projektow ustaw)', $accept = 'text/html') {
+  return with_retry(fn() => fetch_html_once($url, $label, $ua, $accept));
+}
+function fetch_html_once($url, $label, $ua, $accept) {
   $c = curl_init($url);
-  curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 45, CURLOPT_FOLLOWLOCATION => true, CURLOPT_USERAGENT => 'RadarLegislacyjny/1.0 (monitoring projektow ustaw)', CURLOPT_HTTPHEADER => ['Accept: text/html']]);
+  curl_setopt_array($c, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 45, CURLOPT_FOLLOWLOCATION => true, CURLOPT_USERAGENT => $ua, CURLOPT_HTTPHEADER => ['Accept: ' . $accept]]);
   $body = curl_exec($c);
   $status = curl_getinfo($c, CURLINFO_HTTP_CODE);
   $err = curl_error($c);
@@ -560,7 +583,7 @@ function scan_rcl_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
 // ---- EUR-Lex (EU law + Commission proposals) ----------------------------------
 // Port of the EUR-Lex section of _lib.js — read that for the why. Source fields:
 // register "EURLEX", title = fragments separated by "|", matched case-insensitively
-// against the act's POLISH title (a phrase, or a base act's number like "2016/679"
+// against the act's title in the instance language (PL by default; a phrase, or a base act's number like "2016/679"
 // which catches every amendment / implementing act / corrigendum of it).
 // Finds directives + regulations (also implementing/delegated) + corrigenda, and
 // Commission proposals (COM … PC = EU law still in draft). Dated by
@@ -571,6 +594,12 @@ function scan_rcl_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
 // go into a SPARQL string literal and custom sources come from the login-less app,
 // so quotes, backslashes and line breaks are stripped — nothing typed can break out
 // of the literal. Fragments under 3 characters would match almost everything.
+// Language of the EUR-Lex titles that are searched and linked = the instance language
+// (`lang` in hrbp-config.php; missing = 'pl', so the Polish instance is unchanged).
+// Fragments must be written in that language. Codes: authority-table language / EUR-Lex URL.
+const EURLEX_LANGS = ['pl' => ['POL', 'PL'], 'de' => ['DEU', 'DE'], 'en' => ['ENG', 'EN']];
+function eurlex_lang($lang = null) { return EURLEX_LANGS[$lang ?? mail_lang()] ?? EURLEX_LANGS['pl']; }
+
 function eurlex_fragments($title) {
   $f = array_map(fn($x) => mb_strtolower(trim(preg_replace('/["\\\\\r\n]/', '', $x))), explode('|', (string)$title));
   return array_slice(array_values(array_filter($f, fn($x) => mb_strlen($x) >= 3)), 0, 10);
@@ -579,7 +608,7 @@ function is_eurlex_source($s) { return ($s['register'] ?? null) === 'EURLEX' && 
 
 // Date/type filter first in a subquery (a few hundred works per two months),
 // titles joined afterwards — the other way round the query took 5–20 s.
-function eurlex_query($fragments, $dateFrom, $dateTo) {
+function eurlex_query($fragments, $dateFrom, $dateTo, $lang = null) {
   $types = implode(' ', array_map(fn($t) => '<' . EURLEX_RT . $t . '>', array_merge(EURLEX_ACT_TYPES, EURLEX_PROPOSAL_TYPES)));
   $match = implode(' || ', array_map(fn($f) => "CONTAINS(LCASE(STR(?title)), \"$f\")", $fragments));
   return "PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
@@ -591,12 +620,12 @@ SELECT ?celex ?date ?type ?title WHERE {
       ?w cdm:resource_legal_id_celex ?celex .
   } }
   ?e cdm:expression_belongs_to_work ?w ;
-     cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/POL> ;
+     cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/" . eurlex_lang($lang)[0] . "> ;
      cdm:expression_title ?title .
   FILTER($match)
 } ORDER BY DESC(?date) LIMIT 300";
 }
-function eurlex_url($celex) { return 'https://eur-lex.europa.eu/legal-content/PL/TXT/?uri=CELEX:' . rawurlencode($celex); }
+function eurlex_url($celex, $lang = null) { return 'https://eur-lex.europa.eu/legal-content/' . eurlex_lang($lang)[1] . '/TXT/?uri=CELEX:' . rawurlencode($celex); }
 
 // POST (the query is ~1 kB). Roughly every second request hangs or gets a 502
 // (measured 10.2026), so a short timeout and up to EURLEX_ATTEMPTS tries; a 4xx
@@ -656,6 +685,443 @@ function scan_eurlex_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
   }
 }
 
+// ---- RIP: German federal law (Rechtsinformationsportal des Bundes) -------------------
+// Endpoint /v1/legislation, public, no key, "trial" status (the contract may change).
+// Source fields: register "RIP", title = fragments separated by "|" (a law's title,
+// its abbreviation such as "ArbZG", or a title phrase), matched case-insensitively.
+// Facts measured live 11.2026 (fixtures tests/fixtures/rip-legislation-*.json):
+//  - list items are in member[].item; `sort` is rejected (HTTP 422) and there is no
+//    date parameter, so the window is applied HERE on the dates below;
+//  - searchTerm is FULL-TEXT (a search for "ArbZG" also returns laws that merely cite
+//    it), so hits are kept only if the term occurs in name / abbreviation / alternateName;
+//  - the list holds ONE expression per law = its newest Fassung. The ELI
+//    eli/bund/<gazette>/<year>/<no>/<Fassung date>/<n>/deu changes with every amendment,
+//    so "new version" = unseen legislationIdentifier; the Fassung date is the change date;
+//  - coverage is partial in the trial: the Hinweisgeberschutzgesetz itself is NOT in
+//    it (only ordinances that cite it) — an absent law is NOT reported as an error.
+const RIP_BASE = 'https://testphase.rechtsinformationen.bund.de';
+const RIP_PAGE = 50;          // items per request
+const RIP_MAX_PAGES = 3;      // per fragment; beyond that the result is flagged truncated
+const RIP_PACE_US = 250000;   // 4 req/s, well under the 600/min/IP limit
+
+function is_rip_source($s) { return ($s['register'] ?? null) === 'RIP' && count(eurlex_fragments($s['title'] ?? '')) > 0; }
+function rip_list_url($term, $page) { return RIP_BASE . '/v1/legislation?' . qs([['searchTerm', $term], ['size', RIP_PAGE], ['pageIndex', $page]]); }
+
+// Fassung date from an ELI ("eli/bund/bgbl-1/1994/s1171/2024-10-23/1/deu" -> "2024-10-23").
+function rip_version_date($eli) { return preg_match('~/(\d{4}-\d{2}-\d{2})/\d+/[a-z]{3}$~', (string)$eli, $m) ? $m[1] : null; }
+
+// Parsed list response -> feed entries inside [dateFrom, dateTo], deduped by ELI.
+// Pure (the fixture test calls it). `$fragments` = lowercase fragments.
+function rip_entries($data, $fragments, $dateFrom, $dateTo, $todayIso) {
+  if (!is_array($data['member'] ?? null)) throw new Exception('RIP: unexpected response shape (no member list)');
+  $out = [];
+  foreach ($data['member'] as $m) {
+    $i = $m['item'] ?? null;
+    $eli = $i['legislationIdentifier'] ?? null;
+    if (!$eli) continue;
+    $names = mb_strtolower(implode(' | ', array_filter([$i['name'] ?? null, $i['abbreviation'] ?? null, $i['alternateName'] ?? null])));
+    if (!array_filter($fragments, fn($f) => mb_strpos($names, $f) !== false)) continue;
+    $version = rip_version_date($eli);
+    $published = $i['exampleOfWork']['datePublished'] ?? null;
+    // Newest of "Fassung date" and "published in the gazette" = when this version became news.
+    $date = max(array_filter([$version, $published]) ?: ['']);
+    if ($date === '' || $date < $dateFrom || $date > $dateTo) continue;
+    // Human-readable text of this Fassung (the portal's web UI has no stable per-norm URL we could verify).
+    $url = RIP_BASE . ($i['@id'] ?? '/v1/legislation/' . $eli);
+    foreach ($i['encoding'] ?? [] as $enc) if (($enc['encodingFormat'] ?? '') === 'text/html' && !empty($enc['contentUrl'])) { $url = RIP_BASE . $enc['contentUrl']; break; }
+    $abbr = $i['abbreviation'] ?? null;
+    $out[$eli] = ['ts' => format_detected_ts($date), 'type' => 'detected', 'kind' => 'act', 'note' => ($i['name'] ?? $eli) . ($abbr ? " ($abbr)" : ''), 'url' => $url, 'eli' => mb_substr($eli, 0, 120), 'via' => 'title', 'publisher' => 'RIP', 'abbreviation' => $abbr, 'versionDate' => $version, 'datePublished' => $published, 'legalForce' => $i['legislationLegalForce'] ?? null, 'detectedOn' => $todayIso];
+  }
+  return array_values($out);
+}
+
+function scan_rip_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
+  $fragments = eurlex_fragments($s['title']);
+  // The first fragment's URL is what a person can paste into a browser to replay the search.
+  $query = ['mode' => 'title', 'term' => $s['title'], 'register' => 'RIP', 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'lookbackDays' => $lookbackDays, 'url' => rip_list_url($fragments[0], 0)];
+  $detected = [];
+  $seen = [];
+  $errors = [];
+  $truncated = false;
+  foreach ($fragments as $f) {
+    try {
+      for ($page = 0; $page < RIP_MAX_PAGES; $page++) {
+        $data = fetch_json(rip_list_url($f, $page), 'RIP');
+        foreach (rip_entries($data, $fragments, $dateFrom, $dateTo, iso_today()) as $e) if (!isset($seen[$e['eli']])) { $seen[$e['eli']] = true; $detected[] = $e; }
+        usleep(RIP_PACE_US);
+        if (empty($data['view']['next'])) break;
+        if ($page === RIP_MAX_PAGES - 1) $truncated = true;
+      }
+    } catch (Exception $e) {
+      $errors[] = $e->getMessage();
+    }
+  }
+  $r = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'queries' => [$query], 'query' => $query];
+  if ($truncated) $r['truncated'] = true;
+  if ($errors) $r['error'] = implode('; ', array_unique($errors));
+  return $r;
+}
+
+// ---- RIPCASE: German case law (Rechtsinformationsportal, /v1/rechtsprechung) ----------
+// Same portal as RIP, separate endpoint (the old /v1/case-law answers HTTP 410).
+// Source fields: register "RIPCASE", court = "BAG" | "BGH" | ... (param `court`, the
+// `courtType`/`courtName` params are silently ignored), title = OPTIONAL phrases separated
+// by "|" (full-text `searchTerm`, one request per phrase). Without phrases every decision
+// of the court in the window is reported — fine for the BAG (a few per week), far too
+// much for the BGH (150+ per month), so BGH sources must carry phrases.
+// Measured live 11.2026 (fixtures tests/fixtures/ripcase-*.json): `dateFrom`/`dateTo`
+// filter on decisionDate; items sit in member[].item; NO full text in the list (only
+// headline + titleLine), so the feed shows the file number and subject line, not an excerpt.
+const RIPCASE_PAGE = 50;
+const RIPCASE_MAX_PAGES = 3;
+
+function is_ripcase_source($s) { return ($s['register'] ?? null) === 'RIPCASE' && preg_match('/^[A-Za-z]{2,10}$/', (string)($s['court'] ?? '')) === 1; }
+function ripcase_list_url($court, $term, $dateFrom, $dateTo, $page) {
+  $q = [['court', $court], ['dateFrom', $dateFrom], ['dateTo', $dateTo], ['size', RIPCASE_PAGE], ['pageIndex', $page]];
+  if ($term !== null && $term !== '') array_unshift($q, ['searchTerm', $term]);
+  return RIP_BASE . '/v1/rechtsprechung?' . qs($q);
+}
+
+// Parsed list response -> judgment entries, deduped by documentNumber. Pure (fixture test calls it).
+// Throws on an unexpected shape so the source shows an error instead of "0 results".
+function ripcase_entries($data, $todayIso) {
+  if (!is_array($data['member'] ?? null)) throw new Exception('RIPCASE: unexpected response shape (no member list)');
+  $out = [];
+  foreach ($data['member'] as $m) {
+    $i = $m['item'] ?? null;
+    $doc = $i['documentNumber'] ?? null;
+    $date = $i['decisionDate'] ?? null;
+    if (!$doc || !$date) continue;
+    $url = RIP_BASE . ($i['@id'] ?? '/v1/rechtsprechung/' . $doc);
+    foreach ($i['encoding'] ?? [] as $enc) if (($enc['encodingFormat'] ?? '') === 'text/html' && !empty($enc['contentUrl'])) { $url = RIP_BASE . $enc['contentUrl']; break; }
+    $files = array_values(array_filter($i['fileNumbers'] ?? []));
+    $out[$doc] = ['ts' => format_detected_ts($date), 'type' => 'detected', 'kind' => 'judgment',
+      'note' => implode(' · ', array_filter([$i['headline'] ?? $doc, $i['titleLine'] ?? null])),
+      'url' => $url, 'eli' => 'RIPCASE/' . $doc, 'via' => 'title', 'publisher' => 'RIPCASE',
+      'courtType' => $i['courtType'] ?? null, 'courtName' => $i['courtName'] ?? ($i['courtType'] ?? null),
+      'caseNumbers' => $files, 'judgmentType' => $i['documentType'] ?? null, 'judgmentDate' => $date,
+      'ecli' => $i['ecli'] ?? null, 'excerpt' => null, 'keywords' => [], 'detectedOn' => $todayIso];
+  }
+  return array_values($out);
+}
+
+function scan_ripcase_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
+  $court = strtoupper($s['court']);
+  $fragments = !empty($s['title']) ? eurlex_fragments($s['title']) : [''];
+  $query = ['mode' => 'title', 'term' => $court . (empty($s['title']) ? '' : ' / ' . $s['title']), 'register' => 'RIPCASE', 'courtType' => $court, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'lookbackDays' => $lookbackDays, 'url' => ripcase_list_url($court, $fragments[0], $dateFrom, $dateTo, 0)];
+  $detected = [];
+  $seen = [];
+  $errors = [];
+  $truncated = false;
+  foreach ($fragments as $f) {
+    try {
+      for ($page = 0; $page < RIPCASE_MAX_PAGES; $page++) {
+        $data = fetch_json(ripcase_list_url($court, $f, $dateFrom, $dateTo, $page), 'RIPCASE');
+        foreach (ripcase_entries($data, iso_today()) as $e) if (!isset($seen[$e['eli']])) { $seen[$e['eli']] = true; $detected[] = $e; }
+        usleep(RIP_PACE_US);
+        if (empty($data['view']['next'])) break;
+        if ($page === RIPCASE_MAX_PAGES - 1) $truncated = true;
+      }
+    } catch (Exception $e) {
+      $errors[] = $e->getMessage();
+    }
+  }
+  $r = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => count($detected), 'detected' => $detected, 'queries' => [$query], 'query' => $query];
+  if ($truncated) $r['truncated'] = true;
+  if ($errors) $r['error'] = implode('; ', array_unique($errors));
+  return $r;
+}
+
+// ---- DIP: Bundestag bills (Dokumentations- und Informationssystem, /api/v1/vorgang) -----
+// Source fields: register "DIP", title = OPTIONAL phrases separated by "|" (filter f.titel,
+// one request per phrase; none = every Gesetzgebung procedure updated in the window).
+// Needs a personal API key (public on request from the Bundestag, NEVER in the repo):
+// `dip_api_key` in ~/private/hrbp-config.php, or env DIP_API_KEY, or a local
+// ~/.config/radar-de/dip.key. Without it the source shows a clear error, never "0 results".
+// Window = f.aktualisiert.start/end (last UPDATE of the procedure), so a stage change of an
+// old bill is found too; the entry id carries the stage, so each new stage is a new entry.
+// Spec: https://search.dip.bundestag.de/api/v1/openapi.yaml (v1.5). Limit 2 req/s here.
+const DIP_BASE = 'https://search.dip.bundestag.de/api/v1';
+const DIP_PACE_US = 500000;
+const DIP_MAX_PAGES = 3;
+const DIP_STAGE_CODES = ['introduced', 'parliament', 'bundesrat', 'passed', 'promulgated', 'closed'];
+
+function is_dip_source($s) { return ($s['register'] ?? null) === 'DIP'; }
+function dip_api_key() {
+  $k = (string)(hrbp_config()['dip_api_key'] ?? '') ?: (string)getenv('DIP_API_KEY');
+  if ($k === '') { $f = (getenv('HOME') ?: '') . '/.config/radar-de/dip.key'; if (is_file($f)) $k = trim((string)file_get_contents($f)); }
+  return $k;
+}
+function dip_list_url($phrase, $dateFrom, $dateTo, $cursor) {
+  $q = [['f.vorgangstyp', 'Gesetzgebung'], ['f.aktualisiert.start', $dateFrom . 'T00:00:00'], ['f.aktualisiert.end', $dateTo . 'T23:59:59']];
+  if ($phrase !== null && $phrase !== '') $q[] = ['f.titel', $phrase];
+  if ($cursor) $q[] = ['cursor', $cursor];
+  return DIP_BASE . '/vorgang?' . qs($q);
+}
+// DIP's free-text `beratungsstand` -> language-independent code (matched on the stem, the
+// vocabulary is open-ended). Order matters: most advanced first.
+function dip_stage_code($beratungsstand) {
+  $b = mb_strtolower((string)$beratungsstand);
+  if (mb_strpos($b, 'verkündet') !== false) return 'promulgated';
+  if (mb_strpos($b, 'abgeschlossen') !== false || mb_strpos($b, 'erledigt') !== false || mb_strpos($b, 'für erledigt') !== false) return 'closed';
+  if (mb_strpos($b, 'bundesrat') !== false) return 'bundesrat';
+  if (mb_strpos($b, 'angenommen') !== false || mb_strpos($b, 'beschlossen') !== false || mb_strpos($b, 'gesetzesbeschluss') !== false) return 'passed';
+  if (mb_strpos($b, 'noch nicht beraten') !== false || mb_strpos($b, 'überwiesen') !== false) return 'introduced';
+  return 'parliament';
+}
+// One /vorgang response -> bill entries. Pure (fixture test calls it). Throws on a shape
+// without `documents` so a changed API shows as an error instead of "0 results".
+function dip_entries($data, $todayIso) {
+  if (!is_array($data['documents'] ?? null)) throw new Exception('DIP: unexpected response shape (no documents list)');
+  $out = [];
+  foreach ($data['documents'] as $d) {
+    $id = $d['id'] ?? null;
+    $date = $d['datum'] ?? null;
+    if (!$id || !is_iso_date($date)) continue;
+    $stageRaw = (string)($d['beratungsstand'] ?? '');
+    $code = dip_stage_code($stageRaw);
+    $key = 'DIP/' . $id . '/' . $code;
+    $out[$key] = ['ts' => format_detected_ts($date), 'type' => 'detected', 'kind' => 'bill',
+      'note' => $d['titel'] ?? null, 'url' => 'https://dip.bundestag.de/vorgang/-/' . $id,
+      'eli' => mb_substr($key, 0, 120), 'via' => 'title', 'publisher' => 'DIP',
+      'billNumber' => ($d['gesta'] ?? null) ?: (string)$id,
+      'stage' => mt('dip.stage.' . $code), 'stageCode' => $code, 'stageType' => $stageRaw, 'stageDate' => $date,
+      'processStartDate' => null, 'passed' => in_array($code, ['passed', 'promulgated'], true),
+      'euLaw' => false, 'urgent' => false,
+      'applicant' => implode(', ', array_filter($d['initiative'] ?? [], 'is_string')) ?: null,
+      'description' => is_string($d['abstract'] ?? null) ? mb_substr($d['abstract'], 0, 2000) : '',
+      'actEli' => null, 'isapUrl' => null, 'detectedOn' => $todayIso];
+  }
+  return array_values($out);
+}
+function dip_fetch($url, $key) {
+  try { return fetch_json($url, 'DIP', true, ['Authorization: ApiKey ' . $key]); }
+  catch (Exception $e) {
+    if (preg_match('/error (401|403)$/', $e->getMessage())) throw new Exception(mt('dip.keyInvalid'));
+    throw $e;
+  }
+}
+function scan_dip_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
+  $phrases = !empty($s['title']) ? eurlex_fragments($s['title']) : [''];
+  $query = ['mode' => 'title', 'term' => !empty($s['title']) ? $s['title'] : 'Gesetzgebung', 'register' => 'DIP', 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'lookbackDays' => $lookbackDays, 'url' => dip_list_url($phrases[0], $dateFrom, $dateTo, null)];
+  $r = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => 0, 'detected' => [], 'queries' => [$query], 'query' => $query];
+  $key = dip_api_key();
+  if ($key === '') { $r['error'] = mt('dip.keyMissing'); return $r; }
+  $seen = [];
+  $errors = [];
+  foreach ($phrases as $f) {
+    try {
+      $cursor = null;
+      for ($page = 0; $page < DIP_MAX_PAGES; $page++) {
+        $data = dip_fetch(dip_list_url($f, $dateFrom, $dateTo, $cursor), $key);
+        foreach (dip_entries($data, iso_today()) as $e) if (!isset($seen[$e['eli']])) { $seen[$e['eli']] = true; $r['detected'][] = $e; }
+        usleep(DIP_PACE_US);
+        $next = $data['cursor'] ?? null;
+        // Last page: no documents, or the cursor did not move.
+        if (empty($data['documents']) || !$next || $next === $cursor) break;
+        $cursor = $next;
+        if ($page === DIP_MAX_PAGES - 1) $r['truncated'] = true;
+      }
+    } catch (Exception $e) {
+      $errors[] = $e->getMessage();
+    }
+  }
+  $r['found'] = count($r['detected']);
+  if ($errors) $r['error'] = implode('; ', array_unique($errors));
+  return $r;
+}
+
+// ---- REFE: ministry drafts (Referentenentwürfe) from BMAS and BMJV pages ----------
+// There is NO API for drafts before the cabinet, so this scrapes the two ministries'
+// public lists of legislative projects. Source fields: register "REFE", `ministry`
+// = 'BMAS' | 'BMJV', title = phrases separated by "|" (matched against the draft's title).
+//
+// Politeness / legal basis (measured 2026-11-20, see docs/RAPORT-NOC.md Krok 7):
+//  - ONE request per ministry per day: the parsed list is cached on disk for 20 h, so
+//    manual "scan now" clicks do not hit the sites again. BMAS robots.txt asks for
+//    Crawl-delay 180 s between requests and forbids query strings (/*?*) — we send none.
+//  - BMJV robots.txt disallows /DE/Service/ (capital S); the list lives at
+//    /DE/service/ (lower case). Paths are case-sensitive, so the rule does not match,
+//    but the intent is arguably the same area — flagged for the owner to confirm.
+//  - Explicit User-Agent, no e-mail address.
+// shortcut: only the FIRST page of each list is read (the newest ~10 BMAS / ~5 BMJV
+// projects) — pagination uses query strings, which BMAS forbids. Daily scans catch
+// every new project; a first scan sees only what is currently on page 1.
+// shortcut: the list status ("Im Prozess" / "Entwurf") does not separate a Referenten-
+// from a Kabinettsentwurf, so the stage says "Referentenentwurf" only when the teaser
+// text itself says so, otherwise the neutral "Entwurf des Ministeriums".
+// A changed page layout is reported as an error ("Layout geändert"), never as 0 results.
+const REFE_UA = 'RadarLegislacyjnyDE/1.0 (monitoring gesetzgebung)';
+const REFE_CACHE_SECONDS = 72000; // 20 h: a daily cron always refreshes, repeat scans reuse
+const REFE_MINISTRIES = [
+  'BMAS' => ['url' => 'https://www.bmas.de/DE/Service/Gesetze-und-Gesetzesvorhaben/gesetze-und-gesetzesvorhaben.html', 'name' => 'BMAS'],
+  'BMJV' => ['url' => 'https://www.bmjv.de/DE/service/gesetzgebung/gesetzgebung_node.html', 'name' => 'BMJV'],
+];
+const REFE_MONTHS = ['januar' => 1, 'februar' => 2, 'märz' => 3, 'april' => 4, 'mai' => 5, 'juni' => 6, 'juli' => 7, 'august' => 8, 'september' => 9, 'oktober' => 10, 'november' => 11, 'dezember' => 12];
+
+function is_refe_source($s) { return ($s['register'] ?? null) === 'REFE' && isset(REFE_MINISTRIES[$s['ministry'] ?? '']) && count(eurlex_fragments($s['title'] ?? '')) > 0; }
+// "18. November 2026" -> "2026-11-18"; anything else -> null.
+function refe_iso($text) {
+  if (!preg_match('/(\d{1,2})\.\s*([[:alpha:]äöüÄÖÜ]+)\s+(\d{4})/u', (string)$text, $m)) return null;
+  $mon = REFE_MONTHS[mb_strtolower($m[2])] ?? null;
+  return $mon ? sprintf('%04d-%02d-%02d', $m[3], $mon, $m[1]) : null;
+}
+// First capture group of $re in $html, tags stripped and whitespace collapsed; '' if absent.
+function refe_grab($re, $html) { return preg_match($re, $html, $m) ? rcl_text($m[1]) : ''; }
+// Drop the query string and fragment: the bare path is the stable identity of a project page.
+function refe_clean_url($u) { return preg_replace('/[?#].*$/', '', trim($u)); }
+// Pure parsers: HTML -> rows [title, url, date (ISO), status, text]. Return [] when the expected
+// structure is absent (the caller turns that into a "layout changed" error).
+function parse_refe_bmas($html) {
+  $rows = [];
+  foreach (array_slice(explode('<pp-teaser', $html), 1) as $chunk) {
+    $url = preg_match('/<pp-link\s+href="([^"]+)"/', $chunk, $m) ? refe_clean_url(html_entity_decode($m[1])) : '';
+    $title = refe_grab('~<h3[^>]*>(.*?)</h3>~s', $chunk);
+    $date = preg_match('/<time[^>]*datetime="(\d{4}-\d\d-\d\d)"/', $chunk, $m) ? $m[1] : refe_iso(refe_grab('~<time[^>]*>(.*?)</time>~s', $chunk));
+    if (!$url || !$title || !$date) continue; // a teaser missing a core field is not a project row
+    preg_match_all('~<pp-tag[^>]*>\s*<div data-slot="pp-text">(.*?)</div>~s', $chunk, $tags);
+    $rows[] = ['title' => $title, 'url' => $url, 'date' => $date, 'status' => rcl_text(end($tags[1]) ?: ''), 'tags' => array_map('rcl_text', $tags[1]), 'text' => refe_grab('~<p class="text">(.*?)</p>~s', $chunk)];
+  }
+  return $rows;
+}
+function parse_refe_bmjv($html) {
+  $rows = [];
+  foreach (array_slice(explode('<li class="c-teaser c-teaser--law"', $html), 1) as $chunk) {
+    $chunk = explode('</li>', $chunk, 2)[0];
+    $url = preg_match('/c-teaser__link-main"\s+href="([^"]+)"/', $chunk, $m) ? refe_clean_url(html_entity_decode($m[1])) : '';
+    $title = refe_grab('~<h3[^>]*>(.*?)</h3>~s', $chunk);
+    $date = refe_iso(refe_grab('~<time[^>]*>(.*?)</time>~s', $chunk)); // the datetime attribute is empty on this site
+    if (!$url || !$title || !$date) continue;
+    $rows[] = ['title' => $title, 'url' => $url, 'date' => $date, 'status' => refe_grab('~c-teaser__status[^>]*>(.*?)</span>~s', $chunk), 'tags' => [], 'text' => ''];
+  }
+  return $rows;
+}
+// Rows -> feed entries: only projects still in progress (BMAS "Im Prozess", BMJV "Entwurf"),
+// dated inside the window, whose title contains one of the phrases. Dedupe key = page path
+// without date, so one project = one entry for good (later edits are not re-reported).
+function refe_entries($rows, $ministry, $fragments, $dateFrom, $dateTo, $todayIso) {
+  $out = [];
+  foreach ($rows as $r) {
+    if ($ministry === 'BMAS' ? !in_array('Im Prozess', $r['tags'], true) : $r['status'] !== 'Entwurf') continue;
+    if ($r['date'] < $dateFrom || $r['date'] > $dateTo) continue;
+    $low = mb_strtolower($r['title']);
+    if (!array_filter($fragments, fn($f) => mb_strpos($low, $f) !== false)) continue;
+    $out[] = [
+      'ts' => format_detected_ts($r['date']), 'type' => 'detected', 'kind' => 'draft',
+      'note' => $r['title'], 'url' => $r['url'],
+      'eli' => 'REFE/' . $ministry . '/' . mb_substr(preg_replace('/\.html$/', '', basename($r['url'])), 0, 100),
+      'stage' => mt(mb_stripos($r['text'], 'Referentenentwurf') !== false ? 'refe.stage' : 'refe.stageDraft'),
+      'stageDate' => $r['date'], 'via' => 'title', 'watched' => false, 'publisher' => 'REFE',
+      'draftType' => $ministry, 'applicant' => $ministry, 'modifiedDate' => $r['date'], 'detectedOn' => $todayIso,
+    ];
+  }
+  return $out;
+}
+// Parsed rows of one ministry, fetched at most once per 20 h (disk cache). Throws on a
+// failed request or when no project row is recognised (layout changed).
+function refe_rows($ministry) {
+  $path = DATA_DIR . '/cache/refe-' . strtolower($ministry) . '.json';
+  if (storage_available()) {
+    try { $hit = read_json_file($path); } catch (Exception $e) { $hit = null; }
+    if ($hit && is_array($hit['rows'] ?? null) && $hit['rows'] && time() - strtotime($hit['savedAt']) < REFE_CACHE_SECONDS) return $hit['rows'];
+  }
+  $html = fetch_html(REFE_MINISTRIES[$ministry]['url'], $ministry, REFE_UA);
+  $rows = $ministry === 'BMAS' ? parse_refe_bmas($html) : parse_refe_bmjv($html);
+  if (!$rows) throw new Exception($ministry . ': ' . mt('refe.layout'));
+  if (storage_available()) { try { write_json_file($path, ['savedAt' => iso_now(), 'rows' => $rows]); } catch (Exception $e) { /* only costs a re-download */ } }
+  return $rows;
+}
+function scan_refe_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
+  $ministry = $s['ministry'];
+  $query = ['mode' => 'title', 'term' => $s['title'], 'register' => 'REFE', 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'lookbackDays' => $lookbackDays, 'url' => REFE_MINISTRIES[$ministry]['url']];
+  $r = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => 0, 'detected' => [], 'queries' => [$query], 'query' => $query];
+  try {
+    $r['detected'] = refe_entries(refe_rows($ministry), $ministry, eurlex_fragments($s['title']), $dateFrom, $dateTo, iso_today());
+  } catch (Exception $e) {
+    $r['error'] = $e->getMessage();
+  }
+  $r['found'] = count($r['detected']);
+  return $r;
+}
+
+// ---- BAGRSS: signals from the Federal Labour Court's own RSS feeds -------------------
+// https://www.bundesarbeitsgericht.de/feed/<entscheidung|presse>/neueste are the court's
+// official feeds (linked from its site, robots.txt blocks only AI crawlers, generic agents
+// allowed — read 2026-11-20). `entscheidung`: item = file number (title) + subject line
+// (description); `presse`: item = press-release headline. We keep ONLY title, link, date and
+// that one subject line — never the press text in content:encoded (text-and-data-mining
+// caution) — and the entry is a "Signal": it points to the court's page, nothing more.
+// Overlaps RIPCASE/BAG (full metadata, official API) on purpose: the feed is only a faster
+// pointer; use phrases or the `presse` feed alone if the doubling is unwanted.
+// Source fields: register "BAGRSS", feed = "entscheidung" | "presse", title = OPTIONAL phrases "|".
+const BAGRSS_UA = 'RadarLegislacyjnyDE/1.0 (monitoring gesetzgebung)';
+const BAGRSS_CACHE_SECONDS = 21600; // 6 h; the feed changes a few times a week
+const BAGRSS_FEEDS = ['entscheidung' => 'https://www.bundesarbeitsgericht.de/feed/entscheidung/neueste', 'presse' => 'https://www.bundesarbeitsgericht.de/feed/presse/neueste'];
+
+function is_bagrss_source($s) { return ($s['register'] ?? null) === 'BAGRSS' && isset(BAGRSS_FEEDS[$s['feed'] ?? '']); }
+function bagrss_tag($tag, $chunk) {
+  if (!preg_match('~<' . $tag . '[^>]*>(.*?)</' . $tag . '>~s', $chunk, $m)) return '';
+  return rcl_text(str_replace(['<![CDATA[', ']]>'], '', $m[1]));
+}
+// RSS text -> rows [title, url, date (ISO), text]; items without title/link/date are skipped.
+// Pure (fixture test calls it). Only <title>, <link>, <pubDate>, <description> are read.
+function parse_bagrss($xml) {
+  $rows = [];
+  if (!preg_match_all('~<item>(.*?)</item>~s', $xml, $items)) return $rows;
+  foreach ($items[1] as $chunk) {
+    $title = bagrss_tag('title', $chunk); $url = bagrss_tag('link', $chunk); $ts = strtotime(bagrss_tag('pubDate', $chunk));
+    if ($title === '' || $url === '' || !$ts) continue;
+    $rows[] = ['title' => $title, 'url' => $url, 'date' => gmdate('Y-m-d', $ts), 'text' => bagrss_tag('description', $chunk)];
+  }
+  return $rows;
+}
+// Rows -> judgment entries inside the window, optionally filtered by phrases (title + subject line).
+function bagrss_entries($rows, $feed, $fragments, $dateFrom, $dateTo, $todayIso) {
+  $out = [];
+  foreach ($rows as $r) {
+    if ($r['date'] < $dateFrom || $r['date'] > $dateTo) continue;
+    if ($fragments) {
+      $low = mb_strtolower($r['title'] . ' ' . $r['text']);
+      if (!array_filter($fragments, fn($f) => mb_strpos($low, $f) !== false)) continue;
+    }
+    $isDecision = $feed === 'entscheidung';
+    $out[] = [
+      'ts' => format_detected_ts($r['date']), 'type' => 'detected', 'kind' => 'judgment',
+      'note' => $isDecision ? implode(' · ', array_filter([$r['title'], mb_substr($r['text'], 0, 300)])) : $r['title'],
+      'url' => $r['url'], 'eli' => 'BAGRSS/' . $feed . '/' . mb_substr(basename(rtrim($r['url'], '/')), 0, 100), 'via' => 'title', 'publisher' => 'BAGRSS',
+      'courtType' => 'BAG', 'courtName' => 'Bundesarbeitsgericht', 'caseNumbers' => $isDecision ? [$r['title']] : [],
+      'judgmentType' => mt($isDecision ? 'bag.signalDecision' : 'bag.signalPress'), 'judgmentDate' => $r['date'],
+      'ecli' => null, 'excerpt' => null, 'keywords' => [], 'detectedOn' => $todayIso,
+    ];
+  }
+  return $out;
+}
+// Parsed rows of one feed, downloaded at most once per 6 h (disk cache). Throws on a failed
+// request or when the feed holds no recognisable item (a real feed never is empty).
+function bagrss_rows($feed) {
+  $path = DATA_DIR . '/cache/bagrss-' . $feed . '.json';
+  if (storage_available()) {
+    try { $hit = read_json_file($path); } catch (Exception $e) { $hit = null; }
+    if ($hit && is_array($hit['rows'] ?? null) && $hit['rows'] && time() - strtotime($hit['savedAt']) < BAGRSS_CACHE_SECONDS) return $hit['rows'];
+  }
+  $rows = parse_bagrss(fetch_html(BAGRSS_FEEDS[$feed], 'BAG', BAGRSS_UA, 'application/rss+xml, text/xml'));
+  if (!$rows) throw new Exception('BAG: ' . mt('bag.feed'));
+  if (storage_available()) { try { write_json_file($path, ['savedAt' => iso_now(), 'rows' => $rows]); } catch (Exception $e) { /* only costs a re-download */ } }
+  return $rows;
+}
+function scan_bagrss_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays) {
+  $feed = $s['feed'];
+  $query = ['mode' => 'title', 'term' => $feed . (empty($s['title']) ? '' : ' / ' . $s['title']), 'register' => 'BAGRSS', 'courtType' => 'BAG', 'dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'lookbackDays' => $lookbackDays, 'url' => BAGRSS_FEEDS[$feed]];
+  $r = ['id' => $s['id'], 'lastChecked' => $nowStr, 'found' => 0, 'detected' => [], 'queries' => [$query], 'query' => $query];
+  try {
+    $r['detected'] = bagrss_entries(bagrss_rows($feed), $feed, eurlex_fragments($s['title'] ?? ''), $dateFrom, $dateTo, iso_today());
+  } catch (Exception $e) {
+    $r['error'] = $e->getMessage();
+  }
+  $r['found'] = count($r['detected']);
+  return $r;
+}
+
 // ---- scan engine ---------------------------------------------------------------
 function source_queries($s) {
   $reg = $s['register'] ?? null;
@@ -663,6 +1129,11 @@ function source_queries($s) {
   if ($reg === 'SEJM') return is_sejm_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
   if ($reg === 'EURLEX') return is_eurlex_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
   if ($reg === 'RCL') return is_rcl_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
+  if ($reg === 'RIP') return is_rip_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
+  if ($reg === 'RIPCASE') return is_ripcase_source($s) ? [['mode' => 'title', 'term' => ($s['court'] ?? '') . (empty($s['title']) ? '' : ' / ' . $s['title'])]] : [];
+  if ($reg === 'DIP') return is_dip_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
+  if ($reg === 'BAGRSS') return is_bagrss_source($s) ? [['mode' => 'title', 'term' => $s['feed'] . (empty($s['title']) ? '' : ' / ' . $s['title'])]] : [];
+  if ($reg === 'REFE') return is_refe_source($s) ? [['mode' => 'title', 'term' => $s['title']]] : [];
   $qs = [];
   if (!empty($s['keyword'])) $qs[] = ['mode' => 'keyword', 'term' => $s['keyword']];
   if (!empty($s['title'])) $qs[] = ['mode' => 'title', 'term' => $s['title']];
@@ -733,7 +1204,7 @@ function scan_sources($sources, $range) {
   foreach ($sources as $s) {
     $qs = source_queries($s);
     if (!$qs) { $out[] = ['id' => $s['id'], 'lastChecked' => ($s['lastChecked'] ?? null) ?: null, 'found' => 0, 'detected' => []]; continue; }
-    $register = in_array($s['register'] ?? null, ['SAOS', 'SEJM', 'EURLEX', 'RCL'], true) ? $s['register'] : 'ELI';
+    $register = in_array($s['register'] ?? null, REGISTERS, true) ? $s['register'] : 'ELI';
     $last = to_iso_date($s['lastChecked'] ?? null);
     $lookbackDays = $rangeFrom || !$last ? 0 : LOOKBACK_DAYS[$register];
     $dateFrom = $rangeFrom ?: ($last ? shift_iso_days($last, -$lookbackDays) : date('Y') . '-01-01');
@@ -743,6 +1214,11 @@ function scan_sources($sources, $range) {
       'SEJM' => scan_sejm_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
       'EURLEX' => scan_eurlex_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
       'RCL' => scan_rcl_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
+      'RIP' => scan_rip_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
+      'RIPCASE' => scan_ripcase_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
+      'DIP' => scan_dip_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
+      'REFE' => scan_refe_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
+      'BAGRSS' => scan_bagrss_source($s, $dateFrom, $dateTo, $nowStr, $lookbackDays),
       default => scan_eli_source($s, $qs, $dateFrom, $dateTo, $nowStr, $lookbackDays),
     };
     if ($rangeFrom || isset($r['error'])) $r['lastChecked'] = ($s['lastChecked'] ?? null) ?: null;
@@ -753,7 +1229,8 @@ function scan_sources($sources, $range) {
 
 function default_sources() {
   static $s;
-  return $s ??= json_decode(file_get_contents(__DIR__ . '/sources.json'), true);
+  // German instance (`lang` = de) has its own default set; PL keeps sources.json untouched.
+  return $s ??= json_decode(file_get_contents(__DIR__ . (mail_lang() === 'de' ? '/sources.de.json' : '/sources.json')), true);
 }
 function effective_sources($ws, $config) {
   $overrides = $config['overrides'] ?? [];
@@ -787,6 +1264,16 @@ function merge_history($prev, $results, &$freshOut = []) {
   return $history;
 }
 
+// The row stored in the scan doc for one scanned source. A source that FAILED this run reports
+// found=0 only because nothing could be read; storing that 0 would drag the department's numbers
+// down (a timed-out source 202 looked like "0 judgments"). So on error the previous `found` is kept
+// and the error is stored next to it, visible in the UI. `$prevRows` = $prev['sources'] of the doc.
+function persisted_source_row($r, $prevRows) {
+  $found = $r['found'];
+  if (isset($r['error'])) foreach ($prevRows as $p) if ($p['id'] == $r['id']) { $found = $p['found'] ?? $found; break; }
+  return ['id' => $r['id'], 'lastChecked' => $r['lastChecked'], 'found' => $found] + array_intersect_key($r, ['error' => 1, 'truncated' => 1, 'freshness' => 1]);
+}
+
 // Scan + persist one workspace. The merge re-reads the scan doc under its lock,
 // so two overlapping scans (cron + "Sprawdź teraz") both land.
 function scan_workspace($ws, $sources, $range) {
@@ -816,7 +1303,7 @@ function scan_workspace($ws, $sources, $range) {
         return [
           // error / truncated are persisted too, so a failed nightly scan is visible
           // in the UI next morning, not only to whoever clicked "Sprawdź teraz".
-          'sources' => array_merge($untouched, array_map(fn($r) => ['id' => $r['id'], 'lastChecked' => $r['lastChecked'], 'found' => $r['found']] + array_intersect_key($r, ['error' => 1, 'truncated' => 1, 'freshness' => 1]), $results)),
+          'sources' => array_merge($untouched, array_map(fn($r) => persisted_source_row($r, $prev['sources']), $results)),
           'history' => obj(merge_history($prev['history'] ?? [], $results, $fresh)),
           'lastRun' => $lastRun,
         ];
@@ -855,12 +1342,12 @@ function clean_source($s, $trim) {
   $s = is_array($s) ? $s : [];
   $str = $trim ? 'trimmed_or_null' : 'str_or_null';
   // EURLEX keeps publisher "EU" so it is routed to the SPARQL scanner, not a Dz.U. title search.
-  $reg = in_array($s['register'] ?? null, ['SAOS', 'SEJM', 'EURLEX', 'RCL'], true) ? $s['register'] : 'ELI';
+  $reg = in_array($s['register'] ?? null, REGISTERS, true) ? $s['register'] : 'ELI';
   return [
     'id' => is_numeric($s['id'] ?? null) ? +$s['id'] : null,
     'keyword' => $str($s['keyword'] ?? null),
     'title' => $str($s['title'] ?? null),
-    'publisher' => $reg === 'SEJM' ? 'SEJM' : ($reg === 'RCL' ? 'RCL' : ($reg === 'EURLEX' ? 'EU' : (($s['publisher'] ?? null) === 'MP' ? 'MP' : 'DU'))),
+    'publisher' => $reg === 'SEJM' ? 'SEJM' : ($reg === 'RCL' ? 'RCL' : ($reg === 'RIP' ? 'RIP' : ($reg === 'RIPCASE' ? 'RIPCASE' : ($reg === 'DIP' ? 'DIP' : ($reg === 'REFE' ? 'REFE' : ($reg === 'BAGRSS' ? 'BAGRSS' : ($reg === 'EURLEX' ? 'EU' : (($s['publisher'] ?? null) === 'MP' ? 'MP' : 'DU')))))))),
     'register' => $reg,
     'courtType' => in_array($s['courtType'] ?? null, SAOS_COURT_TYPES, true) ? $s['courtType'] : null,
     'judgmentTypes' => is_array($s['judgmentTypes'] ?? null) ? array_slice(array_values(array_filter($s['judgmentTypes'], fn($j) => in_array($j, SAOS_JUDGMENT_TYPES, true))), 0, 5) : [],
@@ -872,10 +1359,44 @@ function clean_source($s, $trim) {
 // ---- e-mail digest (port of _mail.js) ----------------------------------------------
 const MAX_QUEUE = 300;      // backlog kept while mail is not configured yet
 const MAX_PER_SECTION = 40;
-const WS_LABEL = ['hr' => 'HR', 'compliance' => 'Compliance', 'legal' => 'Dział prawny'];
-// Polish labels for EUR-Lex entry types (euType from eurlex_entries).
-const EU_TYPE_LABEL = ['act' => 'akt UE', 'proposal' => 'projekt Komisji (COM)', 'corrigendum' => 'sprostowanie'];
+// ---- backlog guard for the morning digest ---------------------------------------
+// WHY: while mail is not configured (or sending keeps failing) the queue fills up to
+// MAX_QUEUE items; the first digest after mail is switched on would then be a huge mail
+// of months-old news. HOW: only when the queue is a BACKLOG (more than DIGEST_BACKLOG_MIN
+// items) the digest keeps items whose document date ('ts', dd.mm.yyyy hh:mm) is at most
+// DIGEST_MAX_AGE_DAYS old (or has no date) and the mail says how many older ones were
+// skipped. A normal day's queue (a handful of items) is never trimmed, so a fresh find is
+// never lost silently. Skipped items leave the queue but stay in the app's history.
+// shortcut: age is judged by the document date, not by when it was queued (queued items
+// carry no queue time); upgrade by storing 'queuedAt' if that ever matters.
+const DIGEST_BACKLOG_MIN = 50;
+const DIGEST_MAX_AGE_DAYS = 30;
+// Mail texts (department names, EUR-Lex type labels, section titles ...) are in i18n.php.
+require_once __DIR__ . '/i18n.php';
+// Stage names that mean "reached parliament" — a draft entering one of them is urgent.
+// Kept as text because the entry's stage is stored as the source's own word
+// (PL 'Sejm', DE 'Bundestag'/'Bundesrat'); a source may also set stageCode 'parliament'.
+const ALERT_STAGE_WORDS = ['Sejm', 'Bundestag', 'Bundesrat'];
 const TEST_EVERY_S = 600;   // POST /api/notify: one test mail per department per 10 min
+
+/**
+ * Znaczniki „wpływ na HR" po słowach kluczowych w tytule (to samo co app/src/impactTags.js).
+ * To wskazówka, nie ocena prawna. Kropka w regexie zastępuje polską literę diakrytyczną;
+ * `[^\s]*` zamiast `\w*`, by nie zależeć od ustawień UCP.
+ * shortcut: lista zdublowana z JS; zmieniając regułę, zmień oba miejsca (testy mają te same przypadki).
+ * @return string[] identyfikatory (labor, gdpr, procurement, social, safety) w stałej kolejności
+ */
+function impact_tags(string $title): array {
+  static $rules = [
+    'labor' => '/kodeks[^\s]* pracy|\bprac(?:a\b|y\b|own|odaw)|wynagrodz|urlop|zwolnie|zatrudni|mobbing|\bsta[z\x{17c}]|zwi.zk[^\s]* zawodow/u',
+    'gdpr' => '/\brodo\b|ochron[^\s]* danych|dan[^\s]* osobow|prywatno/u',
+    'procurement' => '/zam.wie[^\s]* publiczn|prawo zam.wie/u',
+    'social' => '/\bzus\b|ubezpieczen[^\s]* spo.eczn|emerytur|zasi.k|chorobow|macierzy/u',
+    'safety' => '/\bbhp\b|bezpiecze[^\s]* i higien|wypadk[^\s]* przy pracy|badania lekarskie/u',
+  ];
+  $t = mb_strtolower($title);
+  return array_keys(array_filter($rules, fn($re) => preg_match($re, $t) === 1));
+}
 
 function hrbp_config() { static $c; return $c ??= (is_file(CONFIG_FILE) ? (require CONFIG_FILE) : []); }
 function smtp_configured() { return is_file(SMTP_FILE); }
@@ -889,6 +1410,17 @@ function recipients_for($ws) {
 function mask_email($e) { [$u, $d] = explode('@', $e, 2); return mb_substr($u, 0, 1) . "***@$d"; }
 function notify_status($ws, $doc) {
   return ['smtp' => smtp_configured(), 'recipients' => array_map('mask_email', recipients_for($ws)), 'queued' => count($doc['queue'] ?? []), 'lastSent' => $doc['lastSent'] ?? null, 'lastError' => $doc['lastError'] ?? null];
+}
+// Returns [items to mail, number of items skipped as old backlog].
+// `$today` is Y-m-d (a parameter so tests need no clock).
+function digest_trim($items, $today) {
+  if (count($items) <= DIGEST_BACKLOG_MIN) return [$items, 0];
+  $cut = shift_iso_days($today, -DIGEST_MAX_AGE_DAYS);
+  $kept = array_values(array_filter($items, function ($i) use ($cut) {
+    $d = to_iso_date($i['ts'] ?? '');
+    return !$d || $d >= $cut; // undated items are kept: better a stray line than a lost one
+  }));
+  return [$kept, count($items) - count($kept)];
 }
 function queue_for_digest($ws, $fresh) {
   if (!$fresh) return;
@@ -918,7 +1450,13 @@ function queue_for_digest($ws, $fresh) {
 // seen for the first time, so each stage change alerts exactly once.
 function is_alert_entry($f) {
   $e = $f['e'];
-  return ($e['kind'] ?? '') === 'draft' && (!empty($e['watched']) || mb_stripos((string)($e['stage'] ?? ''), 'Sejm') !== false);
+  // A bill that has just reached the Bundestag (DIP stageCode 'introduced') is as urgent as
+  // a draft entering parliament; later stages of a bill go to the digest only.
+  if (($e['kind'] ?? '') === 'bill' && ($e['stageCode'] ?? '') === 'introduced') return true;
+  if (($e['kind'] ?? '') !== 'draft') return false;
+  if (!empty($e['watched']) || ($e['stageCode'] ?? '') === 'parliament') return true;
+  foreach (ALERT_STAGE_WORDS as $w) if (mb_stripos((string)($e['stage'] ?? ''), $w) !== false) return true;
+  return false;
 }
 // Mails the urgent entries of one scan and returns the entries still to be queued for the
 // digest: everything non-urgent, plus the urgent ones if mail is not configured or failed.
@@ -927,63 +1465,66 @@ function send_alerts($ws, $fresh) {
   $urgent = array_values(array_filter($fresh, 'is_alert_entry'));
   $to = recipients_for($ws);
   if (!$urgent || !smtp_configured() || !$to) return $fresh;
-  $appUrl = rtrim((string)(hrbp_config()['app_url'] ?? 'https://radar.aospot.com'), '/') . "/app/#/$ws/feed";
+  $appUrl = app_link($ws);
   $lines = [];
   foreach ($urgent as $f) {
     $e = $f['e'];
     $lines[] = '- ' . ($e['note'] ?? '') . "\n  " . implode(' · ', array_filter([
-      !empty($e['stage']) ? "etap: {$e['stage']}" . (!empty($e['stageDate']) ? " ({$e['stageDate']})" : '') : null,
-      !empty($e['watched']) ? 'monitorowany' : null,
-      !empty($e['sejmPrint']['number']) ? "druk Sejmu nr {$e['sejmPrint']['number']}" : null,
+      !empty($e['stage']) ? mt('stage', ['stage' => $e['stage']]) . (!empty($e['stageDate']) ? " ({$e['stageDate']})" : '') : null,
+      !empty($e['watched']) ? mt('watched') : null,
+      !empty($e['sejmPrint']['number']) ? mt('print', ['number' => $e['sejmPrint']['number']]) : null,
       $e['applicant'] ?? null,
     ])) . (!empty($e['url']) ? "\n  {$e['url']}" : '');
   }
   $n = count($urgent);
-  $subject = 'ALERT Radar Legislacyjny (' . (WS_LABEL[$ws] ?? $ws) . '): ' . ($n === 1 ? 'zmiana etapu projektu' : "zmiana etapu $n projektów");
+  $subject = mt('alert.subject.' . plural_key($n), ['ws' => ws_label($ws), 'n' => $n]);
   try {
-    send_mail($to, ['subject' => $subject, 'text' => "$subject\n\n" . implode("\n\n", $lines) . "\n\nOtwórz w aplikacji: $appUrl\n\nAlert wysyła Radar Legislacyjny od razu po skanie, gdy monitorowany projekt zmieni etap lub trafi do Sejmu."]);
+    send_mail($to, ['subject' => $subject, 'text' => "$subject\n\n" . implode("\n\n", $lines) . ($appUrl ? "\n\n" . mt('open', ['url' => $appUrl]) : '') . "\n\n" . mt('alert.footer')]);
     return array_values(array_filter($fresh, fn($f) => !is_alert_entry($f)));
   } catch (Exception $e) {
     return $fresh;
   }
 }
 // Plain-text digest (smtp_mail sends text/plain) — the text part of buildDigest.
-function build_digest($ws, $items, $names) {
-  $appUrl = rtrim((string)(hrbp_config()['app_url'] ?? 'https://radar.aospot.com'), '/') . "/app/#/$ws/feed";
+function build_digest($ws, $items, $names, $skipped = 0) {
+  $appUrl = app_link($ws);
+  $of = fn($k) => array_values(array_filter($items, fn($i) => $i['kind'] === $k));
   $sections = array_filter([
-    ['Nowe i zmienione akty prawne', array_values(array_filter($items, fn($i) => $i['kind'] === 'act'))],
-    ['Projekty ustaw w Sejmie — nowy etap', array_values(array_filter($items, fn($i) => $i['kind'] === 'bill'))],
-    ['Projekty rządowe (RCL) — przed Sejmem', array_values(array_filter($items, fn($i) => $i['kind'] === 'draft'))],
-    ['Nowe orzeczenia sądów',array_values(array_filter($items, fn($i) => $i['kind'] === 'judgment'))],
-    ['Prawo UE (EUR-Lex) — akty i projekty Komisji', array_values(array_filter($items, fn($i) => $i['kind'] === 'eu'))],
+    [mt('sec.act'), $of('act')],
+    [mt('sec.bill'), $of('bill')],
+    [mt('sec.draft'), $of('draft')],
+    [mt('sec.judgment'), $of('judgment')],
+    [mt('sec.eu'), $of('eu')],
   ], fn($s) => $s[1]);
   $detail = fn($i) => implode(' · ', array_filter([
     $names[$i['sourceId']] ?? null,
-    $i['kind'] === 'bill' && !empty($i['stage']) ? "etap: {$i['stage']}" . (!empty($i['passed']) ? ' (uchwalona)' : '') : null,
+    $i['kind'] === 'bill' && !empty($i['stage']) ? mt('stage', ['stage' => $i['stage']]) . (!empty($i['passed']) ? mt('passed') : '') : null,
     $i['kind'] === 'judgment' ? implode(' · ', array_filter([$i['courtName'] ?? null, implode(', ', $i['caseNumbers'] ?? [])])) : null,
-    $i['kind'] === 'draft' ? implode(' · ', array_filter([!empty($i['stage']) ? "etap: {$i['stage']}" : null, !empty($i['wykazNumber']) ? "nr {$i['wykazNumber']}" : null, $i['applicant'] ?? null])) : null,
-    $i['kind'] === 'eu' ? implode(' · ', array_filter([EU_TYPE_LABEL[$i['euType'] ?? ''] ?? null, !empty($i['celex']) ? "CELEX {$i['celex']}" : null])) : null,
-    !empty($i['entryIntoForce']) ? "wejście w życie: {$i['entryIntoForce']}" : null,
-    !empty($i['ts']) ? explode(' ', $i['ts'])[0] : null,
+    $i['kind'] === 'draft' ? implode(' · ', array_filter([!empty($i['stage']) ? mt('stage', ['stage' => $i['stage']]) : null, !empty($i['wykazNumber']) ? mt('number', ['number' => $i['wykazNumber']]) : null, $i['applicant'] ?? null])) : null,
+    $i['kind'] === 'eu' ? implode(' · ', array_filter([!empty($i['euType']) ? mt('eu.' . $i['euType']) : null, !empty($i['celex']) ? "CELEX {$i['celex']}" : null])) : null,
+    !empty($i['entryIntoForce']) ? mt('inForce', ['date' => mail_date($i['entryIntoForce'])]) : null,
+    !empty($i['ts']) ? mail_date(explode(' ', $i['ts'])[0]) : null,
+    ($tg = impact_tags($i['title'] ?? '')) ? mt('impact', ['tags' => implode(', ', array_map(fn($x) => mt('tag.' . $x), $tg))]) : null,
   ]));
   $n = count($items);
-  $subject = 'Radar Legislacyjny (' . (WS_LABEL[$ws] ?? $ws) . "): $n " . ($n === 1 ? 'nowa pozycja' : 'nowych pozycji');
+  $subject = mt('subject.' . plural_key($n), ['ws' => ws_label($ws), 'n' => $n]);
   $parts = ["$subject\n"];
   foreach ($sections as [$title, $list]) {
     $lines = ["== $title (" . count($list) . ') =='];
     foreach (array_slice($list, 0, MAX_PER_SECTION) as $i) $lines[] = "- {$i['title']}\n  " . $detail($i) . (!empty($i['url']) ? "\n  {$i['url']}" : '');
-    $lines[] = count($list) > MAX_PER_SECTION ? '… i ' . (count($list) - MAX_PER_SECTION) . ' więcej w aplikacji' : '';
+    $lines[] = count($list) > MAX_PER_SECTION ? mt('more', ['n' => count($list) - MAX_PER_SECTION]) : '';
     $parts[] = implode("\n", $lines);
   }
-  $parts[] = "\nOtwórz w aplikacji: $appUrl";
-  $parts[] = 'Ten mail wysyła Radar Legislacyjny po codziennym skanie. Odbiorców zmienia administrator (notify_to w ~/private/hrbp-config.php).';
+  if ($skipped) $parts[] = mt('trimmed', ['n' => $skipped, 'days' => DIGEST_MAX_AGE_DAYS]);
+  if ($appUrl) $parts[] = "\n" . mt('open', ['url' => $appUrl]);
+  $parts[] = mt('footer');
   return ['subject' => $subject, 'text' => implode("\n\n", $parts)];
 }
 // smtp_mail takes one recipient and returns bool; any failure fails the whole send.
 // ponytail: a partial failure re-sends to everyone next time; track per-recipient if lists grow.
 function send_mail($to, $m) {
   require_once SMTP_FILE;
-  $failed = array_values(array_filter($to, fn($t) => !smtp_mail($t, $m['subject'], $m['text'], '', 'Radar Legislacyjny')));
+  $failed = array_values(array_filter($to, fn($t) => !smtp_mail($t, $m['subject'], $m['text'], '', mt('product'))));
   if ($failed) throw new Exception('send failed: ' . implode(', ', array_map('mask_email', $failed)));
 }
 function source_names($ws, $config) {
@@ -1000,17 +1541,23 @@ function send_digest($ws) {
     update_doc($ws, 'notify', function ($doc) use ($ws, $to, &$res) {
       $items = $doc['queue'] ?? [];
       if (!$items) { $res = ['sent' => false, 'reason' => 'nothing_new']; return null; }
+      [$items, $skipped] = digest_trim($items, gmdate('Y-m-d'));
+      if (!$items) { // whole queue was stale backlog: nothing worth mailing, just clear it
+        $doc['queue'] = [];
+        $res = ['sent' => false, 'reason' => 'nothing_new', 'skipped' => $skipped];
+        return $doc;
+      }
       try {
         $config = [];
         try { $config = load_doc($ws, 'config'); } catch (Exception $e) { /* names fall back to empty */ }
-        send_mail($to, build_digest($ws, $items, source_names($ws, $config)));
+        send_mail($to, build_digest($ws, $items, source_names($ws, $config), $skipped));
         $doc['queue'] = [];
         $doc['lastSent'] = iso_now();
         $doc['lastError'] = null;
       } catch (Exception $e) {
         $doc['lastError'] = mb_substr(substr(iso_now(), 0, 16) . ' ' . $e->getMessage(), 0, 300);
       }
-      $res = ['sent' => !$doc['lastError'], 'count' => count($items)] + ($doc['lastError'] ? ['error' => $doc['lastError']] : []);
+      $res = ['sent' => !$doc['lastError'], 'count' => count($items)] + ($skipped ? ['skipped' => $skipped] : []) + ($doc['lastError'] ? ['error' => $doc['lastError']] : []);
       return $doc;
     });
   } catch (Exception $e) {
@@ -1207,8 +1754,7 @@ try {
       $doc = update_doc($ws, 'notify', function ($doc) use ($to) {
         if (!empty($doc['lastTest']) && time() - strtotime($doc['lastTest']) < TEST_EVERY_S) out(429, ['error' => 'too_often', 'message' => 'One test mail per 10 minutes.']);
         $doc['lastTest'] = iso_now();
-        $text = 'To jest testowy mail z Radaru Legislacyjnego. Skoro dotarł, codzienne podsumowanie nowych zmian też dotrze.';
-        try { send_mail($to, ['subject' => 'Radar Legislacyjny: testowy mail', 'text' => $text]); $doc['lastError'] = null; }
+        try { send_mail($to, ['subject' => mt('test.subject'), 'text' => mt('test.body')]); $doc['lastError'] = null; }
         catch (Exception $e) { $doc['lastError'] = mb_substr(substr($doc['lastTest'], 0, 16) . ' ' . $e->getMessage(), 0, 300); }
         return $doc;
       });

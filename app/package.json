@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:de": "VITE_COUNTRY=de vite build",
+    "check:i18n": "node ../scripts/check-i18n.mjs",
+    "check:de-leaks": "node ../scripts/check-de-leaks.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

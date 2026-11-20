@@ -1,0 +1,11 @@
+{
+  "_meta": "SYNTHETIC — built by hand from the examples in the DIP OpenAPI v1.5 (search.dip.bundestag.de/api/v1/openapi.yaml), NOT a live answer (no API key available on 2026-11-20). Titles/ids invented. Replace with a recorded answer once a key exists.",
+  "numFound": 4,
+  "cursor": "AoJwgNjC_PYCMURydWNrc2FjaGUtMjQ5MjYw",
+  "documents": [
+    {"id": "900001", "typ": "Vorgang", "vorgangstyp": "Gesetzgebung", "wahlperiode": 21, "beratungsstand": "Noch nicht beraten", "initiative": ["Bundesregierung"], "datum": "2026-11-12", "aktualisiert": "2026-11-13T10:00:00+01:00", "titel": "Entwurf eines Gesetzes zur Stärkung der Entgelttransparenz (Beispiel)", "abstract": "Umsetzung der Richtlinie (EU) 2023/970 (synthetisch).", "gesta": "A999"},
+    {"id": "900002", "typ": "Vorgang", "vorgangstyp": "Gesetzgebung", "wahlperiode": 21, "beratungsstand": "Beschlussempfehlung liegt vor", "initiative": ["Fraktion der CDU/CSU", "Fraktion der SPD"], "datum": "2026-11-10", "aktualisiert": "2026-11-11T09:00:00+01:00", "titel": "Entwurf eines Gesetzes zur Änderung des Arbeitszeitgesetzes (Beispiel)"},
+    {"id": "900003", "typ": "Vorgang", "vorgangstyp": "Gesetzgebung", "wahlperiode": 21, "beratungsstand": "Verkündet", "initiative": ["Bundesregierung"], "datum": "2026-11-05", "aktualisiert": "2026-11-06T12:00:00+01:00", "titel": "Gesetz zur Änderung des Hinweisgeberschutzgesetzes (Beispiel)", "gesta": "B101"},
+    {"id": "900004", "typ": "Vorgang", "vorgangstyp": "Gesetzgebung", "wahlperiode": 21, "beratungsstand": "1. Durchgang im Bundesrat", "initiative": [], "datum": "2026-11-03", "aktualisiert": "2026-11-04T08:00:00+01:00", "titel": "Entwurf eines Lieferkettenstärkungsgesetzes (Beispiel)"}
+  ]
+}

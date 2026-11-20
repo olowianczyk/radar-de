@@ -10,6 +10,7 @@ import React from "react";
 import { Card, Badge, Switch, Icon, Button, IconButton, Input, Select, Hint } from "../components/index.js";
 import { tFor, isManualSource, SAOS_JUDGMENT_TYPES } from "../workspaces.js";
 import { fetchKeywords, sourceQueryUrl, sourceQueries, nextScanRange, LOOKBACK_DAYS } from "../isapIntegration.js";
+import { COUNTRY } from "../country.js";
 import { CoverageCard } from "../components/CoverageCard.jsx";
 import { ScanPeriod } from "../components/ScanPeriod.jsx";
 
@@ -81,7 +82,12 @@ function registerLabel(source, t) {
   if (source.register === "SAOS") return t.saos.register;
   if (source.register === "SEJM") return t.sejm.register;
   if (source.register === "EURLEX") return t.eu.register;
-  if (source.register === "RCL") return "RCL — projekty rządowe";
+  if (source.register === "RCL") return t.rclRegister;
+  if (source.register === "RIP") return t.ripRegister;
+  if (source.register === "RIPCASE") return t.ripcaseRegister;
+  if (source.register === "DIP") return t.dipRegister;
+  if (source.register === "REFE") return t.refeRegister;
+  if (source.register === "BAGRSS") return t.bagrssRegister;
   return source.publisher === "MP" ? t.scopeRegisterMP : t.scopeRegisterValue;
 }
 
@@ -153,7 +159,7 @@ function ScopePanel({ source, lang, t, thesaurus }) {
         ))}
         {source.url && (
           <a href={source.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--brand)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <Icon name="external-link" size={12} />{source.register === "SAOS" ? "SAOS" : source.register === "SEJM" ? "Sejm" : source.register === "EURLEX" ? "EUR-Lex" : source.register === "RCL" ? "RCL" : "ISAP"}
+            <Icon name="external-link" size={12} />{(COUNTRY.registers[source.register] || COUNTRY.registers.ELI || { name: source.register }).name}
           </a>
         )}
       </div>
@@ -295,7 +301,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
   const [search, setSearch] = React.useState("");
   const needle = search.trim().toLowerCase();
   const auto = allAuto.filter((s) => {
-    if (filter === "DU" && (s.register === "SAOS" || s.register === "SEJM" || s.register === "EURLEX" || s.register === "RCL" || s.publisher === "MP")) return false;
+    if (filter === "DU" && (s.register === "SAOS" || s.register === "SEJM" || s.register === "EURLEX" || s.register === "RCL" || s.register === "RIP" || s.register === "RIPCASE" || s.register === "DIP" || s.register === "REFE" || s.register === "BAGRSS" || s.publisher === "MP")) return false;
     if (filter === "EURLEX" && s.register !== "EURLEX") return false;
     if (filter === "SEJM" && s.register !== "SEJM") return false;
     if (filter === "MP" && s.publisher !== "MP") return false;
@@ -307,8 +313,8 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
   });
   const areaOrder = Object.keys(ws.areas);
   auto.sort((a, b) => areaOrder.indexOf(a.area) - areaOrder.indexOf(b.area));
-  const counts = { all: allAuto.length, DU: allAuto.filter((s) => s.register !== "SAOS" && s.register !== "SEJM" && s.register !== "EURLEX" && s.register !== "RCL" && s.publisher !== "MP").length, EURLEX: allAuto.filter((s) => s.register === "EURLEX").length, SEJM: allAuto.filter((s) => s.register === "SEJM").length, MP: allAuto.filter((s) => s.publisher === "MP").length, SAOS: allAuto.filter((s) => s.register === "SAOS").length, off: allAuto.filter((s) => !s.active).length, errors: allAuto.filter((s) => s.error).length };
-  const stripeFor = (s) => (s.register === "SAOS" ? "var(--info-600)" : s.register === "SEJM" ? "var(--warning-700)" : s.register === "EURLEX" ? "var(--success-600)" : s.register === "RCL" ? "var(--warning-600)" : s.publisher === "MP" ? "var(--warning-500)" : "var(--brand)");
+  const counts = { all: allAuto.length, DU: allAuto.filter((s) => s.register !== "SAOS" && s.register !== "SEJM" && s.register !== "EURLEX" && s.register !== "RCL" && s.register !== "RIP" && s.register !== "RIPCASE" && s.register !== "DIP" && s.register !== "REFE" && s.register !== "BAGRSS" && s.publisher !== "MP").length, EURLEX: allAuto.filter((s) => s.register === "EURLEX").length, SEJM: allAuto.filter((s) => s.register === "SEJM").length, MP: allAuto.filter((s) => s.publisher === "MP").length, SAOS: allAuto.filter((s) => s.register === "SAOS").length, off: allAuto.filter((s) => !s.active).length, errors: allAuto.filter((s) => s.error).length };
+  const stripeFor = (s) => (s.register === "SAOS" ? "var(--info-600)" : s.register === "SEJM" ? "var(--warning-700)" : s.register === "EURLEX" ? "var(--success-600)" : s.register === "RCL" ? "var(--warning-600)" : s.register === "RIP" ? "var(--brand)" : s.register === "RIPCASE" ? "var(--info-600)" : s.register === "DIP" ? "var(--warning-700)" : s.register === "REFE" ? "var(--warning-600)" : s.register === "BAGRSS" ? "var(--info-600)" : s.publisher === "MP" ? "var(--warning-500)" : "var(--brand)");
 
   const addSource = ({ name, mode, term, publisher, courtType, judgmentType, area }) => {
     const id = Math.max(1000, ...auto.map((s) => s.id)) + 1;
@@ -334,7 +340,7 @@ export function Sources({ lang, ws, backend, sources, setSources, sourceHistory,
         <p style={{ margin: 0, color: "var(--text-muted)", fontSize: 14 }}>{t.sourcesSub}</p>
         <Button variant="secondary" iconLeft={<Icon name="plus" size={16} />} disabled={backend !== "ok"} onClick={() => setAdding((v) => !v)}>{t.addSourceTitle}</Button>
       </div>
-      <CoverageCard t={t} ws={ws} sources={sources} />
+      <CoverageCard t={t} ws={ws} sources={sources} lang={lang} />
       <HowItWorks t={t} />
       {adding && <AddSourceForm t={t} ws={ws} thesaurus={thesaurus} onAdd={addSource} onCancel={() => setAdding(false)} />}
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>

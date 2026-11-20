@@ -277,7 +277,7 @@ function applyConfig(ws, base, config) {
     .filter((c) => !fromCatalogue.some((s) => s.id === c.id))
     .map((c) => {
       const o = overrides[String(c.id)];
-      return { ...c, url: c.register === "SAOS" ? "https://www.saos.org.pl/search" : c.register === "SEJM" ? "https://www.sejm.gov.pl/" : c.register === "RCL" ? "https://legislacja.rcl.gov.pl/" : "https://isap.sejm.gov.pl", publisher: c.register === "SAOS" ? "SAOS" : c.register === "SEJM" ? "SEJM" : c.register === "RCL" ? "RCL" : c.publisher, lastChecked: null, found: 0, scope: null, active: o && typeof o.active === "boolean" ? o.active : true };
+      return { ...c, url: c.register === "SAOS" ? "https://www.saos.org.pl/search" : c.register === "SEJM" ? "https://www.sejm.gov.pl/" : c.register === "RCL" ? "https://legislacja.rcl.gov.pl/" : c.register === "RIP" || c.register === "RIPCASE" ? "https://testphase.rechtsinformationen.bund.de" : c.register === "DIP" ? "https://dip.bundestag.de" : c.register === "REFE" ? "https://www.bmas.de" : c.register === "BAGRSS" ? "https://www.bundesarbeitsgericht.de" : "https://isap.sejm.gov.pl", publisher: c.register === "SAOS" ? "SAOS" : c.register === "SEJM" ? "SEJM" : c.register === "RCL" ? "RCL" : c.register === "RIP" ? "RIP" : c.register === "RIPCASE" ? "RIPCASE" : c.register === "DIP" ? "DIP" : c.register === "REFE" ? "REFE" : c.register === "BAGRSS" ? "BAGRSS" : c.publisher, lastChecked: null, found: 0, scope: null, active: o && typeof o.active === "boolean" ? o.active : true };
     });
   return [...fromCatalogue, ...extra];
 }
@@ -338,7 +338,7 @@ export function AppShell({ ws, setWorkspace, lang, setLang, active, setActive, c
   const [notify, setNotify] = React.useState(null);
   // Watched RCL drafts ("Monitoruj") — shared per department, followed by every scan.
   const [watch, setWatch] = React.useState([]);
-  const watchDraft = React.useCallback((action, query) => saveWatch(ws.id, action, query).then(setWatch).catch((e) => { reportError("Nie udało się zapisać listy monitorowanych", e); throw e; }), [ws.id, reportError]);
+  const watchDraft = React.useCallback((action, query) => saveWatch(ws.id, action, query).then(setWatch).catch((e) => { reportError(tFor(lang, ws).watchSaveError, e); throw e; }), [ws.id, reportError]);
   React.useEffect(() => {
     fetchPersistedState(ws.id).then((state) => {
       setBackend(state.storage ? "ok" : "storage");

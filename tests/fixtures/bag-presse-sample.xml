@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:wfw="http://wellformedweb.org/CommentAPI/" xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:atom="http://www.w3.org/2005/Atom" xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+  xmlns:slash="http://purl.org/rss/1.0/modules/slash/">
+  <channel>
+    <title>Das Bundesarbeitsgericht - Presse</title>
+    <atom:link href="https://www.bundesarbeitsgericht.de/feed/presse/neueste" rel="self" type="application/rss+xml" />
+    <link>https://www.bundesarbeitsgericht.de/</link>
+    <description>Der oberste Gerichtshof für das Gebiet der Arbeitsgerichtsbarkeit</description>
+    <lastBuildDate>Thu, 19 Nov 2026 11:37:37 +0000</lastBuildDate>
+    <language>de-DE</language>
+    <sy:updatePeriod>daily</sy:updatePeriod>
+    <sy:updateFrequency>1</sy:updateFrequency>
+    <generator>https://wordpress.org/?v=7.1.5</generator>
+
+<image>
+	<url>https://www.bundesarbeitsgericht.de/wp-content/uploads/2019/09/cropped-favicon-150x150.png</url>
+	<title>Das Bundesarbeitsgericht</title>
+	<link>https://www.bundesarbeitsgericht.de/</link>
+	<width>32</width>
+	<height>32</height>
+</image>
+<!-- REAL excerpt of https://www.bundesarbeitsgericht.de/feed/presse/neueste saved 2026-11-20 (first 3 items; content:encoded removed). Public data. -->
+<item>
+      <title>Sozialplan - Zeitpunkt der Betriebsratswahl</title>
+      <link>https://www.bundesarbeitsgericht.de/presse/sozialplan-zeitpunkt-der-betriebsratswahl/</link>
+      <pubDate>Tue, 17 Nov 2026 14:09:45 +0000</pubDate>
+      <dc:creator>Das Bundesarbeitsgericht</dc:creator>
+      <guid isPermaLink="false">https://www.bundesarbeitsgericht.de/presse/sozialplan-zeitpunkt-der-betriebsratswahl/</guid>
+      <description>
+        <![CDATA[Sozialplan - Zeitpunkt der Betriebsratswahl]]>
+      </description>
+      <content:encoded/>
+                </item>
+<item>
+      <title>Kündigung wegen Kirchenaustritts</title>
+      <link>https://www.bundesarbeitsgericht.de/presse/kuendigung-wegen-kirchenaustritts/</link>
+      <pubDate>Thu, 05 Nov 2026 14:19:57 +0000</pubDate>
+      <dc:creator>Das Bundesarbeitsgericht</dc:creator>
+      <guid isPermaLink="false">https://www.bundesarbeitsgericht.de/presse/kuendigung-wegen-kirchenaustritts/</guid>
+      <description>
+        <![CDATA[Kündigung wegen Kirchenaustritts]]>
+      </description>
+      <content:encoded/>
+                </item>
+<item>
+      <title>Frau Dr. Ursula Rinck neue Vorsitzende Richterin am Bundesarbeitsgericht</title>
+      <link>https://www.bundesarbeitsgericht.de/presse/frau-dr-ursula-rinck-neue-vorsitzende-richterin-am-bundesarbeitsgericht/</link>
+      <pubDate>Mon, 02 Nov 2026 10:45:56 +0000</pubDate>
+      <dc:creator>Das Bundesarbeitsgericht</dc:creator>
+      <guid isPermaLink="false">https://www.bundesarbeitsgericht.de/presse/frau-dr-ursula-rinck-neue-vorsitzende-richterin-am-bundesarbeitsgericht/</guid>
+      <description>
+        <![CDATA[Frau Dr. Ursula Rinck neue Vorsitzende Richterin am Bundesarbeitsgericht]]>
+      </description>
+      <content:encoded/>
+                </item>
+</channel></rss>

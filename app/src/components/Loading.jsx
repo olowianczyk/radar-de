@@ -1,11 +1,12 @@
 import React from "react";
+import { HRBP_I18N } from "../data.js";
 import { Icon } from "./core/Icon.jsx";
 
 export function LoadingState({ label }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "80px 20px", color: "var(--text-muted)", fontFamily: "var(--font-sans)" }}>
       <div className="hrbp-spin" style={{ width: 28, height: 28, borderRadius: "50%", border: "3px solid var(--border-default)", borderTopColor: "var(--brand)" }} />
-      <span style={{ fontSize: 13 }}>{label || "Ładowanie…"}</span>
+      <span style={{ fontSize: 13 }}>{label || (HRBP_I18N[document.documentElement.lang] || HRBP_I18N.en).loading}</span>
     </div>
   );
 }

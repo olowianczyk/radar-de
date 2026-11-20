@@ -1,0 +1,8 @@
+{
+ "startedAt": "2026-11-20T00:01:21Z",
+ "done": [
+  "A"
+ ],
+ "current": "B",
+ "notes": "iter3 (00:10Z): B1 gotowy - overlay app/src/i18n-de.js wpiety w tFor (tylko COUNTRY.id==='de'), check-de-leaks skanuje scalenie: 213->117 (data.js 0; zostaje Help 67, Features 32, CaseLaw 16, Settings 2) + 21 CODE Sources. check:i18n/build/build:de zielone. NASTEPNY KROK: Settings(2) potem CaseLaw(16), Features(32), Help(67), Sources(21). Nie sprawdzone: PL w przegladarce, UI DE wizualnie."
+}

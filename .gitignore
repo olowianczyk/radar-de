@@ -8,3 +8,7 @@ hr-business-partner-login-page/
 
 # Local Vercel CLI project link (vercel link / vercel deploy) — machine-specific, never committed
 .vercel/
+
+# nocny backup plików (kroki agenta)
+.nightbackup/
+.deploy.env

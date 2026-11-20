@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:wfw="http://wellformedweb.org/CommentAPI/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:sy="http://purl.org/rss/1.0/modules/syndication/" xmlns:slash="http://purl.org/rss/1.0/modules/slash/" >
+  <channel>
+    <title>Das Bundesarbeitsgericht - Entscheidung</title>
+    <atom:link href="https://www.bundesarbeitsgericht.de/feed/entscheidung/neueste" rel="self" type="application/rss+xml" />
+    <link>https://www.bundesarbeitsgericht.de/</link>
+    <description>Der oberste Gerichtshof für das Gebiet der Arbeitsgerichtsbarkeit</description>
+    <lastBuildDate>Thu, 19 Nov 2026 11:37:37 +0000</lastBuildDate>
+    <language>de-DE</language>
+    <sy:updatePeriod>daily</sy:updatePeriod>
+    <sy:updateFrequency>1</sy:updateFrequency>
+    <generator>https://wordpress.org/?v=7.1.5</generator>
+
+<image>
+	<url>https://www.bundesarbeitsgericht.de/wp-content/uploads/2019/09/cropped-favicon-150x150.png</url>
+	<title>Das Bundesarbeitsgericht</title>
+	<link>https://www.bundesarbeitsgericht.de/</link>
+	<width>32</width>
+	<height>32</height>
+</image>
+<!-- REAL excerpt of https://www.bundesarbeitsgericht.de/feed/entscheidung/neueste saved 2026-11-20 (first 3 items; content:encoded removed). Public data. -->
+<item>
+        <title>4 AZR 12/26</title>
+        <link>https://www.bundesarbeitsgericht.de/entscheidung/4-azr-12-26/</link>
+        <pubDate>Wed, 18 Nov 2026 00:00:00 +0000</pubDate>
+        <dc:creator>Das Bundesarbeitsgericht</dc:creator>
+        <guid isPermaLink="false">https://www.bundesarbeitsgericht.de/entscheidung/4-azr-12-26/</guid>
+        <description>
+          <![CDATA[Inflationsausgleichsprämie - Auslegung einer arbeitsvertraglichen Bezugnahmeklausel - dynamische oder statische Verweisung auf den jeweils für den Arbeitgeber geltenden Tarifvertrag - ergänzende Vertragsauslegung]]>
+        </description>
+        <content:encoded/>
+                      </item>
+<item>
+        <title>4 AZR 104/25</title>
+        <link>https://www.bundesarbeitsgericht.de/entscheidung/4-azr-104-25/</link>
+        <pubDate>Tue, 17 Nov 2026 00:00:00 +0000</pubDate>
+        <dc:creator>Das Bundesarbeitsgericht</dc:creator>
+        <guid isPermaLink="false">https://www.bundesarbeitsgericht.de/entscheidung/4-azr-104-25/</guid>
+        <description>
+          <![CDATA[Tarifkollision - Anwendbarkeit eines Tarifvertrags - Elementenfeststellungsklage - Feststellungsinteresse - Antragsänderung durch den Rechtsmittelgegner - einseitige Erledigungserklärung]]>
+        </description>
+        <content:encoded/>
+                      </item>
+<item>
+        <title>10 AZR 62/26</title>
+        <link>https://www.bundesarbeitsgericht.de/entscheidung/10-azr-62-26/</link>
+        <pubDate>Tue, 17 Nov 2026 00:00:00 +0000</pubDate>
+        <dc:creator>Das Bundesarbeitsgericht</dc:creator>
+        <guid isPermaLink="false">https://www.bundesarbeitsgericht.de/entscheidung/10-azr-62-26/</guid>
+        <description>
+          <![CDATA[Inflationsausgleichsprämie - Mindestlohn - Gleichbehandlung]]>
+        </description>
+        <content:encoded/>
+                      </item>
+</channel></rss>

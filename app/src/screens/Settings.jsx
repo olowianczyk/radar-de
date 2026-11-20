@@ -12,25 +12,28 @@ import { sendTestMail } from "../isapIntegration.js";
 // Screen-local strings for the notifications card (order: pl, en, de).
 const NOTIFY = {
   pl: {
-    title: "Powiadomienia e-mail", lead: "Codziennie po porannym skanie dział dostaje jeden mail z tym, co wykryto od poprzedniego: nowe i zmienione akty, nowe etapy projektów ustaw w Sejmie, orzeczenia. Bez nowości mail nie wychodzi.",
+    title: "Powiadomienia e-mail", lead: "Zbiorczy mail dla działu wychodzi raz dziennie, po porannym skanie (zwykle około 6:00 – dokładną godzinę ustala zadanie cron na serwerze): nowe i zmienione akty, nowe etapy projektów ustaw, orzeczenia wykryte od poprzedniego maila. Bez nowości mail nie wychodzi.",
+    alerts: "Alert natychmiastowy to osobny, krótki mail wysyłany od razu po skanie, gdy projekt ustawy z RCL wchodzi do parlamentu (Sejm) albo zmienia etap projekt, który monitorujesz na ekranie „Zmiany w przepisach”. Każda zmiana etapu daje alert tylko raz; wpisy z alertu nie powtarzają się już w porannym mailu. Jeśli wysyłka alertu się nie uda, wpis trafia do porannego zestawienia. Maile dostają adresy odbiorców danego działu (patrz „Odbiorcy”).",
     status: "Stan", on: "Włączone", off: "Nieskonfigurowane", smtp: "Serwer SMTP", smtpOk: "ustawiony", smtpMissing: "brak", to: "Odbiorcy", none: "brak",
     queued: "Czeka na najbliższy mail", lastSent: "Ostatnio wysłano", never: "jeszcze nie", lastError: "Ostatni błąd",
     test: "Wyślij testowy mail", testing: "Wysyłam…", testOk: "Wysłano testowy mail.",
-    setup: "Konfiguracja (administrator, w Vercel → Settings → Environment Variables): SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM oraz NOTIFY_TO (adresy po przecinku) albo NOTIFY_TO_HR / NOTIFY_TO_COMPLIANCE / NOTIFY_TO_LEGAL dla jednego działu. Po zmianie potrzebny redeploy.",
+    setup: "Konfiguracja (administrator, na serwerze): dane SMTP w pliku smtp.php, a odbiorcy w hrbp-config.php – notify_to (adresy po przecinku, dla wszystkich działów) albo notify_to_hr / notify_to_compliance / notify_to_legal dla jednego działu; ustawienie działu ma pierwszeństwo.",
   },
   en: {
-    title: "E-mail notifications", lead: "Every day after the morning scan the department gets one e-mail with what was detected since the previous one: new and amended acts, new stages of bills in the Sejm, judgments. Nothing new, no e-mail.",
+    title: "E-mail notifications", lead: "The department gets one collective e-mail a day, after the morning scan (usually around 6:00 – the exact time is set by the cron job on the server): new and amended acts, new stages of bills, judgments detected since the previous e-mail. Nothing new, no e-mail.",
+    alerts: "An immediate alert is a separate, short e-mail sent right after a scan when a government draft enters parliament, or when a draft you monitor on the “Legal changes” screen changes stage. Each stage change alerts only once; alerted entries are not repeated in the morning e-mail. If the alert cannot be sent, the entry goes into the morning digest. E-mails go to the department’s recipients (see “Recipients”).",
     status: "Status", on: "On", off: "Not configured", smtp: "SMTP server", smtpOk: "set", smtpMissing: "missing", to: "Recipients", none: "none",
     queued: "Waiting for the next e-mail", lastSent: "Last sent", never: "not yet", lastError: "Last error",
     test: "Send a test e-mail", testing: "Sending…", testOk: "Test e-mail sent.",
-    setup: "Setup (administrator, in Vercel → Settings → Environment Variables): SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM and NOTIFY_TO (comma-separated addresses) or NOTIFY_TO_HR / NOTIFY_TO_COMPLIANCE / NOTIFY_TO_LEGAL for one department. Redeploy after a change.",
+    setup: "Setup (administrator, on the server): SMTP details in the file smtp.php, recipients in hrbp-config.php – notify_to (comma-separated addresses, all departments) or notify_to_hr / notify_to_compliance / notify_to_legal for one department; the department setting wins.",
   },
   de: {
-    title: "E-Mail-Benachrichtigungen", lead: "Jeden Tag nach dem Morgenscan erhält die Abteilung eine E-Mail mit allem, was seit der letzten erkannt wurde: neue und geänderte Akte, neue Stufen von Gesetzentwürfen im Sejm, Urteile. Nichts Neues, keine E-Mail.",
+    title: "E-Mail-Benachrichtigungen", lead: "Die Abteilung erhält einmal täglich nach dem Morgenscan eine Sammel-E-Mail (meist gegen 6:00 Uhr – die genaue Zeit legt der Cron-Job auf dem Server fest): neue und geänderte Akte, neue Stufen von Gesetzentwürfen, Urteile seit der letzten E-Mail. Nichts Neues, keine E-Mail.",
+    alerts: "Ein Sofortalarm ist eine eigene, kurze E-Mail direkt nach einem Scan, wenn ein Gesetzentwurf das Parlament erreicht oder ein von Ihnen beobachteter Entwurf die Stufe wechselt. Jeder Stufenwechsel löst nur einmal einen Alarm aus; alarmierte Einträge erscheinen nicht erneut in der Morgen-E-Mail. Schlägt der Versand fehl, landet der Eintrag in der Morgenübersicht. Die E-Mails gehen an die Empfänger der Abteilung (siehe „Empfänger“).",
     status: "Status", on: "Aktiv", off: "Nicht eingerichtet", smtp: "SMTP-Server", smtpOk: "eingerichtet", smtpMissing: "fehlt", to: "Empfänger", none: "keine",
     queued: "Wartet auf die nächste E-Mail", lastSent: "Zuletzt gesendet", never: "noch nicht", lastError: "Letzter Fehler",
     test: "Test-E-Mail senden", testing: "Wird gesendet…", testOk: "Test-E-Mail gesendet.",
-    setup: "Einrichtung (Administrator, in Vercel → Settings → Environment Variables): SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM sowie NOTIFY_TO (Adressen mit Komma) oder NOTIFY_TO_HR / NOTIFY_TO_COMPLIANCE / NOTIFY_TO_LEGAL für eine Abteilung. Danach neu deployen.",
+    setup: "Einrichtung (Administrator, auf dem Server): SMTP-Zugangsdaten in der Datei smtp.php, Empfänger in hrbp-config.php – notify_to (Adressen mit Komma, alle Abteilungen) oder notify_to_hr / notify_to_compliance / notify_to_legal für eine Abteilung; die Abteilungseinstellung hat Vorrang.",
   },
 };
 
@@ -52,6 +55,7 @@ function NotifyCard({ lang, ws, backend, notify, setNotify }) {
   return (
     <Card padding="lg" header={n.title}>
       <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 6px", lineHeight: 1.5 }}>{n.lead}</p>
+      <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "0 0 6px", lineHeight: 1.5 }}>{n.alerts}</p>
       <Row label={n.status}><Badge tone={configured ? "green" : "neutral"}>{configured ? n.on : n.off}</Badge></Row>
       {notify && (
         <>

@@ -27,6 +27,9 @@
 // Ids are stable per workspace: persisted history is keyed by them. After any
 // change run `node scripts/sync-sources.mjs` to regenerate api/_sources.js.
 import { HRBP_I18N } from "./data.js";
+import { COUNTRY } from "./country.js";
+import { WORKSPACES_DE } from "./workspaces-de.js";
+import { I18N_DE_OVERRIDES, mergeDeep } from "./i18n-de.js";
 
 const ISAP = "https://isap.sejm.gov.pl";
 const TONES = ["brand", "blue", "amber", "green", "neutral"];
@@ -92,7 +95,7 @@ const NOTE_EU_NOT_DU = tr("Rozporządzenia UE nie są publikowane w Dz.U. — ic
 const NOTE_NOT_ENACTED = tr("Ustawa może jeszcze nie istnieć (projekt). Źródło złapie ją w dniu publikacji w Dz.U.", "The act may not exist yet (draft). This source will catch it the day it appears in Dz.U.", "Das Gesetz existiert ggf. noch nicht (Entwurf). Diese Quelle erfasst es am Tag der Verkündung.");
 const NOTE_PHASE3 = tr("Faza 3 wg dokumentu wymagań — włącz, jeśli dotyczy profilu działalności.", "Phase 3 per the requirements document — switch on if relevant to the business profile.", "Phase 3 laut Anforderungsdokument — einschalten, wenn für das Geschäftsprofil relevant.");
 
-export const WORKSPACES = [
+export const WORKSPACES_PL = [
   {
     id: "hr",
     icon: "users",
@@ -394,6 +397,9 @@ export const WORKSPACES = [
   },
 ];
 
+// The instance chosen at build time (country.js): PL = the list above, unchanged; DE = workspaces-de.js.
+export { WORKSPACES_DE };
+export const WORKSPACES = COUNTRY.id === "de" ? WORKSPACES_DE : WORKSPACES_PL;
 export const WORKSPACE_IDS = WORKSPACES.map((w) => w.id);
 export const DEFAULT_WORKSPACE = "hr";
 
@@ -430,7 +436,11 @@ export function areaTone(ws, area) {
 // Workspace-aware strings: the shared UI dictionary plus this workspace's area
 // labels and subtitle, so screens keep calling `t.area[x]` / `t.app` unchanged.
 export function tFor(lang, ws) {
-  const base = HRBP_I18N[lang] || HRBP_I18N.pl;
+  // W buildzie DE nakladamy overlay (i18n-de.js) na slownik bazowy: teksty o
+  // Sejmie/SAOS/ISAP/RCL nie moga dotrzec do uzytkownika DE. Build PL nigdy
+  // nie wchodzi w ta galaz, wiec niemiecki/angielski interfejs PL zostaje bez zmian.
+  const raw = HRBP_I18N[lang] || HRBP_I18N.pl;
+  const base = COUNTRY.id === "de" && I18N_DE_OVERRIDES[lang] ? mergeDeep(raw, I18N_DE_OVERRIDES[lang]) : raw;
   const area = {};
   Object.entries(ws.areas).forEach(([k, v]) => { area[k] = v[lang] || v.pl; });
   return { ...base, area, app: ws.title[lang] || ws.title.pl, kbSub: ws.kbSub[lang] || ws.kbSub.pl, wsLabel: ws.label[lang] || ws.label.pl };

@@ -4,6 +4,8 @@
 import React from "react";
 import { Card, Icon } from "./index.js";
 import { isManualSource } from "../workspaces.js";
+import { COUNTRY } from "../country.js";
+import { COVERAGE_DE, COVERAGE_DE_MATRIX, coverageStatsDe } from "../coverage-de.js";
 
 const MARK = {
   auto: { icon: "check-circle-2", color: "var(--success-600)", bg: "var(--success-100)" },
@@ -43,9 +45,12 @@ function fill(s, v) {
   return Object.entries(v).reduce((acc, [k, val]) => acc.replace(`{${k}}`, String(val)), s);
 }
 
-export function CoverageCard({ t, ws, sources, variant = "full" }) {
-  const c = t.coverage;
-  const st = coverageStats(ws, sources);
+export function CoverageCard({ t, ws, sources, variant = "full", lang = "de" }) {
+  // DE build: own texts/matrix/stats (the shared ones describe the Polish registers).
+  const de = COUNTRY.id === "de";
+  const c = de ? COVERAGE_DE[lang] || COVERAGE_DE.en : t.coverage;
+  const list = sources || ws.sources.map((s) => ({ ...s, active: s.kind === "manual" ? false : s.active !== false }));
+  const st = de ? coverageStatsDe(list, isManualSource) : coverageStats(ws, sources);
   const compact = variant === "compact";
   return (
     <Card padding={compact ? "md" : "lg"} style={{ borderColor: "var(--brand)", borderWidth: 1 }}>
@@ -68,7 +73,7 @@ export function CoverageCard({ t, ws, sources, variant = "full" }) {
       </div>
       {!compact && (
         <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 8 }}>
-          {MATRIX.map(([key, level]) => {
+          {(de ? COVERAGE_DE_MATRIX : MATRIX).map(([key, level]) => {
             const m = MARK[level];
             return (
               <div key={key} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 12px", borderRadius: "var(--radius-sm)", background: "var(--surface-sunken)" }}>

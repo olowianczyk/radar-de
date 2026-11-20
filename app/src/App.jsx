@@ -7,6 +7,7 @@ import { Settings } from "./screens/Settings.jsx";
 import { Help } from "./screens/Help.jsx";
 import { Features } from "./screens/Features.jsx";
 import { CaseLaw } from "./screens/CaseLaw.jsx";
+import { DEFAULT_LANG } from "./country.js";
 import { WORKSPACE_IDS, DEFAULT_WORKSPACE, getWorkspace } from "./workspaces.js";
 
 const SCREENS = ["feed", "kb", "sources", "caselaw", "features", "help", "settings"];
@@ -37,9 +38,9 @@ function useHashRoute() {
 
 function useLang() {
   const [lang, setLang] = React.useState(() => {
-    try { return ["pl", "de", "en"].includes(localStorage.getItem("hrbp-lang")) ? localStorage.getItem("hrbp-lang") : "pl"; } catch (e) { return "pl"; }
+    try { return ["pl", "de", "en"].includes(localStorage.getItem("hrbp-lang")) ? localStorage.getItem("hrbp-lang") : DEFAULT_LANG; } catch (e) { return DEFAULT_LANG; }
   });
-  React.useEffect(() => { try { localStorage.setItem("hrbp-lang", lang); } catch (e) {} }, [lang]);
+  React.useEffect(() => { document.documentElement.lang = lang; try { localStorage.setItem("hrbp-lang", lang); } catch (e) {} }, [lang]);
   return [lang, setLang];
 }
 

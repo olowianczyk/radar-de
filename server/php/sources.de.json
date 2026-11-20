@@ -1,0 +1,228 @@
+{
+ "hr": [
+  {
+   "id": 1001,
+   "title": "arbeitszeitgesetz|mindestlohngesetz",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1002,
+   "title": "teilzeit- und befristungsgesetz|nachweisgesetz|arbeitnehmerüberlassungsgesetz",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1003,
+   "title": "kündigungsschutzgesetz|mutterschutzgesetz|entgeltfortzahlungsgesetz|bundesurlaubsgesetz|elternzeitgesetz",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1004,
+   "title": "betriebsverfassungsgesetz|tarifvertragsgesetz|mitbestimmungsgesetz",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1005,
+   "title": "arbeitsschutzgesetz|arbeitssicherheitsgesetz|arbeitsstättenverordnung",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1006,
+   "title": "allgemeines gleichbehandlungsgesetz|entgelttransparenzgesetz",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1007,
+   "title": "betriebsrentengesetz|sozialgesetzbuch",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1051,
+   "title": "entgelttransparenz|2023/970",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1052,
+   "title": "arbeitsbedingungen in der plattformarbeit|2024/2831",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1053,
+   "title": "angemessene mindestlöhne|2022/2041",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1090,
+   "title": "arbeit|entgelt|mindestlohn|betriebsverfassung|kündigung|tarif|beschäftigt",
+   "publisher": "DIP",
+   "register": "DIP",
+   "active": false
+  },
+  {
+   "id": 1092,
+   "publisher": "RIPCASE",
+   "register": "RIPCASE",
+   "court": "BAG"
+  },
+  {
+   "id": 1093,
+   "publisher": "BAGRSS",
+   "register": "BAGRSS",
+   "feed": "presse"
+  }
+ ],
+ "compliance": [
+  {
+   "id": 1101,
+   "title": "hinweisgeberschutzgesetz|hinschg",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1102,
+   "title": "lieferkettensorgfaltspflichtengesetz",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1103,
+   "title": "bundesdatenschutzgesetz|ttdsg",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1104,
+   "title": "geldwäschegesetz",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1105,
+   "title": "bsi-gesetz",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1106,
+   "title": "gesetz gegen wettbewerbsbeschränkungen",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1151,
+   "title": "sorgfaltspflichten von unternehmen|2024/1760",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1152,
+   "title": "2016/679",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1153,
+   "title": "2024/1689",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1154,
+   "title": "2022/2555",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1155,
+   "title": "2019/1937",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1156,
+   "title": "2022/2464",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1157,
+   "title": "2024/1624",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1190,
+   "title": "hinweisgeber|datenschutz|geldwäsche|lieferkette|sorgfaltspflicht|nachhaltigkeitsberichterstattung|korruption",
+   "publisher": "DIP",
+   "register": "DIP",
+   "active": false
+  }
+ ],
+ "legal": [
+  {
+   "id": 1201,
+   "title": "bürgerliches gesetzbuch",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1202,
+   "title": "handelsgesetzbuch",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1203,
+   "title": "gesellschaften mit beschränkter haftung|aktiengesetz",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1204,
+   "title": "zivilprozessordnung",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1205,
+   "title": "insolvenzordnung|restrukturierungsgesetz",
+   "publisher": "RIP",
+   "register": "RIP"
+  },
+  {
+   "id": 1251,
+   "title": "2023/2854|2022/1925",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1252,
+   "title": "2024/2853",
+   "publisher": "EU",
+   "register": "EURLEX"
+  },
+  {
+   "id": 1290,
+   "title": "handelsgesetzbuch|gesellschaft|produkthaftung|bürgerliches gesetzbuch|zivilprozess|insolvenz|verbraucher",
+   "publisher": "DIP",
+   "register": "DIP",
+   "active": false
+  },
+  {
+   "id": 1292,
+   "title": "geschäftsführer|gesellschafterbeschluss|allgemeine geschäftsbedingungen|produkthaftung",
+   "publisher": "RIPCASE",
+   "register": "RIPCASE",
+   "court": "BGH"
+  }
+ ]
+}
